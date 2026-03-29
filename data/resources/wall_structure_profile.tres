@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="StructureProfile" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/structure_profile.gd" id="1_profile"]
+[ext_resource type="Script" path="res://scripts/data/damage_type_modifier.gd" id="2_modifier"]
+
+[sub_resource type="Resource" id="1"]
+script = ExtResource("2_modifier")
+damage_type = &"impact"
+flat_reduction = 4
+multiplier = 1.0
+
+[resource]
+script = ExtResource("1_profile")
+profile_id = &"wall"
+damaged_max_hp = 120
+reinforced_max_hp = 240
+damaged_repair_salvage_cost = 2
+reinforced_repair_salvage_cost = 3
+strengthen_salvage_cost = 6
+strengthen_parts_cost = 2
+default_flat_reduction = 2
+default_multiplier = 1.0
+damage_modifiers = Array[ExtResource("2_modifier")]([SubResource("1")])
+interaction_priority = 10
+damaged_color = Color(0.57, 0.45, 0.35, 1)
+reinforced_color = Color(0.48, 0.68, 0.72, 1)
+breached_color = Color(0.24, 0.18, 0.18, 1)

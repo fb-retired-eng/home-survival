@@ -1,31 +1,52 @@
 extends StaticBody2D
 class_name DefenseSocket
 
+const WALL_BLOCKER_LAYER := 2
+const DOOR_BLOCKER_LAYER := 4
+const STRUCTURE_PROFILE_SCRIPT := preload("res://scripts/data/structure_profile.gd")
+
+signal state_changed(socket: DefenseSocket)
+
 @export var socket_id: StringName
 @export_enum("wall", "door") var socket_type: String = "wall"
 @export_enum("damaged", "reinforced") var tier: String = "damaged"
 @export var current_hp: int = 90
 @export var max_hp: int = 90
+@export var structure_profile: Resource
 @export var socket_size: Vector2 = Vector2(48, 16)
+@export var interaction_area_offset: Vector2 = Vector2.ZERO
+@export var interaction_area_size: Vector2 = Vector2(48, 24)
+@export var show_label: bool = false
 
 @onready var visual: Polygon2D = $Visual
 @onready var label: Label = $Label
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
+@onready var interaction_area: Area2D = $InteractionArea
+@onready var interaction_shape: CollisionShape2D = $InteractionArea/CollisionShape2D
 
 var _initial_tier: String = "damaged"
 var _initial_hp: int = 90
+var _context_label_visible: bool = false
 
 
 func _ready() -> void:
 	add_to_group("defense_sockets")
+	if collision_shape.shape != null:
+		collision_shape.shape = collision_shape.shape.duplicate()
+	if interaction_shape.shape != null:
+		interaction_shape.shape = interaction_shape.shape.duplicate()
 	_initial_tier = tier
 	max_hp = _get_max_hp_for_tier(tier)
 	_initial_hp = clamp(current_hp, 0, max_hp)
 	current_hp = clamp(current_hp, 0, max_hp)
+	z_index = int(round(global_position.y))
 	_refresh_visuals()
 
 
 func get_interaction_label(player) -> String:
+	if not _has_structure_profile():
+		return ""
+
 	var action := _get_available_action()
 	match action:
 		"repair":
@@ -43,10 +64,34 @@ func get_interaction_label(player) -> String:
 
 
 func can_interact(_player) -> bool:
+	if not _has_structure_profile():
+		return false
 	return _get_available_action() != ""
 
 
+func get_interaction_priority(_player) -> int:
+	if _has_structure_profile():
+		return int(structure_profile.interaction_priority)
+	return 10
+
+
+func is_direct_interactable() -> bool:
+	return false
+
+
+func set_context_label_visible(visible: bool) -> void:
+	if _context_label_visible == visible:
+		return
+
+	_context_label_visible = visible
+	label.visible = show_label or _context_label_visible
+
+
 func interact(player) -> void:
+	if not _has_structure_profile():
+		player.message_requested.emit("Socket config missing")
+		return
+
 	var action := _get_available_action()
 	if action.is_empty():
 		return
@@ -75,8 +120,13 @@ func take_damage(amount: int, _source: Variant = null) -> void:
 	if amount <= 0:
 		return
 
-	current_hp = max(current_hp - amount, 0)
+	var damage_amount := _resolve_damage_taken(amount, _source)
+	if damage_amount <= 0:
+		return
+
+	current_hp = max(current_hp - damage_amount, 0)
 	_refresh_visuals()
+	_flash_damage_feedback()
 
 
 func is_breached() -> bool:
@@ -91,6 +141,9 @@ func reset_for_new_run() -> void:
 
 
 func _get_available_action() -> String:
+	if not _has_structure_profile():
+		return ""
+
 	if tier == "damaged":
 		if current_hp < _get_max_hp_for_tier("damaged"):
 			return "repair"
@@ -103,38 +156,24 @@ func _get_available_action() -> String:
 
 
 func _get_max_hp_for_tier(target_tier: String) -> int:
-	if socket_type == "door":
-		if target_tier == "reinforced":
-			return 130
-		return 60
-
-	if target_tier == "reinforced":
-		return 180
-	return 90
+	if _has_structure_profile():
+		return int(structure_profile.get_max_hp_for_tier(target_tier))
+	push_warning("DefenseSocket %s is missing structure_profile for max HP lookup" % socket_id)
+	return max_hp
 
 
 func _get_repair_cost() -> Dictionary:
-	if tier == "reinforced":
-		if socket_type == "door":
-			return {"salvage": 2}
-		return {"salvage": 3}
-
-	if socket_type == "door":
-		return {"salvage": 1}
-	return {"salvage": 2}
+	if _has_structure_profile():
+		return structure_profile.get_repair_cost(tier)
+	push_warning("DefenseSocket %s is missing structure_profile for repair cost lookup" % socket_id)
+	return {}
 
 
 func _get_strengthen_cost() -> Dictionary:
-	if socket_type == "door":
-		return {
-			"salvage": 4,
-			"parts": 1,
-		}
-
-	return {
-		"salvage": 6,
-		"parts": 2,
-	}
+	if _has_structure_profile():
+		return structure_profile.get_strengthen_cost()
+	push_warning("DefenseSocket %s is missing structure_profile for strengthen cost lookup" % socket_id)
+	return {}
 
 
 func _format_cost(cost: Dictionary) -> String:
@@ -152,18 +191,14 @@ func _refresh_visuals() -> void:
 	max_hp = target_max_hp
 	current_hp = clamp(current_hp, 0, max_hp)
 	collision_shape.disabled = current_hp <= 0
+	collision_layer = _get_collision_layer_for_state()
 	_apply_socket_geometry()
 
-	if current_hp <= 0:
-		visual.color = Color(0.24, 0.18, 0.18, 1.0)
-	elif tier == "reinforced":
-		visual.color = Color(0.48, 0.68, 0.72, 1.0)
-	elif socket_type == "door":
-		visual.color = Color(0.74, 0.49, 0.26, 1.0)
-	else:
-		visual.color = Color(0.57, 0.45, 0.35, 1.0)
+	visual.color = _get_visual_color()
 
 	label.text = "%s %d/%d" % [socket_id, current_hp, max_hp]
+	label.visible = show_label or _context_label_visible
+	state_changed.emit(self)
 
 
 func _apply_socket_geometry() -> void:
@@ -171,6 +206,11 @@ func _apply_socket_geometry() -> void:
 	var rectangle_shape := collision_shape.shape as RectangleShape2D
 	if rectangle_shape != null:
 		rectangle_shape.size = socket_size
+
+	var interaction_rectangle := interaction_shape.shape as RectangleShape2D
+	if interaction_rectangle != null:
+		interaction_rectangle.size = interaction_area_size
+	interaction_area.position = interaction_area_offset
 
 	visual.polygon = PackedVector2Array([
 		Vector2(-half_size.x, -half_size.y),
@@ -183,3 +223,51 @@ func _apply_socket_geometry() -> void:
 	label.offset_top = half_size.y + 8.0
 	label.offset_right = max(half_size.x + 24.0, 48.0)
 	label.offset_bottom = label.offset_top + 20.0
+
+
+func _get_collision_layer_for_state() -> int:
+	if current_hp <= 0:
+		return 0
+
+	if socket_type == "door":
+		return DOOR_BLOCKER_LAYER
+	
+	return WALL_BLOCKER_LAYER
+
+
+func _resolve_damage_taken(base_damage: int, source: Variant) -> int:
+	var damage_type := StringName(&"impact")
+	if source is Dictionary:
+		damage_type = StringName(source.get("damage_type", &"impact"))
+
+	if _has_structure_profile():
+		return int(structure_profile.compute_damage_taken(base_damage, damage_type))
+
+	return base_damage
+
+
+func _has_structure_profile() -> bool:
+	return structure_profile != null and structure_profile.get_script() == STRUCTURE_PROFILE_SCRIPT
+
+
+func _get_visual_color() -> Color:
+	if not _has_structure_profile():
+		return Color(0.57, 0.45, 0.35, 1.0)
+
+	if current_hp <= 0:
+		return structure_profile.breached_color
+
+	if tier == "reinforced":
+		return structure_profile.reinforced_color
+
+	return structure_profile.damaged_color
+
+
+func _flash_damage_feedback() -> void:
+	if current_hp <= 0:
+		return
+
+	var settled_color := visual.color
+	visual.color = Color(1.0, 0.56, 0.42, 1.0)
+	var tween := create_tween()
+	tween.tween_property(visual, "color", settled_color, 0.16)

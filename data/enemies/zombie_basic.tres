@@ -6,7 +6,13 @@
 script = ExtResource("1_enemy_definition")
 enemy_id = &"zombie_basic"
 max_health = 50
-move_speed = 70.0
+defense_flat_reduction = 0
+defense_multiplier = 1.0
+move_speed = 52.0
 player_damage = 10
-structure_damage = 10
-attack_interval = 1.0
+structure_damage = 7
+structure_damage_type = &"impact"
+attack_interval = 1.15
+drop_salvage = 1
+bonus_salvage = 1
+bonus_salvage_chance = 0.2

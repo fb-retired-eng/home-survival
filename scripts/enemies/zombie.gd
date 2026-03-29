@@ -2,15 +2,19 @@ extends CharacterBody2D
 class_name Zombie
 
 const EnemyDefinitionResource = preload("res://scripts/data/enemy_definition.gd")
+const ResourcePickupScene = preload("res://scenes/world/ResourcePickup.tscn")
 
 signal died(zombie: Zombie)
 
 @export var definition: EnemyDefinitionResource
 @export var enemy_id: StringName = &"zombie_basic"
 @export var max_health: int = 50
+@export var defense_flat_reduction: int = 0
+@export_range(0.0, 4.0, 0.05) var defense_multiplier: float = 1.0
 @export var move_speed: float = 70.0
 @export var player_damage: int = 10
 @export var structure_damage: int = 10
+@export var structure_damage_type: StringName = &"impact"
 @export var attack_cooldown: float = 1.0
 
 var current_health: int
@@ -20,6 +24,7 @@ var _behavior_context: StringName = &"exploration"
 var _wave_player
 var _wave_sockets: Array = []
 var _player_obstructing_this_frame: bool = false
+var _preferred_socket_ids: PackedStringArray = []
 
 @onready var body_visual: Polygon2D = $Body
 @onready var damage_area: Area2D = $DamageArea
@@ -32,10 +37,11 @@ func _ready() -> void:
 	_base_color = body_visual.color
 
 
-func configure_wave_context(player_ref, defense_sockets: Array) -> void:
+func configure_wave_context(player_ref, defense_sockets: Array, preferred_socket_ids: PackedStringArray = PackedStringArray()) -> void:
 	_behavior_context = &"wave"
 	_wave_player = player_ref
 	_wave_sockets = defense_sockets.duplicate()
+	_preferred_socket_ids = preferred_socket_ids
 
 
 func _physics_process(delta: float) -> void:
@@ -63,10 +69,15 @@ func take_damage(amount: int, _source: Variant = null) -> void:
 	if amount <= 0:
 		return
 
-	current_health = max(current_health - amount, 0)
+	var damage_amount := _resolve_damage_taken(amount, _source)
+	if damage_amount <= 0:
+		return
+
+	current_health = max(current_health - damage_amount, 0)
 	_flash_body(Color(1.0, 0.55, 0.55, 1.0))
 
 	if current_health == 0:
+		_spawn_death_drop()
 		died.emit(self)
 		queue_free()
 
@@ -95,11 +106,45 @@ func _get_attack_target(primary_target):
 
 
 func _get_closest_intact_socket():
-	var closest_socket = null
-	var best_distance := INF
+	var preferred_sockets := _get_intact_preferred_sockets()
+	if not preferred_sockets.is_empty():
+		return _get_closest_socket_from_list(preferred_sockets)
+
+	return _get_closest_socket_from_list(_wave_sockets)
+
+
+func _get_intact_preferred_sockets() -> Array:
+	var preferred_sockets: Array = []
+	if _preferred_socket_ids.is_empty():
+		return preferred_sockets
 
 	for socket in _wave_sockets:
 		if not is_instance_valid(socket):
+			continue
+
+		if not socket.is_in_group("defense_sockets"):
+			continue
+
+		if not _preferred_socket_ids.has(String(socket.socket_id)):
+			continue
+
+		if socket.has_method("is_breached") and socket.is_breached():
+			continue
+
+		preferred_sockets.append(socket)
+
+	return preferred_sockets
+
+
+func _get_closest_socket_from_list(socket_list: Array):
+	var closest_socket = null
+	var best_distance := INF
+
+	for socket in socket_list:
+		if not is_instance_valid(socket):
+			continue
+
+		if not socket.is_in_group("defense_sockets"):
 			continue
 
 		if socket.has_method("is_breached") and socket.is_breached():
@@ -136,7 +181,14 @@ func _try_damage_target(target) -> bool:
 	if not _is_target_in_damage_range(target):
 		return false
 
-	target.take_damage(_get_damage_amount_for_target(target), self)
+	var damage_amount := _get_damage_amount_for_target(target)
+	if target.is_in_group("defense_sockets"):
+		target.take_damage(damage_amount, {
+			"attacker": self,
+			"damage_type": structure_damage_type,
+		})
+	else:
+		target.take_damage(damage_amount, self)
 	return true
 
 
@@ -174,10 +226,25 @@ func _apply_definition() -> void:
 
 	enemy_id = definition.enemy_id
 	max_health = definition.max_health
+	defense_flat_reduction = definition.defense_flat_reduction
+	defense_multiplier = definition.defense_multiplier
 	move_speed = definition.move_speed
 	player_damage = definition.player_damage
 	structure_damage = definition.structure_damage
+	structure_damage_type = definition.structure_damage_type
 	attack_cooldown = definition.attack_interval
+
+
+func _resolve_damage_taken(base_damage: int, source: Variant) -> int:
+	var damage_type := StringName(&"melee")
+	if source is Dictionary:
+		damage_type = StringName(source.get("damage_type", &"melee"))
+
+	if definition != null:
+		return int(definition.compute_damage_taken(base_damage, damage_type))
+
+	var reduced_damage: int = max(base_damage - defense_flat_reduction, 0)
+	return max(int(round(reduced_damage * defense_multiplier)), 0)
 
 
 func _is_player_between_target(primary_target) -> bool:
@@ -213,6 +280,29 @@ func _has_clear_line_to_player() -> bool:
 		return true
 
 	return hit.get("collider") == _wave_player
+
+
+func _spawn_death_drop() -> void:
+	if definition == null or definition.drop_salvage <= 0:
+		return
+
+	var drop_parent: Node = get_parent()
+	var world_node := get_tree().current_scene.get_node_or_null("World")
+	if world_node != null:
+		drop_parent = world_node
+
+	if drop_parent == null:
+		return
+
+	var pickup = ResourcePickupScene.instantiate()
+	var salvage_amount := definition.drop_salvage
+	if definition.bonus_salvage > 0 and randf() < definition.bonus_salvage_chance:
+		salvage_amount += definition.bonus_salvage
+
+	pickup.resource_id = "salvage"
+	pickup.amount = salvage_amount
+	drop_parent.add_child(pickup)
+	pickup.global_position = global_position
 
 
 func _flash_body(flash_color: Color) -> void:

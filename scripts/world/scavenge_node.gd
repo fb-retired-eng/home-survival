@@ -39,6 +39,10 @@ func can_interact(_player) -> bool:
 	return not is_depleted and not _is_searching
 
 
+func get_interaction_priority(_player) -> int:
+	return 20
+
+
 func interact(player) -> void:
 	if is_depleted or _is_searching:
 		return

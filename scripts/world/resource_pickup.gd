@@ -16,8 +16,10 @@ func _ready() -> void:
 func collect(player) -> void:
 	if player == null:
 		return
+	
+	if not player.add_resource(resource_id, amount):
+		return
 
-	player.add_resource(resource_id, amount)
 	queue_free()
 
 

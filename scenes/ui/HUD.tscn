@@ -1,42 +1,71 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_hud"]
+
+[sub_resource type="StyleBoxFlat" id="1_hud_panel"]
+bg_color = Color(0.06, 0.08, 0.09, 0.82)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.88, 0.92, 0.96, 0.12)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+content_margin_left = 16.0
+content_margin_top = 16.0
+content_margin_right = 16.0
+content_margin_bottom = 16.0
 
 [node name="HUD" type="CanvasLayer"]
 script = ExtResource("1_hud")
 
-[node name="MarginContainer" type="MarginContainer" parent="."]
+[node name="PanelContainer" type="PanelContainer" parent="."]
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 430.0
+offset_bottom = 300.0
+theme_override_styles/panel = SubResource("1_hud_panel")
+
+[node name="MarginContainer" type="MarginContainer" parent="PanelContainer"]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 20.0
-offset_top = 20.0
-offset_right = -20.0
-offset_bottom = -20.0
 
-[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="PanelContainer/MarginContainer"]
 theme_override_constants/separation = 12
 
-[node name="HealthLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="HealthLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer"]
 unique_name_in_owner = true
 text = "Health: 100 / 100"
 
-[node name="EnergyLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="EnergyLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer"]
 unique_name_in_owner = true
 text = "Energy: 100 / 100"
 
-[node name="WaveLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="WaveLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer"]
 unique_name_in_owner = true
 text = "Wave: 0 / 3"
 
-[node name="ResourcesLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="PhaseLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer"]
+unique_name_in_owner = true
+text = "Phase: Pre-Wave"
+
+[node name="BaseLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer"]
+unique_name_in_owner = true
+text = "Base: 6 intact, 0 breached"
+
+[node name="ResourcesLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer"]
 unique_name_in_owner = true
 text = "Salvage: 0   Parts: 0   Medicine: 0"
 
-[node name="StatusLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="StatusLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer"]
 unique_name_in_owner = true
-text = "MVP0 scaffold loaded"
+autowrap_mode = 3
+text = "Safe before first wave"
 
-[node name="InteractionLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="InteractionLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer"]
 unique_name_in_owner = true
-text = "Explore the placeholder map"
+autowrap_mode = 3
+text = ""

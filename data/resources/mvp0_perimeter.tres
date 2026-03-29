@@ -1,0 +1,52 @@
+[gd_resource type="Resource" script_class="BasePerimeterDefinition" load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/base_perimeter_definition.gd" id="1_base"]
+[ext_resource type="Script" path="res://scripts/data/perimeter_segment_definition.gd" id="2_segment"]
+[ext_resource type="Resource" path="res://data/resources/wall_structure_profile.tres" id="3_wall_profile"]
+[ext_resource type="Resource" path="res://data/resources/door_structure_profile.tres" id="4_door_profile"]
+
+[sub_resource type="Resource" id="1"]
+script = ExtResource("2_segment")
+socket_id = &"wall_n"
+position = Vector2(640, 208)
+current_hp = 120
+structure_profile = ExtResource("3_wall_profile")
+socket_size = Vector2(400, 24)
+interaction_area_offset = Vector2(0, 40)
+interaction_area_size = Vector2(400, 56)
+
+[sub_resource type="Resource" id="2"]
+script = ExtResource("2_segment")
+socket_id = &"wall_s"
+position = Vector2(640, 512)
+current_hp = 120
+structure_profile = ExtResource("3_wall_profile")
+socket_size = Vector2(400, 24)
+interaction_area_offset = Vector2(0, -40)
+interaction_area_size = Vector2(400, 56)
+
+[sub_resource type="Resource" id="3"]
+script = ExtResource("2_segment")
+socket_id = &"door_w"
+socket_type = "door"
+position = Vector2(428, 360)
+current_hp = 90
+structure_profile = ExtResource("4_door_profile")
+socket_size = Vector2(24, 280)
+interaction_area_offset = Vector2(40, 0)
+interaction_area_size = Vector2(56, 280)
+
+[sub_resource type="Resource" id="4"]
+script = ExtResource("2_segment")
+socket_id = &"door_e"
+socket_type = "door"
+position = Vector2(852, 360)
+current_hp = 90
+structure_profile = ExtResource("4_door_profile")
+socket_size = Vector2(24, 280)
+interaction_area_offset = Vector2(-40, 0)
+interaction_area_size = Vector2(56, 280)
+
+[resource]
+script = ExtResource("1_base")
+segments = Array[ExtResource("2_segment")]([SubResource("1"), SubResource("2"), SubResource("3"), SubResource("4")])

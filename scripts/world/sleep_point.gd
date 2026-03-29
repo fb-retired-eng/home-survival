@@ -26,6 +26,10 @@ func can_interact(player) -> bool:
 	return true
 
 
+func get_interaction_priority(_player) -> int:
+	return 100
+
+
 func interact(player) -> void:
 	if not can_interact(player):
 		return

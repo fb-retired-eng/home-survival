@@ -14,6 +14,7 @@ signal interaction_prompt_changed(text: String)
 @export var max_energy: int = 100
 @export var move_speed: float = 180.0
 @export var melee_damage: int = 25
+@export var melee_damage_type: StringName = &"melee"
 @export var melee_energy_cost: int = 5
 @export var melee_cooldown: float = 0.45
 @export var medicine_heal_amount: int = 35
@@ -61,22 +62,26 @@ func _ready() -> void:
 	action_timer.timeout.connect(_on_action_timer_timeout)
 	_emit_full_state()
 	_update_interaction_prompt()
+	_update_render_order()
 
 
 func _physics_process(delta: float) -> void:
 	if is_dead:
 		velocity = Vector2.ZERO
 		move_and_slide()
+		_update_render_order()
 		return
-
+	
 	if is_busy:
 		velocity = Vector2.ZERO
 		move_and_slide()
+		_update_render_order()
 		return
 
 	attack_cooldown_remaining = max(attack_cooldown_remaining - delta, 0.0)
 	_handle_movement()
 	move_and_slide()
+	_update_render_order()
 
 	if Input.is_action_just_pressed("interact"):
 		_attempt_interact()
@@ -251,18 +256,12 @@ func _handle_movement() -> void:
 func _attempt_attack() -> void:
 	if attack_cooldown_remaining > 0.0:
 		return
-
+	
 	if current_energy < melee_energy_cost:
 		message_requested.emit("Too tired")
 		return
 
-	if not spend_energy(melee_energy_cost):
-		message_requested.emit("Too tired")
-		return
-
-	attack_cooldown_remaining = melee_cooldown
-	_flash_body(Color(1.0, 0.82, 0.54, 1.0))
-
+	var hit_targets: Array = []
 	for body in attack_area.get_overlapping_bodies():
 		if body == self:
 			continue
@@ -270,8 +269,27 @@ func _attempt_attack() -> void:
 		if not body.is_in_group("enemies"):
 			continue
 
-		if body.has_method("take_damage"):
-			body.take_damage(melee_damage, self)
+		if not body.has_method("take_damage"):
+			continue
+
+		hit_targets.append(body)
+
+	if hit_targets.is_empty():
+		return
+	
+	if not spend_energy(melee_energy_cost):
+		message_requested.emit("Too tired")
+		return
+	
+	attack_cooldown_remaining = melee_cooldown
+	_flash_body(Color(1.0, 0.82, 0.54, 1.0))
+	
+	for body in hit_targets:
+		if is_instance_valid(body):
+			body.take_damage(melee_damage, {
+				"attacker": self,
+				"damage_type": melee_damage_type,
+			})
 
 
 func _attempt_use_medicine() -> void:
@@ -327,6 +345,7 @@ func reset_for_new_run() -> void:
 	global_position = _spawn_position
 	_emit_full_state()
 	_update_interaction_prompt()
+	_update_render_order()
 
 
 func _emit_full_state() -> void:
@@ -374,6 +393,7 @@ func _on_action_timer_timeout() -> void:
 
 func _get_active_interactable() -> Node2D:
 	var best_interactable: Node2D = null
+	var best_priority := -INF
 	var best_distance := INF
 
 	for interactable in _nearby_interactables:
@@ -386,8 +406,13 @@ func _get_active_interactable() -> Node2D:
 		if interactable.has_method("can_interact") and not interactable.can_interact(self):
 			continue
 
+		var priority := 0.0
+		if interactable.has_method("get_interaction_priority"):
+			priority = float(interactable.get_interaction_priority(self))
+
 		var distance := global_position.distance_squared_to(interactable.global_position)
-		if distance < best_distance:
+		if priority > best_priority or (is_equal_approx(priority, best_priority) and distance < best_distance):
+			best_priority = priority
 			best_distance = distance
 			best_interactable = interactable
 
@@ -415,6 +440,9 @@ func _register_interactable(interactable: Node2D) -> void:
 	if interactable == null or not interactable.has_method("get_interaction_label"):
 		return
 
+	if interactable.has_method("is_direct_interactable") and not interactable.is_direct_interactable():
+		return
+	
 	if _nearby_interactables.has(interactable):
 		return
 
@@ -425,3 +453,7 @@ func _register_interactable(interactable: Node2D) -> void:
 func _unregister_interactable(interactable: Node2D) -> void:
 	_nearby_interactables.erase(interactable)
 	_update_interaction_prompt()
+
+
+func _update_render_order() -> void:
+	z_index = int(round(global_position.y))

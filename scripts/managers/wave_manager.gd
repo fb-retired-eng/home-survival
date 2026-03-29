@@ -4,46 +4,27 @@ class_name WaveManager
 signal wave_started(wave_number: int)
 signal wave_cleared(wave_number: int)
 
-const WAVE_DEFINITIONS := {
-	1: {
-		"spawn_interval": 0.9,
-		"lanes": [
-			{"id": "north", "count": 3},
-			{"id": "west", "count": 2},
-		],
-	},
-	2: {
-		"spawn_interval": 0.75,
-		"lanes": [
-			{"id": "north", "count": 3},
-			{"id": "east", "count": 2},
-			{"id": "west", "count": 2},
-		],
-	},
-	3: {
-		"spawn_interval": 0.6,
-		"lanes": [
-			{"id": "north", "count": 4},
-			{"id": "east", "count": 3},
-			{"id": "west", "count": 3},
-		],
-	},
-}
+const WAVE_SET_DEFINITION_SCRIPT := preload("res://scripts/data/wave_set_definition.gd")
+const WAVE_DEFINITION_SCRIPT := preload("res://scripts/data/wave_definition.gd")
+const WAVE_LANE_DEFINITION_SCRIPT := preload("res://scripts/data/wave_lane_definition.gd")
 
 @export var zombie_scene: PackedScene
+@export var wave_set_definition: Resource
 
 var active_wave: int = 0
 var active_enemies: int = 0
-var _spawn_queue: Array[StringName] = []
+var _spawn_queue: Array[Dictionary] = []
 var _spawn_interval: float = 1.0
 var _spawn_markers: Dictionary = {}
 var _enemy_parent: Node2D
 var _player
 var _socket_container: Node
 var _spawn_timer: Timer
+var _wave_definitions: Dictionary = {}
 
 
 func _ready() -> void:
+	_rebuild_wave_definition_cache()
 	_spawn_timer = Timer.new()
 	_spawn_timer.one_shot = true
 	add_child(_spawn_timer)
@@ -58,7 +39,7 @@ func configure(spawn_markers: Dictionary, enemy_parent: Node2D, player_ref, sock
 
 
 func has_wave_definition(wave_number: int) -> bool:
-	return WAVE_DEFINITIONS.has(wave_number)
+	return _wave_definitions.has(wave_number)
 
 
 func can_start_wave(wave_number: int) -> bool:
@@ -67,7 +48,7 @@ func can_start_wave(wave_number: int) -> bool:
 
 func get_highest_defined_wave() -> int:
 	var highest_wave := 0
-	for wave_number in WAVE_DEFINITIONS.keys():
+	for wave_number in _wave_definitions.keys():
 		highest_wave = max(highest_wave, int(wave_number))
 	return highest_wave
 
@@ -94,7 +75,7 @@ func start_wave(wave_number: int) -> bool:
 
 	reset()
 
-	var definition: Dictionary = WAVE_DEFINITIONS.get(wave_number, {})
+	var definition: Dictionary = _wave_definitions.get(wave_number, {})
 	active_wave = wave_number
 	active_enemies = 0
 	_spawn_interval = float(definition.get("spawn_interval", 1.0))
@@ -123,9 +104,11 @@ func _build_spawn_queue(definition: Dictionary) -> void:
 	var pending: Array[Dictionary] = []
 
 	for lane_entry in definition.get("lanes", []):
+		var lane_id := String(lane_entry.get("id", ""))
 		pending.append({
-			"id": StringName(str(lane_entry.get("id", ""))),
+			"lane_id": StringName(lane_id),
 			"remaining": int(lane_entry.get("count", 0)),
+			"preferred_socket_ids": Array(lane_entry.get("preferred_socket_ids", [])),
 		})
 
 	var has_remaining := true
@@ -136,12 +119,15 @@ func _build_spawn_queue(definition: Dictionary) -> void:
 				continue
 
 			has_remaining = true
-			_spawn_queue.append(StringName(pending_lane.get("id", &"")))
+			_spawn_queue.append({
+				"lane_id": StringName(pending_lane.get("lane_id", &"")),
+				"preferred_socket_ids": Array(pending_lane.get("preferred_socket_ids", [])),
+			})
 			pending_lane["remaining"] = int(pending_lane.get("remaining", 0)) - 1
 
 
 func _validate_wave_setup(wave_number: int, emit_warnings: bool) -> bool:
-	var definition: Dictionary = WAVE_DEFINITIONS.get(wave_number, {})
+	var definition: Dictionary = _wave_definitions.get(wave_number, {})
 	if definition.is_empty():
 		if emit_warnings:
 			push_warning("Missing wave definition for wave %d" % wave_number)
@@ -157,6 +143,27 @@ func _validate_wave_setup(wave_number: int, emit_warnings: bool) -> bool:
 			push_warning("WaveManager is missing enemy parent")
 		return false
 
+	if _player == null or not is_instance_valid(_player):
+		if emit_warnings:
+			push_warning("WaveManager is missing player reference")
+		return false
+
+	if _socket_container == null or not is_instance_valid(_socket_container):
+		if emit_warnings:
+			push_warning("WaveManager is missing defense socket container")
+		return false
+
+	if _get_defense_sockets().is_empty():
+		if emit_warnings:
+			push_warning("WaveManager found no defense sockets")
+		return false
+
+	var valid_socket_ids := {}
+	for socket in _get_defense_sockets():
+		if not is_instance_valid(socket):
+			continue
+		valid_socket_ids[String(socket.socket_id)] = true
+
 	var lanes: Array = definition.get("lanes", [])
 	if lanes.is_empty():
 		if emit_warnings:
@@ -171,12 +178,90 @@ func _validate_wave_setup(wave_number: int, emit_warnings: bool) -> bool:
 				push_warning("Wave %d has an invalid lane entry" % wave_number)
 			return false
 
+		for preferred_socket_id in lane_entry.get("preferred_socket_ids", []):
+			var socket_id := String(preferred_socket_id)
+			if socket_id.is_empty() or not valid_socket_ids.has(socket_id):
+				if emit_warnings:
+					push_warning("Wave %d lane %s references unknown preferred socket %s" % [wave_number, lane_id, socket_id])
+				return false
+
 		if not _spawn_markers.has(lane_id) or _spawn_markers.get(lane_id) == null:
 			if emit_warnings:
 				push_warning("Wave %d is missing spawn marker for lane %s" % [wave_number, lane_id])
 			return false
 
 	return true
+
+
+func _rebuild_wave_definition_cache() -> void:
+	_wave_definitions.clear()
+
+	if wave_set_definition == null:
+		return
+
+	if wave_set_definition.get_script() != WAVE_SET_DEFINITION_SCRIPT:
+		push_warning("WaveManager wave_set_definition is not a WaveSetDefinition resource")
+		return
+
+	for wave_resource in wave_set_definition.waves:
+		if wave_resource == null:
+			push_warning("Wave set contains a null wave resource")
+			continue
+
+		if wave_resource.get_script() != WAVE_DEFINITION_SCRIPT:
+			push_warning("Wave set contains an invalid wave resource")
+			continue
+
+		var wave_number := int(wave_resource.wave_number)
+		if wave_number <= 0:
+			push_warning("Wave resource has invalid wave_number")
+			continue
+
+		if _wave_definitions.has(wave_number):
+			push_warning("Wave set contains duplicate wave_number %d" % wave_number)
+			continue
+
+		if float(wave_resource.spawn_interval) <= 0.0:
+			push_warning("Wave %d has invalid spawn_interval" % wave_number)
+			continue
+
+		var lanes: Array[Dictionary] = []
+		var wave_is_valid := true
+		for lane_resource in wave_resource.lanes:
+			if lane_resource == null:
+				push_warning("Wave %d contains a null lane resource" % wave_number)
+				wave_is_valid = false
+				break
+
+			if lane_resource.get_script() != WAVE_LANE_DEFINITION_SCRIPT:
+				push_warning("Wave %d contains an invalid lane resource" % wave_number)
+				wave_is_valid = false
+				break
+
+			var lane_id := StringName(lane_resource.lane_id)
+			var lane_count := int(lane_resource.count)
+			if String(lane_id).is_empty() or lane_count <= 0:
+				push_warning("Wave %d contains an invalid lane definition" % wave_number)
+				wave_is_valid = false
+				break
+
+			lanes.append({
+				"id": lane_id,
+				"count": lane_count,
+				"preferred_socket_ids": Array(lane_resource.preferred_socket_ids),
+			})
+
+		if not wave_is_valid:
+			continue
+
+		if lanes.is_empty():
+			push_warning("Wave %d has no valid lanes" % wave_number)
+			continue
+
+		_wave_definitions[wave_number] = {
+			"spawn_interval": float(wave_resource.spawn_interval),
+			"lanes": lanes,
+		}
 
 
 func _spawn_next_enemy() -> void:
@@ -191,7 +276,8 @@ func _spawn_next_enemy() -> void:
 		clear_wave()
 		return
 
-	var lane_id := String(_spawn_queue.pop_front())
+	var spawn_entry: Dictionary = _spawn_queue.pop_front()
+	var lane_id := String(spawn_entry.get("lane_id", ""))
 	var marker: Node2D = _spawn_markers.get(lane_id, null)
 	if marker == null:
 		push_warning("Missing spawn marker for lane %s" % lane_id)
@@ -200,7 +286,11 @@ func _spawn_next_enemy() -> void:
 		_enemy_parent.add_child(zombie)
 		zombie.global_position = marker.global_position
 		if zombie.has_method("configure_wave_context"):
-			zombie.configure_wave_context(_player, _get_defense_sockets())
+			zombie.configure_wave_context(
+				_player,
+				_get_defense_sockets(),
+				PackedStringArray(Array(spawn_entry.get("preferred_socket_ids", [])))
+			)
 		if zombie.has_signal("died"):
 			zombie.died.connect(_on_zombie_died)
 		active_enemies += 1
@@ -217,6 +307,8 @@ func _get_defense_sockets() -> Array:
 		return sockets
 
 	for child in _socket_container.get_children():
+		if not child.is_in_group("defense_sockets"):
+			continue
 		sockets.append(child)
 
 	return sockets

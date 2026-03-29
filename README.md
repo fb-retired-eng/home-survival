@@ -48,9 +48,10 @@ godot --headless --path . --quit
 
 ## Controls
 - Move: `WASD` or arrow keys
-- Attack: `J` or left mouse
-- Interact: `E` or space
+- Attack: `Space` or left mouse
+- Interact: `E`
 - Use medicine: `F` or `Q`
+- Restart after win/loss: `R`
 
 ## Important Docs
 - [`MVP0_SPEC.md`](MVP0_SPEC.md): implementation source of truth

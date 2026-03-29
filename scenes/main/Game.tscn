@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/player/Player.tscn" id="1_player_scene"]
 [ext_resource type="PackedScene" path="res://scenes/ui/HUD.tscn" id="2_hud_scene"]
@@ -11,6 +11,8 @@
 [ext_resource type="Script" path="res://scripts/managers/game_manager.gd" id="4_game_manager"]
 [ext_resource type="Script" path="res://scripts/managers/wave_manager.gd" id="5_wave_manager"]
 [ext_resource type="Script" path="res://scripts/main/game.gd" id="8_game_script"]
+[ext_resource type="Resource" path="res://data/resources/mvp0_perimeter.tres" id="13_perimeter"]
+[ext_resource type="Resource" path="res://data/waves/mvp0_waves.tres" id="14_waves"]
 
 [sub_resource type="RectangleShape2D" id="1_horizontal_wall"]
 size = Vector2(1280, 32)
@@ -20,6 +22,8 @@ size = Vector2(32, 720)
 
 [node name="Game" type="Node2D"]
 script = ExtResource("8_game_script")
+defense_socket_scene = ExtResource("11_socket_scene")
+perimeter_definition = ExtResource("13_perimeter")
 
 [node name="GameManager" type="Node" parent="."]
 script = ExtResource("4_game_manager")
@@ -27,6 +31,7 @@ script = ExtResource("4_game_manager")
 [node name="WaveManager" type="Node" parent="."]
 script = ExtResource("5_wave_manager")
 zombie_scene = ExtResource("12_zombie_scene")
+wave_set_definition = ExtResource("14_waves")
 
 [node name="World" type="Node2D" parent="."]
 
@@ -37,6 +42,22 @@ polygon = PackedVector2Array(0, 0, 1280, 0, 1280, 720, 0, 720)
 [node name="BaseZone" type="Polygon2D" parent="World"]
 color = Color(0.22, 0.28, 0.24, 1)
 polygon = PackedVector2Array(440, 220, 840, 220, 840, 500, 440, 500)
+
+[node name="BaseInnerEdgeTop" type="Polygon2D" parent="World"]
+color = Color(0.84, 0.9, 0.82, 0.2)
+polygon = PackedVector2Array(440, 220, 840, 220, 840, 224, 440, 224)
+
+[node name="BaseInnerEdgeBottom" type="Polygon2D" parent="World"]
+color = Color(0.84, 0.9, 0.82, 0.2)
+polygon = PackedVector2Array(440, 496, 840, 496, 840, 500, 440, 500)
+
+[node name="BaseInnerEdgeLeft" type="Polygon2D" parent="World"]
+color = Color(0.84, 0.9, 0.82, 0.2)
+polygon = PackedVector2Array(440, 220, 444, 220, 444, 500, 440, 500)
+
+[node name="BaseInnerEdgeRight" type="Polygon2D" parent="World"]
+color = Color(0.84, 0.9, 0.82, 0.2)
+polygon = PackedVector2Array(836, 220, 840, 220, 840, 500, 836, 500)
 
 [node name="NorthLane" type="Polygon2D" parent="World"]
 color = Color(0.46, 0.19, 0.16, 0.5)
@@ -178,50 +199,6 @@ shape = SubResource("2_vertical_wall")
 position = Vector2(640, 360)
 
 [node name="DefenseSockets" type="Node2D" parent="World"]
-
-[node name="WallNW" parent="World/DefenseSockets" instance=ExtResource("11_socket_scene")]
-position = Vector2(540, 220)
-socket_id = &"wall_nw"
-current_hp = 90
-max_hp = 90
-socket_size = Vector2(200, 20)
-
-[node name="WallNE" parent="World/DefenseSockets" instance=ExtResource("11_socket_scene")]
-position = Vector2(740, 220)
-socket_id = &"wall_ne"
-current_hp = 60
-max_hp = 90
-socket_size = Vector2(200, 20)
-
-[node name="WallSW" parent="World/DefenseSockets" instance=ExtResource("11_socket_scene")]
-position = Vector2(540, 500)
-socket_id = &"wall_sw"
-current_hp = 90
-max_hp = 90
-socket_size = Vector2(200, 20)
-
-[node name="WallSE" parent="World/DefenseSockets" instance=ExtResource("11_socket_scene")]
-position = Vector2(740, 500)
-socket_id = &"wall_se"
-current_hp = 60
-max_hp = 90
-socket_size = Vector2(200, 20)
-
-[node name="DoorW" parent="World/DefenseSockets" instance=ExtResource("11_socket_scene")]
-position = Vector2(440, 360)
-socket_id = &"door_w"
-socket_type = "door"
-current_hp = 45
-max_hp = 60
-socket_size = Vector2(20, 280)
-
-[node name="DoorE" parent="World/DefenseSockets" instance=ExtResource("11_socket_scene")]
-position = Vector2(840, 360)
-socket_id = &"door_e"
-socket_type = "door"
-current_hp = 30
-max_hp = 60
-socket_size = Vector2(20, 280)
 
 [node name="ExplorationEnemies" type="Node2D" parent="World"]
 

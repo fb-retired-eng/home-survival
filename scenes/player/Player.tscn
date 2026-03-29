@@ -12,11 +12,13 @@ size = Vector2(28, 18)
 radius = 20.0
 
 [sub_resource type="CircleShape2D" id="4_interaction_shape"]
-radius = 28.0
+radius = 44.0
 
 [node name="Player" type="CharacterBody2D"]
 script = ExtResource("1_player")
 position = Vector2(640, 360)
+collision_layer = 1
+collision_mask = 2
 
 [node name="Body" type="Polygon2D" parent="."]
 color = Color(0.88, 0.92, 0.96, 1)
@@ -33,6 +35,7 @@ shape = SubResource("1_body_shape")
 position_smoothing_enabled = true
 position_smoothing_speed = 6.0
 current = true
+zoom = Vector2(1, 1)
 
 [node name="AttackPivot" type="Node2D" parent="."]
 
