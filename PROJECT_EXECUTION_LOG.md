@@ -48,3 +48,24 @@ Validation:
 
 ### README
 - Replaced the placeholder README with a project overview, local run instructions, controls, key docs, and next development steps.
+
+### Scavenging Interaction Slice
+- Added a minimal interaction system to the player with proximity-based prompts, interact-key handling, and timed actions.
+- Replaced temporary loose pickups in the main scene with 8 authored scavenging nodes across `POI_A` and `POI_B`.
+- Implemented node search duration, energy spending, direct inventory payout, depletion for the rest of the run, and POI-specific bonus reward rolls.
+- Added a temporary sleep interaction stub so the shared interaction contract already covers both scavenging and sleep points.
+- Hardened resource handling by validating resource IDs before adding them to player inventory.
+
+Validation:
+- Headless Godot project load succeeded after the scavenging and interaction changes.
+
+### Interaction And Data Cleanup
+- Added timed-action cancellation on death so searches cannot complete after the player dies.
+- Moved interaction gating into the player/game layer so current interactables are controlled by one run-state rule.
+- Replaced hardcoded POI bonus-roll logic with data-driven bonus table resources in `data/pois/`.
+- Centralized more player mutations through shared resource and energy helpers.
+- Replaced scaffold-only phase text with state-aware status messages such as the safe opening phase before wave 1.
+- Updated scavenging prompts so low-energy nodes clearly communicate that the player is too tired to search.
+
+Validation:
+- Headless Godot project load succeeded after the interaction and resource-data cleanup.

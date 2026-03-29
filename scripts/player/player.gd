@@ -1,11 +1,14 @@
 extends CharacterBody2D
 class_name Player
 
+const RESOURCE_IDS := ["salvage", "parts", "medicine"]
+
 signal health_changed(current: int, maximum: int)
 signal energy_changed(current: int, maximum: int)
 signal resources_changed(resources: Dictionary)
 signal message_requested(text: String)
 signal player_died()
+signal interaction_prompt_changed(text: String)
 
 @export var max_health: int = 100
 @export var max_energy: int = 100
@@ -13,6 +16,7 @@ signal player_died()
 @export var melee_damage: int = 25
 @export var melee_energy_cost: int = 5
 @export var melee_cooldown: float = 0.45
+@export var medicine_heal_amount: int = 35
 
 var current_health: int
 var current_energy: int
@@ -23,15 +27,22 @@ var resources: Dictionary = {
 }
 
 var is_dead: bool = false
+var is_busy: bool = false
 var facing_direction: Vector2 = Vector2.UP
 var attack_cooldown_remaining: float = 0.0
 var _base_body_color: Color
+var _nearby_interactables: Array[Area2D] = []
+var _busy_label: String = ""
+var _action_complete_callback: Callable
+var _interaction_gate_callback: Callable
 
 @onready var body_visual: Polygon2D = $Body
 @onready var facing_marker: Polygon2D = $FacingMarker
 @onready var attack_pivot: Node2D = $AttackPivot
 @onready var attack_area: Area2D = $AttackPivot/AttackArea
 @onready var pickup_detector: Area2D = $PickupDetector
+@onready var interaction_detector: Area2D = $InteractionDetector
+@onready var action_timer: Timer = $ActionTimer
 
 
 func _ready() -> void:
@@ -39,7 +50,11 @@ func _ready() -> void:
 	current_energy = max_energy
 	_base_body_color = body_visual.color
 	pickup_detector.area_entered.connect(_on_pickup_detector_area_entered)
+	interaction_detector.area_entered.connect(_on_interaction_detector_area_entered)
+	interaction_detector.area_exited.connect(_on_interaction_detector_area_exited)
+	action_timer.timeout.connect(_on_action_timer_timeout)
 	_emit_full_state()
+	_update_interaction_prompt()
 
 
 func _physics_process(delta: float) -> void:
@@ -48,9 +63,17 @@ func _physics_process(delta: float) -> void:
 		move_and_slide()
 		return
 
+	if is_busy:
+		velocity = Vector2.ZERO
+		move_and_slide()
+		return
+
 	attack_cooldown_remaining = max(attack_cooldown_remaining - delta, 0.0)
 	_handle_movement()
 	move_and_slide()
+
+	if Input.is_action_just_pressed("interact"):
+		_attempt_interact()
 
 	if Input.is_action_just_pressed("attack"):
 		_attempt_attack()
@@ -59,14 +82,92 @@ func _physics_process(delta: float) -> void:
 		_attempt_use_medicine()
 
 
-func add_resource(resource_id: String, amount: int) -> void:
+func add_resource(resource_id: String, amount: int, show_message: bool = true) -> bool:
 	if amount == 0:
-		return
+		return false
+
+	if not RESOURCE_IDS.has(resource_id):
+		message_requested.emit("Invalid resource id: %s" % resource_id)
+		return false
 
 	var current_amount: int = int(resources.get(resource_id, 0))
 	resources[resource_id] = max(current_amount + amount, 0)
 	resources_changed.emit(resources.duplicate(true))
-	message_requested.emit("%s +%d" % [resource_id.capitalize(), amount])
+	if show_message:
+		message_requested.emit("%s +%d" % [resource_id.capitalize(), amount])
+	return true
+
+
+func spend_resource(resource_id: String, amount: int) -> bool:
+	if amount <= 0:
+		return true
+
+	if not RESOURCE_IDS.has(resource_id):
+		message_requested.emit("Invalid resource id: %s" % resource_id)
+		return false
+
+	var current_amount: int = int(resources.get(resource_id, 0))
+	if current_amount < amount:
+		return false
+
+	resources[resource_id] = current_amount - amount
+	resources_changed.emit(resources.duplicate(true))
+	_update_interaction_prompt()
+	return true
+
+
+func can_spend_energy(amount: int) -> bool:
+	return current_energy >= amount
+
+
+func spend_energy(amount: int) -> bool:
+	if amount <= 0:
+		return true
+
+	if current_energy < amount:
+		return false
+
+	current_energy -= amount
+	energy_changed.emit(current_energy, max_energy)
+	_update_interaction_prompt()
+	return true
+
+
+func restore_energy(amount: int) -> void:
+	if amount <= 0:
+		return
+
+	current_energy = min(current_energy + amount, max_energy)
+	energy_changed.emit(current_energy, max_energy)
+	_update_interaction_prompt()
+
+
+func begin_timed_action(duration: float, label: String, on_complete: Callable) -> bool:
+	if is_dead or is_busy:
+		return false
+
+	is_busy = true
+	_busy_label = label
+	_action_complete_callback = on_complete
+	action_timer.start(duration)
+	_update_interaction_prompt()
+	return true
+
+
+func cancel_timed_action() -> void:
+	if not is_busy:
+		return
+
+	action_timer.stop()
+	is_busy = false
+	_busy_label = ""
+	_action_complete_callback = Callable()
+	_update_interaction_prompt()
+
+
+func set_interaction_gate(callback: Callable) -> void:
+	_interaction_gate_callback = callback
+	_update_interaction_prompt()
 
 
 func take_damage(amount: int, _source: Variant = null) -> void:
@@ -110,8 +211,10 @@ func _attempt_attack() -> void:
 		message_requested.emit("Too tired")
 		return
 
-	current_energy -= melee_energy_cost
-	energy_changed.emit(current_energy, max_energy)
+	if not spend_energy(melee_energy_cost):
+		message_requested.emit("Too tired")
+		return
+
 	attack_cooldown_remaining = melee_cooldown
 	_flash_body(Color(1.0, 0.82, 0.54, 1.0))
 
@@ -133,17 +236,31 @@ func _attempt_use_medicine() -> void:
 		message_requested.emit("Health full")
 		return
 
-	resources["medicine"] = medicine_count - 1
-	resources_changed.emit(resources.duplicate(true))
-	heal(35)
+	if not spend_resource("medicine", 1):
+		message_requested.emit("No medicine")
+		return
+
+	heal(medicine_heal_amount)
 	message_requested.emit("Used medicine")
+	_update_interaction_prompt()
+
+
+func _attempt_interact() -> void:
+	var interactable := _get_active_interactable()
+	if interactable == null:
+		return
+
+	if interactable.has_method("interact"):
+		interactable.interact(self)
 
 
 func _die() -> void:
 	is_dead = true
+	cancel_timed_action()
 	velocity = Vector2.ZERO
 	message_requested.emit("You died")
 	player_died.emit()
+	_update_interaction_prompt()
 
 
 func _emit_full_state() -> void:
@@ -161,3 +278,68 @@ func _flash_body(flash_color: Color) -> void:
 func _on_pickup_detector_area_entered(area: Area2D) -> void:
 	if area.has_method("collect"):
 		area.collect(self)
+
+
+func _on_interaction_detector_area_entered(area: Area2D) -> void:
+	if not area.has_method("get_interaction_label"):
+		return
+
+	if _nearby_interactables.has(area):
+		return
+
+	_nearby_interactables.append(area)
+	_update_interaction_prompt()
+
+
+func _on_interaction_detector_area_exited(area: Area2D) -> void:
+	_nearby_interactables.erase(area)
+	_update_interaction_prompt()
+
+
+func _on_action_timer_timeout() -> void:
+	is_busy = false
+	var callback := _action_complete_callback
+	_action_complete_callback = Callable()
+	_busy_label = ""
+	if callback.is_valid() and not is_dead:
+		callback.call()
+	_update_interaction_prompt()
+
+
+func _get_active_interactable() -> Area2D:
+	var best_interactable: Area2D = null
+	var best_distance := INF
+
+	for interactable in _nearby_interactables:
+		if not is_instance_valid(interactable):
+			continue
+
+		if _interaction_gate_callback.is_valid() and not _interaction_gate_callback.call(interactable):
+			continue
+
+		if interactable.has_method("can_interact") and not interactable.can_interact(self):
+			continue
+
+		var distance := global_position.distance_squared_to(interactable.global_position)
+		if distance < best_distance:
+			best_distance = distance
+			best_interactable = interactable
+
+	return best_interactable
+
+
+func _update_interaction_prompt() -> void:
+	if is_dead:
+		interaction_prompt_changed.emit("")
+		return
+
+	if is_busy:
+		interaction_prompt_changed.emit(_busy_label)
+		return
+
+	var interactable := _get_active_interactable()
+	if interactable != null and interactable.has_method("get_interaction_label"):
+		interaction_prompt_changed.emit(str(interactable.get_interaction_label(self)))
+		return
+
+	interaction_prompt_changed.emit("")

@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="ScavengeBonusTable" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/scavenge_bonus_table.gd" id="1_bonus_table"]
+
+[resource]
+script = ExtResource("1_bonus_table")
+empty_weight = 30.0
+salvage_weight = 50.0
+parts_weight = 15.0
+medicine_weight = 5.0

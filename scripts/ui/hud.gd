@@ -15,9 +15,11 @@ func bind_player(target) -> void:
 	player.health_changed.connect(_on_health_changed)
 	player.energy_changed.connect(_on_energy_changed)
 	player.resources_changed.connect(_on_resources_changed)
+	player.interaction_prompt_changed.connect(set_interaction_prompt)
 	_on_health_changed(player.current_health, player.max_health)
 	_on_energy_changed(player.current_energy, player.max_energy)
 	_on_resources_changed(player.resources.duplicate(true))
+	set_interaction_prompt("")
 
 
 func set_status(text: String) -> void:

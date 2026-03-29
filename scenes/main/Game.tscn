@@ -1,11 +1,13 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/player/Player.tscn" id="1_player_scene"]
 [ext_resource type="PackedScene" path="res://scenes/ui/HUD.tscn" id="2_hud_scene"]
 [ext_resource type="PackedScene" path="res://scenes/world/SleepPoint.tscn" id="3_sleep_scene"]
+[ext_resource type="PackedScene" path="res://scenes/world/ScavengeNode.tscn" id="6_scavenge_scene"]
+[ext_resource type="Resource" path="res://data/pois/poi_a_bonus.tres" id="7_poi_a_bonus"]
+[ext_resource type="Resource" path="res://data/pois/poi_b_bonus.tres" id="10_poi_b_bonus"]
 [ext_resource type="Script" path="res://scripts/managers/game_manager.gd" id="4_game_manager"]
 [ext_resource type="Script" path="res://scripts/managers/wave_manager.gd" id="5_wave_manager"]
-[ext_resource type="PackedScene" path="res://scenes/world/ResourcePickup.tscn" id="7_pickup_scene"]
 [ext_resource type="Script" path="res://scripts/main/game.gd" id="8_game_script"]
 
 [sub_resource type="RectangleShape2D" id="1_horizontal_wall"]
@@ -59,6 +61,36 @@ offset_right = 36.0
 offset_bottom = 63.0
 text = "POI A"
 
+[node name="Node1" parent="World/POI_A" instance=ExtResource("6_scavenge_scene")]
+position = Vector2(-50, -28)
+node_id = &"poi_a_1"
+poi_id = &"poi_a"
+reward_salvage = 3
+bonus_table = ExtResource("7_poi_a_bonus")
+
+[node name="Node2" parent="World/POI_A" instance=ExtResource("6_scavenge_scene")]
+position = Vector2(54, -10)
+node_id = &"poi_a_2"
+poi_id = &"poi_a"
+reward_salvage = 2
+bonus_table = ExtResource("7_poi_a_bonus")
+
+[node name="Node3" parent="World/POI_A" instance=ExtResource("6_scavenge_scene")]
+position = Vector2(-18, 46)
+node_id = &"poi_a_3"
+poi_id = &"poi_a"
+reward_salvage = 2
+reward_parts = 1
+bonus_table = ExtResource("7_poi_a_bonus")
+
+[node name="Node4" parent="World/POI_A" instance=ExtResource("6_scavenge_scene")]
+position = Vector2(42, 54)
+node_id = &"poi_a_4"
+poi_id = &"poi_a"
+reward_salvage = 2
+reward_medicine = 1
+bonus_table = ExtResource("7_poi_a_bonus")
+
 [node name="POI_B" type="Node2D" parent="World"]
 position = Vector2(1030, 150)
 
@@ -72,6 +104,35 @@ offset_top = 40.0
 offset_right = 36.0
 offset_bottom = 63.0
 text = "POI B"
+
+[node name="Node1" parent="World/POI_B" instance=ExtResource("6_scavenge_scene")]
+position = Vector2(-54, -20)
+node_id = &"poi_b_1"
+poi_id = &"poi_b"
+reward_parts = 1
+bonus_table = ExtResource("10_poi_b_bonus")
+
+[node name="Node2" parent="World/POI_B" instance=ExtResource("6_scavenge_scene")]
+position = Vector2(52, -8)
+node_id = &"poi_b_2"
+poi_id = &"poi_b"
+reward_salvage = 1
+reward_parts = 1
+bonus_table = ExtResource("10_poi_b_bonus")
+
+[node name="Node3" parent="World/POI_B" instance=ExtResource("6_scavenge_scene")]
+position = Vector2(-14, 50)
+node_id = &"poi_b_3"
+poi_id = &"poi_b"
+reward_parts = 1
+bonus_table = ExtResource("10_poi_b_bonus")
+
+[node name="Node4" parent="World/POI_B" instance=ExtResource("6_scavenge_scene")]
+position = Vector2(50, 58)
+node_id = &"poi_b_4"
+poi_id = &"poi_b"
+reward_parts = 2
+bonus_table = ExtResource("10_poi_b_bonus")
 
 [node name="SpawnMarkers" type="Node2D" parent="World"]
 
@@ -114,20 +175,5 @@ shape = SubResource("2_vertical_wall")
 position = Vector2(640, 360)
 
 [node name="Player" parent="." instance=ExtResource("1_player_scene")]
-
-[node name="PickupSalvage" parent="World" instance=ExtResource("7_pickup_scene")]
-position = Vector2(560, 360)
-resource_id = "salvage"
-amount = 3
-
-[node name="PickupParts" parent="World" instance=ExtResource("7_pickup_scene")]
-position = Vector2(260, 230)
-resource_id = "parts"
-amount = 2
-
-[node name="PickupMedicine" parent="World" instance=ExtResource("7_pickup_scene")]
-position = Vector2(970, 220)
-resource_id = "medicine"
-amount = 1
 
 [node name="HUD" parent="." instance=ExtResource("2_hud_scene")]

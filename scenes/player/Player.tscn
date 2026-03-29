@@ -1,4 +1,4 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
 
@@ -10,6 +10,9 @@ size = Vector2(28, 18)
 
 [sub_resource type="CircleShape2D" id="3_pickup_shape"]
 radius = 20.0
+
+[sub_resource type="CircleShape2D" id="4_interaction_shape"]
+radius = 28.0
 
 [node name="Player" type="CharacterBody2D"]
 script = ExtResource("1_player")
@@ -43,3 +46,11 @@ shape = SubResource("2_attack_shape")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="PickupDetector"]
 shape = SubResource("3_pickup_shape")
+
+[node name="InteractionDetector" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractionDetector"]
+shape = SubResource("4_interaction_shape")
+
+[node name="ActionTimer" type="Timer" parent="."]
+one_shot = true

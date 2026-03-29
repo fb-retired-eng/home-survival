@@ -5,5 +5,107 @@ class_name ScavengeNode
 @export var poi_id: StringName
 @export var search_duration: float = 0.9
 @export var search_energy_cost: int = 15
+@export var reward_salvage: int = 0
+@export var reward_parts: int = 0
+@export var reward_medicine: int = 0
+@export var bonus_table: Resource
 
 var is_depleted: bool = false
+var _is_searching: bool = false
+
+@onready var visual: Polygon2D = $Visual
+@onready var label: Label = $Label
+
+
+func _ready() -> void:
+	_refresh_visuals()
+
+
+func get_interaction_label(player) -> String:
+	if is_depleted:
+		return ""
+
+	if _is_searching:
+		return "Searching..."
+
+	if player != null and not player.can_spend_energy(search_energy_cost):
+		return "Too tired to search"
+
+	return "Search (%d energy)" % search_energy_cost
+
+
+func can_interact(_player) -> bool:
+	return not is_depleted and not _is_searching
+
+
+func interact(player) -> void:
+	if is_depleted or _is_searching:
+		return
+
+	if not player.can_spend_energy(search_energy_cost):
+		player.message_requested.emit("Too tired")
+		return
+
+	if not player.spend_energy(search_energy_cost):
+		player.message_requested.emit("Too tired")
+		return
+
+	_is_searching = true
+	_refresh_visuals()
+	if not player.begin_timed_action(search_duration, "Searching...", Callable(self, "_complete_search").bind(player)):
+		_is_searching = false
+		player.restore_energy(search_energy_cost)
+		_refresh_visuals()
+
+
+func _complete_search(player) -> void:
+	_is_searching = false
+	is_depleted = true
+	var rewards := {
+		"salvage": reward_salvage,
+		"parts": reward_parts,
+		"medicine": reward_medicine,
+	}
+	_apply_bonus_reward(rewards)
+	_grant_rewards(player, rewards)
+	_refresh_visuals()
+
+
+func _apply_bonus_reward(rewards: Dictionary) -> void:
+	if bonus_table == null:
+		return
+
+	if not bonus_table.has_method("roll_bonus"):
+		return
+
+	var rolled_rewards: Dictionary = bonus_table.roll_bonus()
+	for resource_id in ["salvage", "parts", "medicine"]:
+		rewards[resource_id] = int(rewards.get(resource_id, 0)) + int(rolled_rewards.get(resource_id, 0))
+
+
+func _grant_rewards(player, rewards: Dictionary) -> void:
+	var reward_summary: Array[String] = []
+	for resource_id in ["salvage", "parts", "medicine"]:
+		var amount := int(rewards.get(resource_id, 0))
+		if amount <= 0:
+			continue
+
+		player.add_resource(resource_id, amount, false)
+		reward_summary.append("%s +%d" % [resource_id.capitalize(), amount])
+
+	if reward_summary.is_empty():
+		player.message_requested.emit("Searched node")
+	else:
+		player.message_requested.emit(", ".join(reward_summary))
+
+
+func _refresh_visuals() -> void:
+	if is_depleted:
+		visual.color = Color(0.33, 0.33, 0.35, 1.0)
+		label.text = "Depleted"
+	elif _is_searching:
+		visual.color = Color(0.98, 0.9, 0.48, 1.0)
+		label.text = "Searching..."
+	else:
+		visual.color = Color(0.93, 0.79, 0.35, 1.0)
+		label.text = "Search"
