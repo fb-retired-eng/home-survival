@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_definition.gd" id="1_enemy_definition"]
+
+[resource]
+script = ExtResource("1_enemy_definition")
+enemy_id = &"zombie_brute"
+body_color = Color(0.56, 0.38, 0.22, 1)
+max_health = 90
+defense_flat_reduction = 2
+defense_multiplier = 1.0
+move_speed = 34.0
+player_damage = 16
+structure_damage = 14
+structure_damage_type = &"crush"
+attack_interval = 1.35
+drop_salvage = 2
+bonus_salvage = 1
+bonus_salvage_chance = 0.35

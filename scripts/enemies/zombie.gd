@@ -225,6 +225,7 @@ func _apply_definition() -> void:
 		return
 
 	enemy_id = definition.enemy_id
+	body_visual.color = definition.body_color
 	max_health = definition.max_health
 	defense_flat_reduction = definition.defense_flat_reduction
 	defense_multiplier = definition.defense_multiplier

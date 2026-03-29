@@ -1,6 +1,8 @@
 extends Resource
 class_name StructureProfile
 
+const DAMAGE_TYPE_MODIFIER_SCRIPT := preload("res://scripts/data/damage_type_modifier.gd")
+
 @export var profile_id: StringName = &"structure"
 @export var damaged_max_hp: int = 90
 @export var reinforced_max_hp: int = 180
@@ -15,6 +17,19 @@ class_name StructureProfile
 @export var damaged_color: Color = Color(0.57, 0.45, 0.35, 1.0)
 @export var reinforced_color: Color = Color(0.48, 0.68, 0.72, 1.0)
 @export var breached_color: Color = Color(0.24, 0.18, 0.18, 1.0)
+
+
+func is_valid_profile(expected_profile_id: StringName = &"") -> bool:
+	if expected_profile_id != StringName() and profile_id != expected_profile_id:
+		return false
+
+	for modifier in damage_modifiers:
+		if modifier == null:
+			return false
+		if modifier.get_script() != DAMAGE_TYPE_MODIFIER_SCRIPT:
+			return false
+
+	return true
 
 
 func get_max_hp_for_tier(tier: String) -> int:
@@ -45,6 +60,8 @@ func compute_damage_taken(base_damage: int, damage_type: StringName = &"impact")
 
 	for modifier in damage_modifiers:
 		if modifier == null:
+			continue
+		if modifier.get_script() != DAMAGE_TYPE_MODIFIER_SCRIPT:
 			continue
 		if StringName(modifier.get("damage_type")) != damage_type:
 			continue

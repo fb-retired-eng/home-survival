@@ -353,3 +353,19 @@ Validation:
 
 Validation:
 - Headless Godot project load succeeded after the config validation hardening pass.
+
+### Multiple Enemy Types In Wave Data
+- Added per-lane `enemy_definition` references to wave data so lane entries now choose which enemy config to spawn instead of assuming a single global zombie type.
+- Added a second enemy resource, `zombie_brute`, with distinct HP, speed, defense, damage, salvage, and visual color.
+- Extended wall and door structure profiles with `crush` damage modifiers and updated wave 3 to mix brutes into the east and west lanes.
+
+Validation:
+- Headless Godot project load succeeded after the multi-enemy wave-data update.
+
+### Review Fixes For Data Validation
+- Reduced the basic-zombie counts in wave 3 so the brute rollout adds variety without unintentionally inflating the total enemy count.
+- Added validation methods for structure profiles and enemy definitions so malformed modifier resources or mismatched wall/door profiles are rejected instead of silently falling back.
+- Tightened perimeter and wave validation to require profile/type consistency before content is accepted into the runtime caches.
+
+Validation:
+- Headless Godot project load succeeded after the review-fix data validation pass.

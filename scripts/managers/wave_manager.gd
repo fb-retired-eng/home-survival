@@ -7,6 +7,7 @@ signal wave_cleared(wave_number: int)
 const WAVE_SET_DEFINITION_SCRIPT := preload("res://scripts/data/wave_set_definition.gd")
 const WAVE_DEFINITION_SCRIPT := preload("res://scripts/data/wave_definition.gd")
 const WAVE_LANE_DEFINITION_SCRIPT := preload("res://scripts/data/wave_lane_definition.gd")
+const ENEMY_DEFINITION_SCRIPT := preload("res://scripts/data/enemy_definition.gd")
 
 @export var zombie_scene: PackedScene
 @export var wave_set_definition: Resource
@@ -108,6 +109,7 @@ func _build_spawn_queue(definition: Dictionary) -> void:
 		pending.append({
 			"lane_id": StringName(lane_id),
 			"remaining": int(lane_entry.get("count", 0)),
+			"enemy_definition": lane_entry.get("enemy_definition"),
 			"preferred_socket_ids": Array(lane_entry.get("preferred_socket_ids", [])),
 		})
 
@@ -121,6 +123,7 @@ func _build_spawn_queue(definition: Dictionary) -> void:
 			has_remaining = true
 			_spawn_queue.append({
 				"lane_id": StringName(pending_lane.get("lane_id", &"")),
+				"enemy_definition": pending_lane.get("enemy_definition"),
 				"preferred_socket_ids": Array(pending_lane.get("preferred_socket_ids", [])),
 			})
 			pending_lane["remaining"] = int(pending_lane.get("remaining", 0)) - 1
@@ -176,6 +179,16 @@ func _validate_wave_setup(wave_number: int, emit_warnings: bool) -> bool:
 		if lane_id.is_empty() or lane_count <= 0:
 			if emit_warnings:
 				push_warning("Wave %d has an invalid lane entry" % wave_number)
+			return false
+
+		var enemy_definition: Resource = lane_entry.get("enemy_definition")
+		if enemy_definition == null or enemy_definition.get_script() != ENEMY_DEFINITION_SCRIPT:
+			if emit_warnings:
+				push_warning("Wave %d lane %s is missing a valid enemy_definition" % [wave_number, lane_id])
+			return false
+		if not enemy_definition.is_valid_definition():
+			if emit_warnings:
+				push_warning("Wave %d lane %s has an invalid enemy_definition resource" % [wave_number, lane_id])
 			return false
 
 		for preferred_socket_id in lane_entry.get("preferred_socket_ids", []):
@@ -245,9 +258,20 @@ func _rebuild_wave_definition_cache() -> void:
 				wave_is_valid = false
 				break
 
+				if lane_resource.enemy_definition == null or lane_resource.enemy_definition.get_script() != ENEMY_DEFINITION_SCRIPT:
+					push_warning("Wave %d lane %s is missing a valid enemy_definition" % [wave_number, lane_id])
+					wave_is_valid = false
+					break
+
+				if not lane_resource.enemy_definition.is_valid_definition():
+					push_warning("Wave %d lane %s has an invalid enemy_definition resource" % [wave_number, lane_id])
+					wave_is_valid = false
+					break
+
 			lanes.append({
 				"id": lane_id,
 				"count": lane_count,
+				"enemy_definition": lane_resource.enemy_definition,
 				"preferred_socket_ids": Array(lane_resource.preferred_socket_ids),
 			})
 
@@ -283,6 +307,7 @@ func _spawn_next_enemy() -> void:
 		push_warning("Missing spawn marker for lane %s" % lane_id)
 	else:
 		var zombie = zombie_scene.instantiate()
+		zombie.definition = spawn_entry.get("enemy_definition")
 		_enemy_parent.add_child(zombie)
 		zombie.global_position = marker.global_position
 		if zombie.has_method("configure_wave_context"):

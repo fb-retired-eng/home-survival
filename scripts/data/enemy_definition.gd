@@ -1,7 +1,10 @@
 extends Resource
 class_name EnemyDefinition
 
+const DAMAGE_TYPE_MODIFIER_SCRIPT := preload("res://scripts/data/damage_type_modifier.gd")
+
 @export var enemy_id: StringName = &"enemy"
+@export var body_color: Color = Color(0.39, 0.68, 0.38, 1.0)
 @export var max_health: int = 50
 @export var defense_flat_reduction: int = 0
 @export_range(0.0, 4.0, 0.05) var defense_multiplier: float = 1.0
@@ -16,6 +19,27 @@ class_name EnemyDefinition
 @export_range(0.0, 1.0, 0.01) var bonus_salvage_chance: float = 0.2
 
 
+func is_valid_definition() -> bool:
+	if enemy_id == StringName():
+		return false
+	if max_health <= 0:
+		return false
+	if move_speed < 0.0:
+		return false
+	if player_damage < 0 or structure_damage < 0:
+		return false
+	if attack_interval <= 0.0:
+		return false
+
+	for modifier in damage_taken_modifiers:
+		if modifier == null:
+			return false
+		if modifier.get_script() != DAMAGE_TYPE_MODIFIER_SCRIPT:
+			return false
+
+	return true
+
+
 func compute_damage_taken(base_damage: int, damage_type: StringName = &"melee") -> int:
 	if base_damage <= 0:
 		return 0
@@ -25,6 +49,8 @@ func compute_damage_taken(base_damage: int, damage_type: StringName = &"melee") 
 
 	for modifier in damage_taken_modifiers:
 		if modifier == null:
+			continue
+		if modifier.get_script() != DAMAGE_TYPE_MODIFIER_SCRIPT:
 			continue
 		if StringName(modifier.get("damage_type")) != damage_type:
 			continue

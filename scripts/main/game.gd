@@ -109,6 +109,11 @@ func _is_valid_perimeter_segment(segment: Resource, seen_socket_ids: Dictionary)
 		push_warning("Perimeter segment %s is missing a valid structure_profile" % socket_id)
 		return false
 
+	var expected_profile_id := StringName(segment.socket_type)
+	if not segment.structure_profile.is_valid_profile(expected_profile_id):
+		push_warning("Perimeter segment %s has a structure_profile that does not match socket_type %s" % [socket_id, segment.socket_type])
+		return false
+
 	seen_socket_ids[socket_id] = true
 	return true
 
