@@ -1,4 +1,4 @@
-extends Area2D
+extends StaticBody2D
 class_name DefenseSocket
 
 @export var socket_id: StringName
@@ -6,13 +6,21 @@ class_name DefenseSocket
 @export_enum("damaged", "reinforced") var tier: String = "damaged"
 @export var current_hp: int = 90
 @export var max_hp: int = 90
+@export var socket_size: Vector2 = Vector2(48, 16)
 
 @onready var visual: Polygon2D = $Visual
 @onready var label: Label = $Label
+@onready var collision_shape: CollisionShape2D = $CollisionShape2D
+
+var _initial_tier: String = "damaged"
+var _initial_hp: int = 90
 
 
 func _ready() -> void:
+	add_to_group("defense_sockets")
+	_initial_tier = tier
 	max_hp = _get_max_hp_for_tier(tier)
+	_initial_hp = clamp(current_hp, 0, max_hp)
 	current_hp = clamp(current_hp, 0, max_hp)
 	_refresh_visuals()
 
@@ -68,6 +76,17 @@ func take_damage(amount: int, _source: Variant = null) -> void:
 		return
 
 	current_hp = max(current_hp - amount, 0)
+	_refresh_visuals()
+
+
+func is_breached() -> bool:
+	return current_hp <= 0
+
+
+func reset_for_new_run() -> void:
+	tier = _initial_tier
+	max_hp = _get_max_hp_for_tier(tier)
+	current_hp = clamp(_initial_hp, 0, max_hp)
 	_refresh_visuals()
 
 
@@ -132,6 +151,8 @@ func _refresh_visuals() -> void:
 	var target_max_hp := _get_max_hp_for_tier(tier)
 	max_hp = target_max_hp
 	current_hp = clamp(current_hp, 0, max_hp)
+	collision_shape.disabled = current_hp <= 0
+	_apply_socket_geometry()
 
 	if current_hp <= 0:
 		visual.color = Color(0.24, 0.18, 0.18, 1.0)
@@ -143,3 +164,22 @@ func _refresh_visuals() -> void:
 		visual.color = Color(0.57, 0.45, 0.35, 1.0)
 
 	label.text = "%s %d/%d" % [socket_id, current_hp, max_hp]
+
+
+func _apply_socket_geometry() -> void:
+	var half_size := socket_size * 0.5
+	var rectangle_shape := collision_shape.shape as RectangleShape2D
+	if rectangle_shape != null:
+		rectangle_shape.size = socket_size
+
+	visual.polygon = PackedVector2Array([
+		Vector2(-half_size.x, -half_size.y),
+		Vector2(half_size.x, -half_size.y),
+		Vector2(half_size.x, half_size.y),
+		Vector2(-half_size.x, half_size.y),
+	])
+
+	label.offset_left = -max(half_size.x + 14.0, 40.0)
+	label.offset_top = half_size.y + 8.0
+	label.offset_right = max(half_size.x + 24.0, 48.0)
+	label.offset_bottom = label.offset_top + 20.0

@@ -1,8 +1,9 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/player/Player.tscn" id="1_player_scene"]
 [ext_resource type="PackedScene" path="res://scenes/ui/HUD.tscn" id="2_hud_scene"]
 [ext_resource type="PackedScene" path="res://scenes/world/SleepPoint.tscn" id="3_sleep_scene"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/Zombie.tscn" id="12_zombie_scene"]
 [ext_resource type="PackedScene" path="res://scenes/world/DefenseSocket.tscn" id="11_socket_scene"]
 [ext_resource type="PackedScene" path="res://scenes/world/ScavengeNode.tscn" id="6_scavenge_scene"]
 [ext_resource type="Resource" path="res://data/pois/poi_a_bonus.tres" id="7_poi_a_bonus"]
@@ -25,6 +26,7 @@ script = ExtResource("4_game_manager")
 
 [node name="WaveManager" type="Node" parent="."]
 script = ExtResource("5_wave_manager")
+zombie_scene = ExtResource("12_zombie_scene")
 
 [node name="World" type="Node2D" parent="."]
 
@@ -178,28 +180,32 @@ position = Vector2(640, 360)
 [node name="DefenseSockets" type="Node2D" parent="World"]
 
 [node name="WallNW" parent="World/DefenseSockets" instance=ExtResource("11_socket_scene")]
-position = Vector2(520, 240)
+position = Vector2(540, 220)
 socket_id = &"wall_nw"
 current_hp = 90
 max_hp = 90
+socket_size = Vector2(200, 20)
 
 [node name="WallNE" parent="World/DefenseSockets" instance=ExtResource("11_socket_scene")]
-position = Vector2(760, 240)
+position = Vector2(740, 220)
 socket_id = &"wall_ne"
 current_hp = 60
 max_hp = 90
+socket_size = Vector2(200, 20)
 
 [node name="WallSW" parent="World/DefenseSockets" instance=ExtResource("11_socket_scene")]
-position = Vector2(520, 480)
+position = Vector2(540, 500)
 socket_id = &"wall_sw"
 current_hp = 90
 max_hp = 90
+socket_size = Vector2(200, 20)
 
 [node name="WallSE" parent="World/DefenseSockets" instance=ExtResource("11_socket_scene")]
-position = Vector2(760, 480)
+position = Vector2(740, 500)
 socket_id = &"wall_se"
 current_hp = 60
 max_hp = 90
+socket_size = Vector2(200, 20)
 
 [node name="DoorW" parent="World/DefenseSockets" instance=ExtResource("11_socket_scene")]
 position = Vector2(440, 360)
@@ -207,6 +213,7 @@ socket_id = &"door_w"
 socket_type = "door"
 current_hp = 45
 max_hp = 60
+socket_size = Vector2(20, 280)
 
 [node name="DoorE" parent="World/DefenseSockets" instance=ExtResource("11_socket_scene")]
 position = Vector2(840, 360)
@@ -214,6 +221,11 @@ socket_id = &"door_e"
 socket_type = "door"
 current_hp = 30
 max_hp = 60
+socket_size = Vector2(20, 280)
+
+[node name="ExplorationEnemies" type="Node2D" parent="World"]
+
+[node name="WaveEnemies" type="Node2D" parent="World"]
 
 [node name="Player" parent="." instance=ExtResource("1_player_scene")]
 

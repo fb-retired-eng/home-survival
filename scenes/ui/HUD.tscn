@@ -25,6 +25,10 @@ text = "Health: 100 / 100"
 unique_name_in_owner = true
 text = "Energy: 100 / 100"
 
+[node name="WaveLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+unique_name_in_owner = true
+text = "Wave: 0 / 3"
+
 [node name="ResourcesLabel" type="Label" parent="MarginContainer/VBoxContainer"]
 unique_name_in_owner = true
 text = "Salvage: 0   Parts: 0   Medicine: 0"

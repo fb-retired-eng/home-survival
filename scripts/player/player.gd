@@ -31,7 +31,7 @@ var is_busy: bool = false
 var facing_direction: Vector2 = Vector2.UP
 var attack_cooldown_remaining: float = 0.0
 var _base_body_color: Color
-var _nearby_interactables: Array[Area2D] = []
+var _nearby_interactables: Array[Node2D] = []
 var _busy_label: String = ""
 var _action_complete_callback: Callable
 var _interaction_gate_callback: Callable
@@ -44,14 +44,20 @@ var _interaction_gate_callback: Callable
 @onready var interaction_detector: Area2D = $InteractionDetector
 @onready var action_timer: Timer = $ActionTimer
 
+var _spawn_position: Vector2
+
 
 func _ready() -> void:
+	add_to_group("player")
+	_spawn_position = global_position
 	current_health = max_health
 	current_energy = max_energy
 	_base_body_color = body_visual.color
 	pickup_detector.area_entered.connect(_on_pickup_detector_area_entered)
 	interaction_detector.area_entered.connect(_on_interaction_detector_area_entered)
 	interaction_detector.area_exited.connect(_on_interaction_detector_area_exited)
+	interaction_detector.body_entered.connect(_on_interaction_detector_body_entered)
+	interaction_detector.body_exited.connect(_on_interaction_detector_body_exited)
 	action_timer.timeout.connect(_on_action_timer_timeout)
 	_emit_full_state()
 	_update_interaction_prompt()
@@ -171,6 +177,12 @@ func restore_energy(amount: int) -> void:
 	_update_interaction_prompt()
 
 
+func restore_full_energy() -> void:
+	current_energy = max_energy
+	energy_changed.emit(current_energy, max_energy)
+	_update_interaction_prompt()
+
+
 func begin_timed_action(duration: float, label: String, on_complete: Callable) -> bool:
 	if is_dead or is_busy:
 		return false
@@ -196,6 +208,10 @@ func cancel_timed_action() -> void:
 
 func set_interaction_gate(callback: Callable) -> void:
 	_interaction_gate_callback = callback
+	_update_interaction_prompt()
+
+
+func refresh_interaction_prompt() -> void:
 	_update_interaction_prompt()
 
 
@@ -251,6 +267,9 @@ func _attempt_attack() -> void:
 		if body == self:
 			continue
 
+		if not body.is_in_group("enemies"):
+			continue
+
 		if body.has_method("take_damage"):
 			body.take_damage(melee_damage, self)
 
@@ -292,6 +311,24 @@ func _die() -> void:
 	_update_interaction_prompt()
 
 
+func reset_for_new_run() -> void:
+	is_dead = false
+	cancel_timed_action()
+	current_health = max_health
+	current_energy = max_energy
+	resources = {
+		"salvage": 0,
+		"parts": 0,
+		"medicine": 0,
+	}
+	attack_cooldown_remaining = 0.0
+	velocity = Vector2.ZERO
+	_nearby_interactables.clear()
+	global_position = _spawn_position
+	_emit_full_state()
+	_update_interaction_prompt()
+
+
 func _emit_full_state() -> void:
 	health_changed.emit(current_health, max_health)
 	energy_changed.emit(current_energy, max_energy)
@@ -310,19 +347,19 @@ func _on_pickup_detector_area_entered(area: Area2D) -> void:
 
 
 func _on_interaction_detector_area_entered(area: Area2D) -> void:
-	if not area.has_method("get_interaction_label"):
-		return
-
-	if _nearby_interactables.has(area):
-		return
-
-	_nearby_interactables.append(area)
-	_update_interaction_prompt()
+	_register_interactable(area)
 
 
 func _on_interaction_detector_area_exited(area: Area2D) -> void:
-	_nearby_interactables.erase(area)
-	_update_interaction_prompt()
+	_unregister_interactable(area)
+
+
+func _on_interaction_detector_body_entered(body: Node2D) -> void:
+	_register_interactable(body)
+
+
+func _on_interaction_detector_body_exited(body: Node2D) -> void:
+	_unregister_interactable(body)
 
 
 func _on_action_timer_timeout() -> void:
@@ -335,8 +372,8 @@ func _on_action_timer_timeout() -> void:
 	_update_interaction_prompt()
 
 
-func _get_active_interactable() -> Area2D:
-	var best_interactable: Area2D = null
+func _get_active_interactable() -> Node2D:
+	var best_interactable: Node2D = null
 	var best_distance := INF
 
 	for interactable in _nearby_interactables:
@@ -372,3 +409,19 @@ func _update_interaction_prompt() -> void:
 		return
 
 	interaction_prompt_changed.emit("")
+
+
+func _register_interactable(interactable: Node2D) -> void:
+	if interactable == null or not interactable.has_method("get_interaction_label"):
+		return
+
+	if _nearby_interactables.has(interactable):
+		return
+
+	_nearby_interactables.append(interactable)
+	_update_interaction_prompt()
+
+
+func _unregister_interactable(interactable: Node2D) -> void:
+	_nearby_interactables.erase(interactable)
+	_update_interaction_prompt()

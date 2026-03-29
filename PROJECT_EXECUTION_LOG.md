@@ -79,3 +79,41 @@ Validation:
 
 Validation:
 - Headless Godot project load succeeded after the defense socket implementation.
+
+### Sleep And Wave Slice
+- Replaced the sleep-point stub with a real transition that restores player energy to full, increments the wave number, and enters `ACTIVE_WAVE`.
+- Expanded `WaveManager` into a real authored wave spawner using the three lane markers and the wave counts/intervals from the spec.
+- Added live wave-state HUD display and phase-aware sleep labels so the player can see when the next wave will start.
+- Updated zombies to use wave targeting behavior against intact defense sockets first and the player only after the base is breached.
+- Tightened combat grouping so player melee only hits enemies and spawned wave enemies no longer depend on hand-placed scene content.
+
+Validation:
+- Headless Godot project load succeeded after the sleep and wave implementation.
+
+### Wave Architecture And Blocking Fixes
+- Converted defense sockets into real static blockers that disable collision only when breached, so wave enemies cannot walk through intact base defenses.
+- Updated player interaction detection to handle both area-based interactables and body-based blockers, preserving socket repair and strengthen interactions after the scene change.
+- Moved zombie combat stats into a shared enemy definition resource so future wave and exploration spawners can reuse the same enemy data without duplicating stats.
+- Split wave enemies into a dedicated `WaveEnemies` layer and reserved a separate `ExplorationEnemies` layer so wave cleanup no longer wipes future daytime enemies.
+- Refined wave zombie behavior so sockets remain the primary siege target, but the player is hit when physically obstructing a zombie on the way in.
+- Added authored-wave validation and final-wave syncing so wave-data drift no longer traps the run in an empty `ACTIVE_WAVE` state.
+
+Validation:
+- Headless Godot project load succeeded after the architecture and blocking fixes.
+
+### Reset And Perimeter Cleanup
+- Resized and repositioned the six authored sockets so they now form a continuous perimeter around the base instead of leaving large open gaps.
+- Added per-run reset hooks for the player, defense sockets, and scavenge nodes so a future restart path can restore a clean run state instead of reusing depleted or damaged world state.
+- Made sleep misconfiguration visible in the interaction prompt while keeping sleep interactable in `PRE_WAVE`.
+- Improved zombie obstruction handling so stationary player blocking near a socket still counts as obstruction instead of relying only on slide collisions.
+
+Validation:
+- Headless Godot project load succeeded after the reset and perimeter cleanup.
+
+### Review Follow-Up Fixes
+- Added a line-of-sight ray check to zombie obstruction logic so players are no longer damaged through intact sockets or walls.
+- Moved the sleep energy refill behind successful wave-start validation so failed or misconfigured sleep attempts do not grant free recovery.
+- Cleared the player's cached nearby interactables during run reset so teleports and future restart flow do not leave stale prompt state behind.
+
+Validation:
+- Headless Godot project load succeeded after the review follow-up fixes.

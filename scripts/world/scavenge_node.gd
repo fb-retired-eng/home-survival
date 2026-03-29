@@ -18,6 +18,7 @@ var _is_searching: bool = false
 
 
 func _ready() -> void:
+	add_to_group("scavenge_nodes")
 	_refresh_visuals()
 
 
@@ -109,3 +110,9 @@ func _refresh_visuals() -> void:
 	else:
 		visual.color = Color(0.93, 0.79, 0.35, 1.0)
 		label.text = "Search"
+
+
+func reset_for_new_run() -> void:
+	is_depleted = false
+	_is_searching = false
+	_refresh_visuals()

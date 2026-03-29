@@ -5,6 +5,7 @@ var player
 
 @onready var health_label: Label = %HealthLabel
 @onready var energy_label: Label = %EnergyLabel
+@onready var wave_label: Label = %WaveLabel
 @onready var resources_label: Label = %ResourcesLabel
 @onready var status_label: Label = %StatusLabel
 @onready var interaction_label: Label = %InteractionLabel
@@ -28,6 +29,10 @@ func set_status(text: String) -> void:
 
 func set_interaction_prompt(text: String) -> void:
 	interaction_label.text = text
+
+
+func set_wave(current_wave: int, final_wave: int) -> void:
+	wave_label.text = "Wave: %d / %d" % [current_wave, final_wave]
 
 
 func _on_health_changed(current: int, maximum: int) -> void:
