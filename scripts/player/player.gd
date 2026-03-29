@@ -116,6 +116,35 @@ func spend_resource(resource_id: String, amount: int) -> bool:
 	return true
 
 
+func has_resources(costs: Dictionary) -> bool:
+	for resource_id in costs.keys():
+		var amount := int(costs[resource_id])
+		if amount <= 0:
+			continue
+
+		if not RESOURCE_IDS.has(String(resource_id)):
+			return false
+
+		if int(resources.get(String(resource_id), 0)) < amount:
+			return false
+
+	return true
+
+
+func spend_resources(costs: Dictionary) -> bool:
+	if not has_resources(costs):
+		return false
+
+	for resource_id in costs.keys():
+		var amount := int(costs[resource_id])
+		if amount <= 0:
+			continue
+		spend_resource(String(resource_id), amount)
+
+	_update_interaction_prompt()
+	return true
+
+
 func can_spend_energy(amount: int) -> bool:
 	return current_energy >= amount
 

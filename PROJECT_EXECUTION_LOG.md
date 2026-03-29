@@ -69,3 +69,13 @@ Validation:
 
 Validation:
 - Headless Godot project load succeeded after the interaction and resource-data cleanup.
+
+### Defense Socket Slice
+- Implemented six authored defense sockets around the base using the exact starting HP pattern from the spec.
+- Added repair and strengthen interactions with resource cost checks, damaged/reinforced tier transitions, and socket HP restoration rules.
+- Added placeholder socket damage handling so future wave enemies can target the same socket script instead of introducing a second damage path.
+- Exposed socket status visually with per-socket labels and color changes for damaged, reinforced, and broken states.
+- Extended player resource helpers so socket interactions use the same shared spend/check path as scavenging and medicine use.
+
+Validation:
+- Headless Godot project load succeeded after the defense socket implementation.
