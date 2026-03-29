@@ -1,0 +1,16 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/scavenge_node.gd" id="1_scavenge"]
+
+[sub_resource type="CircleShape2D" id="1_scavenge_shape"]
+radius = 18.0
+
+[node name="ScavengeNode" type="Area2D"]
+script = ExtResource("1_scavenge")
+
+[node name="Visual" type="Polygon2D" parent="."]
+color = Color(0.93, 0.79, 0.35, 1)
+polygon = PackedVector2Array(0, -18, 18, 0, 0, 18, -18, 0)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("1_scavenge_shape")

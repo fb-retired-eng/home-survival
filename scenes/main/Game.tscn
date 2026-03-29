@@ -1,0 +1,133 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/player/Player.tscn" id="1_player_scene"]
+[ext_resource type="PackedScene" path="res://scenes/ui/HUD.tscn" id="2_hud_scene"]
+[ext_resource type="PackedScene" path="res://scenes/world/SleepPoint.tscn" id="3_sleep_scene"]
+[ext_resource type="Script" path="res://scripts/managers/game_manager.gd" id="4_game_manager"]
+[ext_resource type="Script" path="res://scripts/managers/wave_manager.gd" id="5_wave_manager"]
+[ext_resource type="PackedScene" path="res://scenes/world/ResourcePickup.tscn" id="7_pickup_scene"]
+[ext_resource type="Script" path="res://scripts/main/game.gd" id="8_game_script"]
+
+[sub_resource type="RectangleShape2D" id="1_horizontal_wall"]
+size = Vector2(1280, 32)
+
+[sub_resource type="RectangleShape2D" id="2_vertical_wall"]
+size = Vector2(32, 720)
+
+[node name="Game" type="Node2D"]
+script = ExtResource("8_game_script")
+
+[node name="GameManager" type="Node" parent="."]
+script = ExtResource("4_game_manager")
+
+[node name="WaveManager" type="Node" parent="."]
+script = ExtResource("5_wave_manager")
+
+[node name="World" type="Node2D" parent="."]
+
+[node name="Playfield" type="Polygon2D" parent="World"]
+color = Color(0.14, 0.18, 0.15, 1)
+polygon = PackedVector2Array(0, 0, 1280, 0, 1280, 720, 0, 720)
+
+[node name="BaseZone" type="Polygon2D" parent="World"]
+color = Color(0.22, 0.28, 0.24, 1)
+polygon = PackedVector2Array(440, 220, 840, 220, 840, 500, 440, 500)
+
+[node name="NorthLane" type="Polygon2D" parent="World"]
+color = Color(0.46, 0.19, 0.16, 0.5)
+polygon = PackedVector2Array(540, 0, 740, 0, 740, 160, 540, 160)
+
+[node name="EastLane" type="Polygon2D" parent="World"]
+color = Color(0.46, 0.19, 0.16, 0.5)
+polygon = PackedVector2Array(1080, 220, 1280, 220, 1280, 500, 1080, 500)
+
+[node name="WestLane" type="Polygon2D" parent="World"]
+color = Color(0.46, 0.19, 0.16, 0.5)
+polygon = PackedVector2Array(0, 220, 200, 220, 200, 500, 0, 500)
+
+[node name="POI_A" type="Node2D" parent="World"]
+position = Vector2(260, 170)
+
+[node name="Marker" type="Polygon2D" parent="World/POI_A"]
+color = Color(0.93, 0.72, 0.28, 1)
+polygon = PackedVector2Array(0, -28, 24, 0, 0, 28, -24, 0)
+
+[node name="Label" type="Label" parent="World/POI_A"]
+offset_left = -28.0
+offset_top = 40.0
+offset_right = 36.0
+offset_bottom = 63.0
+text = "POI A"
+
+[node name="POI_B" type="Node2D" parent="World"]
+position = Vector2(1030, 150)
+
+[node name="Marker" type="Polygon2D" parent="World/POI_B"]
+color = Color(0.81, 0.55, 0.26, 1)
+polygon = PackedVector2Array(0, -28, 24, 0, 0, 28, -24, 0)
+
+[node name="Label" type="Label" parent="World/POI_B"]
+offset_left = -28.0
+offset_top = 40.0
+offset_right = 36.0
+offset_bottom = 63.0
+text = "POI B"
+
+[node name="SpawnMarkers" type="Node2D" parent="World"]
+
+[node name="North" type="Marker2D" parent="World/SpawnMarkers"]
+position = Vector2(640, 56)
+
+[node name="East" type="Marker2D" parent="World/SpawnMarkers"]
+position = Vector2(1210, 360)
+
+[node name="West" type="Marker2D" parent="World/SpawnMarkers"]
+position = Vector2(70, 360)
+
+[node name="MapBounds" type="Node2D" parent="World"]
+
+[node name="TopWall" type="StaticBody2D" parent="World/MapBounds"]
+position = Vector2(640, -16)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/MapBounds/TopWall"]
+shape = SubResource("1_horizontal_wall")
+
+[node name="BottomWall" type="StaticBody2D" parent="World/MapBounds"]
+position = Vector2(640, 736)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/MapBounds/BottomWall"]
+shape = SubResource("1_horizontal_wall")
+
+[node name="LeftWall" type="StaticBody2D" parent="World/MapBounds"]
+position = Vector2(-16, 360)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/MapBounds/LeftWall"]
+shape = SubResource("2_vertical_wall")
+
+[node name="RightWall" type="StaticBody2D" parent="World/MapBounds"]
+position = Vector2(1296, 360)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/MapBounds/RightWall"]
+shape = SubResource("2_vertical_wall")
+
+[node name="SleepPoint" parent="World" instance=ExtResource("3_sleep_scene")]
+position = Vector2(640, 360)
+
+[node name="Player" parent="." instance=ExtResource("1_player_scene")]
+
+[node name="PickupSalvage" parent="World" instance=ExtResource("7_pickup_scene")]
+position = Vector2(560, 360)
+resource_id = "salvage"
+amount = 3
+
+[node name="PickupParts" parent="World" instance=ExtResource("7_pickup_scene")]
+position = Vector2(260, 230)
+resource_id = "parts"
+amount = 2
+
+[node name="PickupMedicine" parent="World" instance=ExtResource("7_pickup_scene")]
+position = Vector2(970, 220)
+resource_id = "medicine"
+amount = 1
+
+[node name="HUD" parent="." instance=ExtResource("2_hud_scene")]

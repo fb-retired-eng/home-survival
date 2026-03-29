@@ -1,0 +1,45 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
+
+[sub_resource type="RectangleShape2D" id="1_body_shape"]
+size = Vector2(24, 24)
+
+[sub_resource type="RectangleShape2D" id="2_attack_shape"]
+size = Vector2(28, 18)
+
+[sub_resource type="CircleShape2D" id="3_pickup_shape"]
+radius = 20.0
+
+[node name="Player" type="CharacterBody2D"]
+script = ExtResource("1_player")
+position = Vector2(640, 360)
+
+[node name="Body" type="Polygon2D" parent="."]
+color = Color(0.88, 0.92, 0.96, 1)
+polygon = PackedVector2Array(-12, -12, 12, -12, 12, 12, -12, 12)
+
+[node name="FacingMarker" type="Polygon2D" parent="."]
+color = Color(0.96, 0.49, 0.29, 1)
+polygon = PackedVector2Array(0, -18, 6, -6, -6, -6)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("1_body_shape")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position_smoothing_enabled = true
+position_smoothing_speed = 6.0
+current = true
+
+[node name="AttackPivot" type="Node2D" parent="."]
+
+[node name="AttackArea" type="Area2D" parent="AttackPivot"]
+position = Vector2(0, -24)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="AttackPivot/AttackArea"]
+shape = SubResource("2_attack_shape")
+
+[node name="PickupDetector" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="PickupDetector"]
+shape = SubResource("3_pickup_shape")
