@@ -85,7 +85,7 @@ func _on_energy_changed(current: int, maximum: int) -> void:
 
 
 func _on_resources_changed(resources: Dictionary) -> void:
-	resources_label.text = "Salvage %d   |   Parts %d   |   Medicine %d" % [
+	resources_label.text = "🔩%d  ⚙️%d  🩹%d" % [
 		int(resources.get("salvage", 0)),
 		int(resources.get("parts", 0)),
 		int(resources.get("medicine", 0)),

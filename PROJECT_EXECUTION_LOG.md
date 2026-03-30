@@ -819,3 +819,19 @@ Validation:
 - Strengthened the documented picky-review rule so it now explicitly requires an adversarial reviewer stance instead of a soft confirmatory pass.
 - Added a runtime-probe requirement for gameplay, AI, combat, collision, spawn, reset, and phase/state-machine changes when feasible.
 - Updated the visible README checklist so the repo workflow now treats static review alone as insufficient for risky gameplay changes.
+
+### HUD Footprint Refinement
+- Split the HUD into a smaller top-left vitals card, a lighter secondary status panel, and a bottom-center interaction prompt instead of one large top-left block.
+- Reduced persistent screen coverage by keeping only core always-on info in the main card and moving situational prompts out of that space.
+- Fixed the review-found layout fragility by anchoring the interaction prompt to the bottom center instead of fixed screen pixels.
+
+Validation:
+- Headless Godot project load succeeded after the HUD footprint refinement.
+
+### HUD Compactness And Readability Pass
+- Replaced the compact HUD vitals/resource shorthand with lightweight emoji labels so the information density stays high without longer text labels consuming space.
+- Collapsed health and energy into a single aligned vitals row so the main HUD card is shorter and reads more like a game overlay than a stacked debug panel.
+- Tightened the vitals layout so icons, bars, and values share one straight line instead of appearing vertically staggered.
+
+Validation:
+- Headless Godot project load succeeded after the HUD compactness and readability pass.
