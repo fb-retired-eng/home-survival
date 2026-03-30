@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3]
+[gd_scene load_steps=18 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/player/Player.tscn" id="1_player_scene"]
 [ext_resource type="PackedScene" path="res://scenes/ui/HUD.tscn" id="2_hud_scene"]
@@ -13,16 +13,19 @@
 [ext_resource type="Script" path="res://scripts/main/game.gd" id="8_game_script"]
 [ext_resource type="Resource" path="res://data/resources/mvp0_perimeter.tres" id="13_perimeter"]
 [ext_resource type="Resource" path="res://data/waves/mvp0_waves.tres" id="14_waves"]
+[ext_resource type="Script" path="res://scripts/world/exploration_spawn_point.gd" id="15_exploration_spawn"]
+[ext_resource type="Resource" path="res://data/enemies/zombie_basic.tres" id="16_basic_enemy"]
 
 [sub_resource type="RectangleShape2D" id="1_horizontal_wall"]
-size = Vector2(1280, 32)
+size = Vector2(1920, 32)
 
 [sub_resource type="RectangleShape2D" id="2_vertical_wall"]
-size = Vector2(32, 720)
+size = Vector2(32, 1080)
 
 [node name="Game" type="Node2D"]
 script = ExtResource("8_game_script")
 defense_socket_scene = ExtResource("11_socket_scene")
+exploration_enemy_scene = ExtResource("12_zombie_scene")
 perimeter_definition = ExtResource("13_perimeter")
 
 [node name="GameManager" type="Node" parent="."]
@@ -37,42 +40,42 @@ wave_set_definition = ExtResource("14_waves")
 
 [node name="Playfield" type="Polygon2D" parent="World"]
 color = Color(0.14, 0.18, 0.15, 1)
-polygon = PackedVector2Array(0, 0, 1280, 0, 1280, 720, 0, 720)
+polygon = PackedVector2Array(0, 0, 1920, 0, 1920, 1080, 0, 1080)
 
 [node name="BaseZone" type="Polygon2D" parent="World"]
 color = Color(0.22, 0.28, 0.24, 1)
-polygon = PackedVector2Array(440, 220, 840, 220, 840, 500, 440, 500)
+polygon = PackedVector2Array(760, 400, 1160, 400, 1160, 680, 760, 680)
 
 [node name="BaseInnerEdgeTop" type="Polygon2D" parent="World"]
 color = Color(0.84, 0.9, 0.82, 0.2)
-polygon = PackedVector2Array(440, 220, 840, 220, 840, 224, 440, 224)
+polygon = PackedVector2Array(760, 400, 1160, 400, 1160, 404, 760, 404)
 
 [node name="BaseInnerEdgeBottom" type="Polygon2D" parent="World"]
 color = Color(0.84, 0.9, 0.82, 0.2)
-polygon = PackedVector2Array(440, 496, 840, 496, 840, 500, 440, 500)
+polygon = PackedVector2Array(760, 676, 1160, 676, 1160, 680, 760, 680)
 
 [node name="BaseInnerEdgeLeft" type="Polygon2D" parent="World"]
 color = Color(0.84, 0.9, 0.82, 0.2)
-polygon = PackedVector2Array(440, 220, 444, 220, 444, 500, 440, 500)
+polygon = PackedVector2Array(760, 400, 764, 400, 764, 680, 760, 680)
 
 [node name="BaseInnerEdgeRight" type="Polygon2D" parent="World"]
 color = Color(0.84, 0.9, 0.82, 0.2)
-polygon = PackedVector2Array(836, 220, 840, 220, 840, 500, 836, 500)
+polygon = PackedVector2Array(1156, 400, 1160, 400, 1160, 680, 1156, 680)
 
 [node name="NorthLane" type="Polygon2D" parent="World"]
 color = Color(0.46, 0.19, 0.16, 0.5)
-polygon = PackedVector2Array(540, 0, 740, 0, 740, 160, 540, 160)
+polygon = PackedVector2Array(860, 0, 1060, 0, 1060, 300, 860, 300)
 
 [node name="EastLane" type="Polygon2D" parent="World"]
 color = Color(0.46, 0.19, 0.16, 0.5)
-polygon = PackedVector2Array(1080, 220, 1280, 220, 1280, 500, 1080, 500)
+polygon = PackedVector2Array(1600, 320, 1920, 320, 1920, 760, 1600, 760)
 
 [node name="WestLane" type="Polygon2D" parent="World"]
 color = Color(0.46, 0.19, 0.16, 0.5)
-polygon = PackedVector2Array(0, 220, 200, 220, 200, 500, 0, 500)
+polygon = PackedVector2Array(0, 320, 320, 320, 320, 760, 0, 760)
 
 [node name="POI_A" type="Node2D" parent="World"]
-position = Vector2(260, 170)
+position = Vector2(320, 250)
 
 [node name="Marker" type="Polygon2D" parent="World/POI_A"]
 color = Color(0.93, 0.72, 0.28, 1)
@@ -116,7 +119,7 @@ reward_medicine = 1
 bonus_table = ExtResource("7_poi_a_bonus")
 
 [node name="POI_B" type="Node2D" parent="World"]
-position = Vector2(1030, 150)
+position = Vector2(1600, 250)
 
 [node name="Marker" type="Polygon2D" parent="World/POI_B"]
 color = Color(0.81, 0.55, 0.26, 1)
@@ -158,47 +161,162 @@ poi_id = &"poi_b"
 reward_parts = 2
 bonus_table = ExtResource("10_poi_b_bonus")
 
+[node name="POI_C" type="Node2D" parent="World"]
+position = Vector2(320, 860)
+
+[node name="Marker" type="Polygon2D" parent="World/POI_C"]
+color = Color(0.9, 0.67, 0.25, 1)
+polygon = PackedVector2Array(0, -28, 24, 0, 0, 28, -24, 0)
+
+[node name="Label" type="Label" parent="World/POI_C"]
+offset_left = -28.0
+offset_top = 40.0
+offset_right = 36.0
+offset_bottom = 63.0
+text = "POI C"
+
+[node name="Node1" parent="World/POI_C" instance=ExtResource("6_scavenge_scene")]
+position = Vector2(-64, -36)
+node_id = &"poi_c_1"
+poi_id = &"poi_c"
+reward_salvage = 3
+bonus_table = ExtResource("7_poi_a_bonus")
+
+[node name="Node2" parent="World/POI_C" instance=ExtResource("6_scavenge_scene")]
+position = Vector2(52, -18)
+node_id = &"poi_c_2"
+poi_id = &"poi_c"
+reward_salvage = 2
+reward_parts = 1
+bonus_table = ExtResource("7_poi_a_bonus")
+
+[node name="Node3" parent="World/POI_C" instance=ExtResource("6_scavenge_scene")]
+position = Vector2(-18, 54)
+node_id = &"poi_c_3"
+poi_id = &"poi_c"
+reward_salvage = 2
+reward_medicine = 1
+bonus_table = ExtResource("7_poi_a_bonus")
+
+[node name="Node4" parent="World/POI_C" instance=ExtResource("6_scavenge_scene")]
+position = Vector2(56, 66)
+node_id = &"poi_c_4"
+poi_id = &"poi_c"
+reward_salvage = 2
+reward_parts = 1
+bonus_table = ExtResource("7_poi_a_bonus")
+
+[node name="POI_D" type="Node2D" parent="World"]
+position = Vector2(1600, 860)
+
+[node name="Marker" type="Polygon2D" parent="World/POI_D"]
+color = Color(0.8, 0.52, 0.23, 1)
+polygon = PackedVector2Array(0, -28, 24, 0, 0, 28, -24, 0)
+
+[node name="Label" type="Label" parent="World/POI_D"]
+offset_left = -28.0
+offset_top = 40.0
+offset_right = 36.0
+offset_bottom = 63.0
+text = "POI D"
+
+[node name="Node1" parent="World/POI_D" instance=ExtResource("6_scavenge_scene")]
+position = Vector2(-58, -32)
+node_id = &"poi_d_1"
+poi_id = &"poi_d"
+reward_parts = 1
+bonus_table = ExtResource("10_poi_b_bonus")
+
+[node name="Node2" parent="World/POI_D" instance=ExtResource("6_scavenge_scene")]
+position = Vector2(54, -14)
+node_id = &"poi_d_2"
+poi_id = &"poi_d"
+reward_salvage = 1
+reward_parts = 2
+bonus_table = ExtResource("10_poi_b_bonus")
+
+[node name="Node3" parent="World/POI_D" instance=ExtResource("6_scavenge_scene")]
+position = Vector2(-20, 56)
+node_id = &"poi_d_3"
+poi_id = &"poi_d"
+reward_parts = 1
+reward_medicine = 1
+bonus_table = ExtResource("10_poi_b_bonus")
+
+[node name="Node4" parent="World/POI_D" instance=ExtResource("6_scavenge_scene")]
+position = Vector2(58, 70)
+node_id = &"poi_d_4"
+poi_id = &"poi_d"
+reward_parts = 2
+bonus_table = ExtResource("10_poi_b_bonus")
+
 [node name="SpawnMarkers" type="Node2D" parent="World"]
 
 [node name="North" type="Marker2D" parent="World/SpawnMarkers"]
-position = Vector2(640, 56)
+position = Vector2(960, 90)
 
 [node name="East" type="Marker2D" parent="World/SpawnMarkers"]
-position = Vector2(1210, 360)
+position = Vector2(1830, 540)
 
 [node name="West" type="Marker2D" parent="World/SpawnMarkers"]
-position = Vector2(70, 360)
+position = Vector2(90, 540)
 
 [node name="MapBounds" type="Node2D" parent="World"]
 
 [node name="TopWall" type="StaticBody2D" parent="World/MapBounds"]
-position = Vector2(640, -16)
+position = Vector2(960, -16)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="World/MapBounds/TopWall"]
 shape = SubResource("1_horizontal_wall")
 
 [node name="BottomWall" type="StaticBody2D" parent="World/MapBounds"]
-position = Vector2(640, 736)
+position = Vector2(960, 1096)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="World/MapBounds/BottomWall"]
 shape = SubResource("1_horizontal_wall")
 
 [node name="LeftWall" type="StaticBody2D" parent="World/MapBounds"]
-position = Vector2(-16, 360)
+position = Vector2(-16, 540)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="World/MapBounds/LeftWall"]
 shape = SubResource("2_vertical_wall")
 
 [node name="RightWall" type="StaticBody2D" parent="World/MapBounds"]
-position = Vector2(1296, 360)
+position = Vector2(1936, 540)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="World/MapBounds/RightWall"]
 shape = SubResource("2_vertical_wall")
 
 [node name="SleepPoint" parent="World" instance=ExtResource("3_sleep_scene")]
-position = Vector2(640, 360)
+position = Vector2(960, 540)
 
 [node name="DefenseSockets" type="Node2D" parent="World"]
+
+[node name="ExplorationSpawnPoints" type="Node2D" parent="World"]
+
+[node name="POI_A_Guard" type="Marker2D" parent="World/ExplorationSpawnPoints"]
+position = Vector2(382, 328)
+script = ExtResource("15_exploration_spawn")
+spawn_id = &"explore_guard_a"
+enemy_definition = ExtResource("16_basic_enemy")
+
+[node name="POI_B_Guard" type="Marker2D" parent="World/ExplorationSpawnPoints"]
+position = Vector2(1534, 332)
+script = ExtResource("15_exploration_spawn")
+spawn_id = &"explore_guard_b"
+enemy_definition = ExtResource("16_basic_enemy")
+
+[node name="POI_C_Guard" type="Marker2D" parent="World/ExplorationSpawnPoints"]
+position = Vector2(394, 760)
+script = ExtResource("15_exploration_spawn")
+spawn_id = &"explore_guard_c"
+enemy_definition = ExtResource("16_basic_enemy")
+
+[node name="POI_D_Guard" type="Marker2D" parent="World/ExplorationSpawnPoints"]
+position = Vector2(1528, 756)
+script = ExtResource("15_exploration_spawn")
+spawn_id = &"explore_guard_d"
+enemy_definition = ExtResource("16_basic_enemy")
 
 [node name="ExplorationEnemies" type="Node2D" parent="World"]
 

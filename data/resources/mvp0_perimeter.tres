@@ -8,7 +8,7 @@
 [sub_resource type="Resource" id="1"]
 script = ExtResource("2_segment")
 socket_id = &"wall_n"
-position = Vector2(640, 208)
+position = Vector2(960, 388)
 current_hp = 120
 structure_profile = ExtResource("3_wall_profile")
 socket_size = Vector2(400, 24)
@@ -18,7 +18,7 @@ interaction_area_size = Vector2(400, 56)
 [sub_resource type="Resource" id="2"]
 script = ExtResource("2_segment")
 socket_id = &"wall_s"
-position = Vector2(640, 512)
+position = Vector2(960, 692)
 current_hp = 120
 structure_profile = ExtResource("3_wall_profile")
 socket_size = Vector2(400, 24)
@@ -29,7 +29,7 @@ interaction_area_size = Vector2(400, 56)
 script = ExtResource("2_segment")
 socket_id = &"door_w"
 socket_type = "door"
-position = Vector2(428, 360)
+position = Vector2(748, 540)
 current_hp = 90
 structure_profile = ExtResource("4_door_profile")
 socket_size = Vector2(24, 280)
@@ -40,7 +40,7 @@ interaction_area_size = Vector2(56, 280)
 script = ExtResource("2_segment")
 socket_id = &"door_e"
 socket_type = "door"
-position = Vector2(852, 360)
+position = Vector2(1172, 540)
 current_hp = 90
 structure_profile = ExtResource("4_door_profile")
 socket_size = Vector2(24, 280)

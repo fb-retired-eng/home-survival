@@ -27,6 +27,7 @@ signal state_changed(socket: DefenseSocket)
 var _initial_tier: String = "damaged"
 var _initial_hp: int = 90
 var _context_label_visible: bool = false
+var _damage_feedback_tween: Tween
 
 
 func _ready() -> void:
@@ -133,6 +134,20 @@ func is_breached() -> bool:
 	return current_hp <= 0
 
 
+func get_attack_aim_point(from_position: Vector2) -> Vector2:
+	var half_size := socket_size * 0.5
+	var clamped_point := Vector2(
+		clampf(from_position.x, global_position.x - half_size.x, global_position.x + half_size.x),
+		clampf(from_position.y, global_position.y - half_size.y, global_position.y + half_size.y)
+	)
+	var to_center := global_position - clamped_point
+	if to_center.is_zero_approx():
+		return clamped_point
+
+	var inset_distance: float = min(2.0, min(half_size.x, half_size.y) * 0.25)
+	return clamped_point + to_center.normalized() * inset_distance
+
+
 func reset_for_new_run() -> void:
 	tier = _initial_tier
 	max_hp = _get_max_hp_for_tier(tier)
@@ -218,11 +233,33 @@ func _apply_socket_geometry() -> void:
 		Vector2(half_size.x, half_size.y),
 		Vector2(-half_size.x, half_size.y),
 	])
+	_apply_label_layout(half_size)
 
-	label.offset_left = -max(half_size.x + 14.0, 40.0)
-	label.offset_top = half_size.y + 8.0
-	label.offset_right = max(half_size.x + 24.0, 48.0)
-	label.offset_bottom = label.offset_top + 20.0
+
+func _apply_label_layout(half_size: Vector2) -> void:
+	var label_width: float = max(socket_size.x + 48.0, 120.0)
+	var label_height: float = 24.0
+	var margin: float = 10.0
+
+	if socket_size.x >= socket_size.y:
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.offset_left = -label_width * 0.5
+		label.offset_right = label.offset_left + label_width
+		if global_position.y <= 360.0:
+			label.offset_top = -half_size.y - label_height - margin
+		else:
+			label.offset_top = half_size.y + margin
+		label.offset_bottom = label.offset_top + label_height
+		return
+
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	if global_position.x <= 640.0:
+		label.offset_left = half_size.x + margin
+	else:
+		label.offset_left = -label_width - half_size.x - margin
+	label.offset_top = -label_height * 0.5
+	label.offset_right = label.offset_left + label_width
+	label.offset_bottom = label.offset_top + label_height
 
 
 func _get_collision_layer_for_state() -> int:
@@ -269,5 +306,17 @@ func _flash_damage_feedback() -> void:
 
 	var settled_color := visual.color
 	visual.color = Color(1.0, 0.56, 0.42, 1.0)
-	var tween := create_tween()
-	tween.tween_property(visual, "color", settled_color, 0.16)
+	if _damage_feedback_tween != null and is_instance_valid(_damage_feedback_tween):
+		_damage_feedback_tween.kill()
+
+	var pulse_scale := Vector2(1.08, 1.08)
+	if socket_size.x >= socket_size.y:
+		pulse_scale = Vector2(1.02, 1.16)
+	else:
+		pulse_scale = Vector2(1.16, 1.02)
+
+	visual.scale = pulse_scale
+	visual.position = Vector2.ZERO
+	_damage_feedback_tween = create_tween()
+	_damage_feedback_tween.parallel().tween_property(visual, "color", settled_color, 0.16)
+	_damage_feedback_tween.parallel().tween_property(visual, "scale", Vector2.ONE, 0.16)

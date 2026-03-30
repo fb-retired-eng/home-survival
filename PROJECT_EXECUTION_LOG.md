@@ -341,7 +341,7 @@ Validation:
 ### Wave Definitions To Data
 - Moved wave counts, spawn intervals, lane IDs, and preferred socket targets out of `wave_manager.gd` into `data/waves/mvp0_waves.tres`.
 - Added wave-set, wave, and wave-lane resource scripts so authored wave data can be validated and cached into the runtime spawn queue without hardcoded dictionaries.
-- Updated `WaveManager` and `Game.tscn` to load wave behavior from the wave-set resource while preserving the existing 3-wave MVP0 flow.
+- Updated `WaveManager` and `Game.tscn` to load wave behavior from the wave-set resource while preserving the authored MVP0 wave flow.
 
 Validation:
 - Headless Godot project load succeeded after the wave-definition data refactor.
@@ -369,3 +369,453 @@ Validation:
 
 Validation:
 - Headless Godot project load succeeded after the review-fix data validation pass.
+
+### Enemy Facing Marker
+- Added a visible facing marker to enemy scenes and rotated it from the current target direction so zombie orientation reads clearly while moving and while standing in attack range.
+
+Validation:
+- Headless Godot project load succeeded after the enemy facing marker update.
+
+### Visible Attack Effects
+- Added a visible melee swipe effect for the player so attacks read on screen instead of only through damage results.
+- Added a brief enemy strike flash tied to zombie attack direction so enemy hits are easier to parse in combat.
+
+Validation:
+- Headless Godot project load succeeded after the visible attack effects pass.
+
+### Review Fixes For Wave Cache And Attack Commitment
+- Moved wave-definition cache rebuild to `WaveManager.configure()` so cache validation runs after live spawn markers, player, and perimeter sockets are available instead of rebuilding too early in `_ready()`.
+- Fixed wave-lane cache validation so every lane now validates its enemy definition and preferred socket IDs during cache rebuild, preventing malformed wave data from being counted as a defined runnable wave.
+- Changed player melee feedback so the visible swing only plays after a real hit attempt is committed, rather than showing free attack flashes when swinging at empty space.
+
+Validation:
+- Headless Godot project load succeeded after the wave-cache and attack-commitment review fixes.
+
+### Sleep Partial HP Restore
+- Changed sleep so a successful wave start now restores full energy and a small amount of HP instead of only restoring energy.
+- Made the sleep heal amount configurable from `Game` so it can be tuned without touching the sleep interaction flow.
+- Updated the MVP0 spec wording so the documented sleep behavior matches the current game.
+
+Validation:
+- Headless Godot project load succeeded after the sleep-heal update.
+
+### End-State Overlay Visibility
+- Added a centered end-state overlay to the HUD so victory and loss are visually obvious instead of only appearing as small text inside the top-left info panel.
+- Wired `WIN` and `LOSS` state changes to show distinct overlay titles, messages, and accent colors while keeping restart instructions visible.
+- Updated victory status text to use the configured final-wave count instead of a hardcoded `3`.
+
+Validation:
+- Headless Godot project load succeeded after the end-state overlay update.
+
+### Configurable Enemy Intelligence
+- Extended `EnemyDefinition` with configurable wave targeting and obstruction behavior so enemy resources can choose whether to prioritize sockets or players and whether to peel onto a blocking player.
+- Updated zombie runtime targeting to read those intelligence settings from enemy configs instead of hardcoding one shared behavior in `zombie.gd`.
+- Made the existing enemy types intentionally different: basic zombies still switch to a blocking player, while brutes stay committed to structure pressure.
+
+Validation:
+- Headless Godot project load succeeded after the configurable enemy-intelligence update.
+
+### Enemy Intelligence Review Fixes
+- Added exploration target mode and fallback-to-player behavior to enemy configs so the new intelligence settings apply outside wave mode and `socket_only` enemies do not go inert after all sockets are breached.
+- Added contact retaliation behavior so heavy enemies can stay structure-focused without creating a free body-block exploit for the player.
+- Updated the basic and brute enemy resources to author the new AI fields explicitly instead of relying on defaults.
+
+Validation:
+- Headless Godot project load succeeded after the enemy-intelligence review fixes.
+
+### Facing-Gated Enemy Attacks
+- Changed enemy melee so overlap alone is no longer enough to deal damage; enemies must also be facing the player or structure when the hit resolves.
+- Added a configurable attack-facing cone threshold to enemy definitions so different enemy types can have tighter or wider attack arcs through data.
+- Authored the current basic and brute enemies with different facing tolerances so heavier enemies can keep a broader attack cone without restoring rear-hit damage.
+
+Validation:
+- Headless Godot project load succeeded after the facing-gated enemy attack update.
+
+### Nearby Player Aggro
+- Added configurable nearby-player aggro and chase radii to enemy definitions so enemies can switch from their default target logic to actively pursuing the player when the player gets too close.
+- Updated zombie runtime to maintain a chase state with separate acquire and break distances instead of doing a one-frame proximity override.
+- Authored the current basic and brute enemies with different chase distances so lighter enemies react earlier while heavier enemies still require closer commitment.
+
+Validation:
+- Headless Godot project load succeeded after the nearby-player aggro update.
+
+### Lowest-Tier Enemy Tuning
+- Slowed the basic zombie down further and increased its attack interval so the lowest-tier enemy applies less constant pressure.
+- Kept the change fully data-driven by tuning only the `zombie_basic` enemy resource.
+
+Validation:
+- Headless Godot project load succeeded after the lowest-tier enemy tuning pass.
+
+### Lowest-Tier Enemy Tuning Pass 2
+- Reduced the basic zombie move speed again and increased its attack interval again to further soften early-wave pressure.
+- Kept the adjustment data-only so the balance remains editable from the enemy resource.
+
+Validation:
+- Headless Godot project load succeeded after the second lowest-tier enemy tuning pass.
+
+### Socket Label Layout Cleanup
+- Changed defense-socket HP labels to use side-aware placement instead of always rendering below the socket, which reduces overlap between wall and door labels around the base perimeter.
+- Placed top-wall labels above, bottom-wall labels below, and door labels inward toward the base so nearby labels do not block each other as often.
+
+Validation:
+- Headless Godot project load succeeded after the socket-label layout cleanup.
+
+### Player Attack Energy Tuning
+- Reduced the player melee energy cost from `5` to `1` to make basic combat less punishing on the energy economy.
+
+Validation:
+- Headless Godot project load succeeded after the player attack energy tuning pass.
+
+### Extended Wave Set
+- Expanded the wave data from 3 waves to 5 waves so the run lasts longer without changing the core loop structure.
+- Added two later waves with heavier mixed-lane pressure, including more north-wall basics and extra brute pressure on the side doors.
+- Kept the change fully data-driven by extending `mvp0_waves.tres` only; final-wave count continues to sync from authored wave data at runtime.
+
+Validation:
+- Headless Godot project load succeeded after the wave-set extension.
+
+### Review Fixes For Aggro And Docs Drift
+- Changed nearby-player chase so it no longer overrides authored `SOCKET_ONLY` or `SOCKET_THEN_PLAYER` target modes; aggro now only takes priority for player-led target modes.
+- Added line-of-sight gating to player detection so enemies do not start chasing through intact barriers.
+- Generalized player lookup in enemy AI so future exploration enemies can resolve the live player without depending on wave-only setup.
+- Updated stale 3-wave wording in the README, spec, and execution log to match the current authored 5-wave run.
+
+Validation:
+- Headless Godot project load succeeded after the aggro-and-docs review fixes.
+
+### Basic Enemy Chase Override
+- Added a per-enemy `chase_overrides_target_mode` setting so nearby-player aggro can be enabled for lighter enemies without forcing heavy enemies off their structure-focused behavior.
+- Enabled chase override for the basic zombie and kept it disabled for the brute, restoring the intended split between player-reactive weak enemies and structure-committed heavy enemies.
+
+Validation:
+- Headless Godot project load succeeded after the basic-enemy chase override fix.
+
+### Larger Map And Expanded Scavenging Layout
+- Expanded the authored playfield from the original tight layout into a larger 1920x1080 map and recentered the base, sleep point, spawn markers, and perimeter around the new map center.
+- Added two more POIs so the map now has four scavenging clusters distributed around the corners instead of only two side clusters.
+- Increased the number of searchable nodes from 8 to 16 by adding four nodes each to the new POIs, giving the larger map more meaningful collection space instead of empty travel.
+
+Validation:
+- Headless Godot project load succeeded after the larger-map and POI expansion pass.
+
+### Prep-Stage Exploration Enemies
+- Added authored exploration spawn points near the POIs and wired `Game` to spawn those enemies only during later `PRE_WAVE` phases, while keeping the opening pre-wave phase safe.
+- Exploration enemies now use exploration-only context, never target the base, and are cleared when a defense wave starts.
+- Exploration enemies stay dormant until the player gets close, and defeated exploration spawns stay cleared for the rest of the run instead of respawning every prep phase.
+
+Validation:
+- Headless Godot project load succeeded after the prep-stage exploration-enemy pass.
+
+### Exploration Enemy Persistence And Sleep Gating
+- Changed prep-stage exploration enemies to persist across prep phases and wave transitions instead of being destroyed and respawned at full health whenever the run returns to `PRE_WAVE`.
+- Exploration enemies are now suspended during active defense waves and resumed afterward, preserving their run-state without letting them interfere with base-defense targeting.
+- Sleep is now blocked when an exploration enemy is actively engaged with the player, closing the exploit where a live prep threat could be deleted by sleeping.
+- Updated the MVP0 spec so the authored 4-socket, 4-POI map and current baseline resource values match the actual game.
+
+Validation:
+- Headless Godot project load succeeded after the exploration-enemy persistence and sleep-gating fixes.
+
+### Wave Spawn Spread And Enemy Crowd Steering
+- Added spawn jitter to wave spawning so enemies no longer stack onto the exact lane marker position and march in a single straight file.
+- Added configurable enemy separation and sidestep steering so zombies spread out and try to walk around other enemies that are blocking access to a player or structure target.
+- Updated player chase detection to ignore other enemies as raycast blockers, so enemies can still notice a nearby player even when another zombie is standing between them.
+
+Validation:
+- Headless Godot project load succeeded after the spawn-spread and crowd-steering pass.
+
+### Crowd Steering Review Fixes
+- Tightened enemy attack validation so rear enemies cannot damage a player or socket through another enemy body.
+- Narrowed sidestep steering to real crowd blocks near the attack target, reducing the risk of orbiting or unnecessary lateral drift.
+- Changed wave spawn spread from full-circle scattering to lane-oriented fan-out, so enemies still approach from readable corridors instead of spawning behind or far off the lane marker.
+
+Validation:
+- Headless Godot project load succeeded after the crowd-steering review fixes.
+
+### Reinforced Wall And Door Color Split
+- Adjusted the reinforced structure colors in the wall and door profiles so upgraded walls and upgraded doors remain visually distinct instead of converging to the same reinforced tone.
+
+Validation:
+- Headless Godot project load succeeded after the reinforced color split update.
+
+### Facing-Based Player Detection
+- Added a separate detection facing threshold to enemy definitions so “can notice the player” is tuned independently from “can attack the player.”
+- Updated chase detection so enemies only acquire nearby players when the player is inside their vision cone and line of sight, instead of noticing players from any nearby direction.
+
+Validation:
+- Headless Godot project load succeeded after the facing-based player detection update.
+
+### Forced Enemy Awareness On Hit Or Contact
+- Added a temporary player-alert state so enemies that are struck by the player or enter direct player contact will notice and chase that player even if the player was originally outside the normal detection cone.
+- Kept ordinary proximity detection vision-cone-based, so only explicit combat/contact breaks the facing requirement.
+
+Validation:
+- Headless Godot project load succeeded after the forced-awareness update.
+
+### Start-Of-Run POI Enemy Groups
+- Changed exploration spawns so POI enemies can appear from the very start of the run instead of only after the first defense wave.
+- Added per-spawn-point random group sizing with authored min/max counts, currently supporting groups between 1 and 5 enemies.
+- Made those group sizes roll once per spawn point per run and persist correctly across prep phases and wave suspensions instead of rerolling every sync.
+- Added local scatter around exploration spawn markers so POI enemies appear as loose groups instead of a single stack on the marker.
+
+Validation:
+- Headless Godot project load succeeded after the start-of-run POI group spawn update.
+
+### Compact HUD Panel Pass
+- Compressed the top-left HUD into fewer denser rows by combining HP and energy into one line and wave and phase into one line.
+- Reduced the panel footprint, spacing, and text bloat so the HUD covers less of the enlarged map while keeping the important information visible.
+- Shortened the resource row and refined status/interaction styling so the panel reads cleaner without losing functionality.
+
+Validation:
+- Headless Godot project load succeeded after the compact HUD pass.
+
+### Review Fixes For Opening Threats And HUD Space
+- Updated the opening pre-wave status text so it no longer claims the run starts safe now that exploration enemies can spawn near POIs from the beginning.
+- Added duplicate exploration `spawn_id` validation and runtime skipping so malformed scene data cannot silently merge multiple POIs into one persistence bucket.
+- Increased the compact HUD panel’s vertical breathing room and let the wrapped status and interaction rows claim vertical space, reducing the risk of clipping longer messages.
+
+Validation:
+- Headless Godot project load succeeded after the opening-threat, spawn-id, and HUD-space review fixes.
+
+### Enemy Facing Alignment And Contact Push Fix
+- Initialized enemy visuals from the same facing vector used by AI detection so newly spawned enemies no longer show a different facing direction than their internal detection cone.
+- Removed zombie body-vs-player body collision so the player can no longer physically “carry” enemies around on contact, while leaving player contact/aggro behavior to the damage area and AI logic.
+
+Validation:
+- Headless Godot project load succeeded after the enemy-facing and contact-push fixes.
+
+### Collision Layer And True Touch Follow-Up
+- Moved zombie bodies onto their own physics layer so enemies collide with walls, doors, and each other again without restoring the old player-carry bug.
+- Retargeted the player attack area to the new enemy layer so melee still hits correctly after the collision-layer split.
+- Added a dedicated body-touch area for enemies and switched alert-on-touch to use that true body-contact signal instead of the larger attack/damage range.
+- Rotated the zombie body visual from the same facing vector used by AI, making the shown facing direction easier to trust at a glance.
+
+Validation:
+- Headless Godot project load succeeded after the collision-layer and true-touch follow-up.
+
+### Enemy Body Pressure And Sleep-Gating Fix
+- Restored player collision against the enemy body layer so enemy packs occupy space again instead of being fully phaseable.
+- Kept zombie bodies non-colliding against the player layer, preserving the fix for the old “player carries enemy around” artifact.
+- Tightened prep-stage engagement checks so sleep blocking uses true body touch instead of the larger damage radius.
+
+Validation:
+- Headless Godot project load succeeded after the enemy body-pressure and sleep-gating fix.
+
+### Short Player-Attack Windup
+- Added a configurable player-attack preparation time to enemy definitions so enemies do not land an instant hit on the exact frame they first spot or aggro onto the player.
+- Kept the general attack interval unchanged; the prep delay only affects the first player-directed hit after engagement and resets once the enemy loses the player.
+- Tuned the current enemies with a short delay: basic zombies at `0.3s` and brutes at `0.4s`.
+
+Validation:
+- Headless Godot project load succeeded after the player-attack windup pass.
+
+### General Enemy Attack Tell
+- Generalized the short attack-prep timer so the same windup applies before both player attacks and structure attacks instead of only before player-directed hits.
+- Moved the prep arming ahead of the visual update so the attack tell appears immediately on the first prep frame instead of one frame late.
+- Added a tiny lost-target grace window so contact-edge jitter does not constantly restart the windup visual and delay.
+
+Validation:
+- Headless Godot project load succeeded after the generalized attack-tell pass.
+
+### Kitchen Knife Weapon Data Refactor
+- Added a `WeaponDefinition` resource path for player melee so damage, energy cost, cooldown, windup, hitbox, and flash styling can be tuned from weapon data instead of hardcoded player exports.
+- Created the default `Kitchen Knife` weapon resource and wired the player scene to equip it at startup.
+- Updated the player attack flow to use weapon-driven energy cost, attack cooldown, and a short configurable windup while preserving the existing rule that attacking air does not consume energy.
+
+Validation:
+- Headless Godot project load succeeded after the kitchen-knife weapon refactor.
+
+### Configurable Weapon And Enemy Attack Visuals
+- Added weapon-configurable attack-indicator styling so different player weapons can tune their projected hit area color, windup scale, strike burst, and fade timing through `WeaponDefinition`.
+- Added enemy-configurable attack-tell styling so different enemy types can tune their prep color, prep growth, prep alpha, strike burst, and strike duration through `EnemyDefinition`.
+- Tuned the current kitchen knife, basic zombie, and brute resources explicitly so their attack presentations now differ by data instead of sharing one hardcoded visual profile.
+
+Validation:
+- Headless Godot project load succeeded after the configurable weapon-and-enemy attack-visual pass.
+
+### Weapon Windup And Fallback Hardening
+- Preserved the no-effect attack rule for weapon windup by refunding the spent energy and skipping cooldown if the final strike resolves with no targets in range.
+- Added a validated fallback to the default kitchen knife resource so a bad `equipped_weapon` assignment no longer silently disables player combat.
+- Finished moving player strike-flash tuning into `WeaponDefinition`, including flash start scale and flash duration, so the remaining player attack presentation is data-driven too.
+
+Validation:
+- Headless Godot project load succeeded after the weapon windup and fallback hardening pass.
+
+### Visible No-Hit Player Swings
+- Changed player melee so attacks that miss still play the weapon windup and strike animation instead of failing silently.
+- Kept the no-hit behavior non-committal: misses do not consume energy or apply cooldown, while real hits still follow the normal weapon-driven cost and cooldown rules.
+
+Validation:
+- Headless Godot project load succeeded after the visible no-hit swing update.
+
+### Development Workflow Note
+- Added `DEVELOPMENT_WORKFLOW.md` to document the repo rule that any significant code change should be followed by a picky code review pass.
+- Linked the workflow doc from the README so the post-change review pattern stays visible during normal development.
+
+### Weapon Runtime-Swap And Miss-Recovery Cleanup
+- Made player weapon assignment runtime-aware so changing `equipped_weapon` now reapplies attack visuals and hitbox settings immediately instead of waiting for a reset path.
+- Loosened weapon validation to accept resources that conform to the `WeaponDefinition` class contract instead of requiring one exact script file.
+- Added a small weapon-configurable miss recovery so empty swings are still readable and free of energy cost, but no longer fully spam-free in pacing.
+
+Validation:
+- Headless Godot project load succeeded after the weapon runtime-swap and miss-recovery cleanup.
+
+### Damage Reaction Animation Pass
+- Added short directional damage reactions to the player and enemies using local nudge-plus-squash animation layered on top of the existing hit flash.
+- Strengthened wall and door damage feedback with a visible impact pulse so structure hits read more clearly during defense.
+- Kept all damage reactions visual-only so collision, navigation, and combat resolution still use the same underlying gameplay state.
+
+Validation:
+- Headless Godot project load succeeded after the damage reaction animation pass.
+
+### Nearby Ally Aggro Propagation
+- Added enemy-configurable local alert propagation so when one enemy detects the player, nearby enemies can be activated as well instead of staying dormant in place.
+- Exposed `alert_nearby_enemies` and `ally_alert_radius` in `EnemyDefinition` so different enemy types can tune how strongly they wake nearby allies.
+- Tuned the current basic zombie and brute with different ally-alert radii to keep the wake-up behavior local rather than map-wide.
+
+Validation:
+- Headless Godot project load succeeded after the nearby-ally aggro propagation pass.
+
+### Review Workflow Clarification
+- Updated the workflow doc so significant code changes now explicitly require an automatic same-session picky review pass, not just a manual reminder.
+- Added a visible change checklist to the README and a commit checklist to the workflow doc so review and validation steps are easy to follow before commit or push.
+
+### Differentiated Attack Prep Vs Strike Readability
+- Split player weapon attack presentation into separate windup and strike indicator colors so the kitchen knife now reads as a softer prep telegraph followed by a brighter committed strike.
+- Split enemy attack presentation into separate prep and strike styling by adding dedicated strike color and strike start-scale config to `EnemyDefinition`.
+- Tuned the current basic zombie and brute so their prep tells remain readable, but their real hit now lands with a visibly sharper flash than the windup state.
+
+Validation:
+- Headless Godot project load succeeded after the prep-vs-strike readability pass.
+
+### Longer Enemy Attack Windup Tuning
+- Increased the basic zombie attack prep time from `0.3` to `0.45` so the enemy windup is easier to read before contact damage lands.
+- Increased the brute attack prep time from `0.4` to `0.6` so its heavier attacks feel more deliberate and give the player a clearer reaction window.
+
+Validation:
+- Headless Godot project load succeeded after the enemy attack-windup tuning pass.
+
+### Temporary One-Second Enemy Windup Test
+- Set both the basic zombie and brute `attack_prep_time` to `1.0` second to make the distinction between attack prep and the actual strike state unmistakable during playtesting.
+- Kept the rest of the attack visual pipeline unchanged so this test isolates timing rather than mixing in more presentation changes.
+
+Validation:
+- Headless Godot project load succeeded after the temporary one-second enemy windup test pass.
+
+### Enemy Attack Tell Window Split
+- Separated internal enemy attack prep from the visible tell so staying close to a target no longer keeps the attack animation on for the entire prep duration.
+- Added `attack_tell_lead_time` to `EnemyDefinition` so enemies can spend longer charging an attack internally while only showing the visible warning during the final slice before the strike.
+- Tuned the basic zombie and brute with short visible tell windows even while their prep time remains at `1.0` second for testing.
+
+Validation:
+- Headless Godot project load succeeded after the enemy attack tell-window split pass.
+
+### Weapon Attack Tell Window Split
+- Applied the same two-stage timing model to player weapons by separating total `attack_windup` from visible `attack_indicator_lead_time`.
+- Changed the player windup indicator so it only appears during the final lead-time slice before the strike instead of staying on for the full weapon windup.
+- Tuned the kitchen knife with a short `0.12` second visible tell window.
+
+Validation:
+- Headless Godot project load succeeded after the weapon attack tell-window split pass.
+
+### Attack Feel Tuning Pass
+- Retuned the kitchen knife for a faster, cleaner melee read: shorter visible tell, tighter strike burst, and faster strike fade so player attacks feel responsive without losing anticipation.
+- Brought the basic zombie back from the `1.0s` test windup to a more playable medium telegraph with a short visible lead time and a sharper strike burst.
+- Tuned the brute to stay heavier than the basic zombie, but with a shorter visible tell than the full internal prep so it feels deliberate instead of sluggish.
+
+Validation:
+- Headless Godot project load succeeded after the attack feel tuning pass.
+
+### Enemy Attack State Machine Cleanup
+- Fixed the enemy attack state so failed hits no longer leave the prep state armed at zero time, which could make the visible attack tell appear stuck on while the enemy stayed close to the player.
+- Tightened attack prep so it only arms when the enemy has a valid attack solution: target in range, clear attack path, and correct facing.
+- Changed successful attacks to enter cooldown before resetting the prep state so the real strike flash is not immediately suppressed by the prep reset path.
+
+Validation:
+- Headless Godot project load succeeded after the enemy attack state machine cleanup pass.
+
+### Enemy Attack Prep Re-arming Adjustment
+- Loosened enemy prep arming so attack windup can begin once a target is plausibly attackable in range, instead of requiring a fully valid strike solution before any tell can appear.
+- Kept the stricter facing and clear-path checks for the actual hit resolution, so the attack tell is visible again without reintroducing the old always-on stuck prep state.
+
+Validation:
+- Headless Godot project load succeeded after the enemy attack prep re-arming adjustment.
+
+### Restart Exploration Respawn Fix
+- Fixed the run-reset ordering issue where exploration spawn defeat state was cleared after the `PRE_WAVE` resync had already run, leaving prep-stage enemies missing after pressing `R`.
+- The reset handler now performs a fresh exploration-enemy sync after clearing defeated-spawn and spawn-count bookkeeping, so start-of-run POI enemies come back correctly on restart.
+
+Validation:
+- Headless Godot project load succeeded after the restart exploration respawn fix.
+
+### Enemy Spawn Facing Initialization
+- Fixed enemy spawn-time facing so enemies no longer all begin with the same default downward orientation.
+- Wave enemies now initialize their facing toward their current wave target when configured, while exploration enemies randomize their starting facing if they do not yet have a live target.
+
+Validation:
+- Headless Godot project load succeeded after the enemy spawn facing initialization pass.
+
+### Exploration Spawn Facing Hook
+- Added optional authored initial facing to exploration spawn points so future patrol-like staging has a stable data hook instead of relying on pure random spawn orientation.
+- Changed exploration-context configuration so newly spawned enemies can use authored facing when present, while surviving exploration enemies no longer get their facing randomly reset every prep-phase resync.
+
+Validation:
+- Headless Godot project load succeeded after the exploration spawn facing hook pass.
+
+### Review Fixes For Restart Respawn And Enemy Prep Tells
+- Fixed exploration-enemy restart resync to ignore nodes already queued for deletion, so pressing `R` no longer treats old prep enemies as still alive while rebuilding the new run state.
+- Tightened enemy prep arming so attack tells now require attack-range plus valid facing, and only bypass the clear-path check for true player body contact.
+- Kept real hit resolution stricter than prep, but removed the broad “nearby only” telegraph that could show attack tells for obviously invalid swings.
+
+Validation:
+- Headless Godot project load succeeded after the restart-respawn and enemy-prep review fixes.
+
+### Review Workflow Hardening
+- Strengthened the repo workflow so significant code changes now require runtime validation followed by an independent reviewer subagent when available, instead of relying on a same-context self-review by default.
+- Expanded the documented review checklist to explicitly call out reset flow, spawn flow, timing/state-machine bugs, collision pressure, and config-driven validation as recurring risk areas for this project.
+- Updated the README checklist so the stronger review expectation stays visible during normal development.
+
+### Review Fixes For Restart Sync And Patrol Hooks
+- Added a restart-only guard so actual `R`-triggered resets skip the earlier `PRE_WAVE` exploration sync and use the post-reset sync as the single authoritative rebuild path.
+- Extended exploration enemy setup to preserve a stable spawn anchor position and authored facing alongside the existing spawn ID, creating a cleaner data hook for future patrol or return-to-post behavior.
+- Added a minimal spawn-point anchor accessor so patrol-like systems can build from authored marker positions without another exploration-spawn refactor.
+
+Validation:
+- Headless Godot project load succeeded after the restart-sync and patrol-hook review fixes.
+
+### Structure Attack Targeting Fix
+- Fixed wave enemies using the center of large wall and door sockets for movement, facing, and attack-path checks, which could leave them in range but unable to satisfy the attack gates against structures.
+- Added a structure-side attack aim point helper and switched zombie structure movement/facing/path logic to target the nearest reachable point on the socket face instead of the socket center.
+- This keeps player-facing logic unchanged while making large perimeter segments attackable again by enemies standing near their edges.
+
+Validation:
+- Headless Godot project load succeeded after the structure attack targeting fix.
+
+### Structure Target Selection Follow-Up
+- Fixed a target-selection bug where wave enemies could override their wall or door target to the player whenever the player was merely inside the enemy damage radius, even if a structure was physically between them.
+- Tightened the player-contact override to require literal body touch instead of damage-area overlap, so structure-focused enemies keep attacking walls and doors unless the player is actually in contact.
+- Kept the earlier structure aim-point logic in place so large sockets still use nearest-face movement and attack checks.
+
+Validation:
+- Headless Godot project load succeeded after the structure target-selection follow-up.
+
+### Root Cause Fix For Structure Attacks
+- Investigated the wall-attack regression with a headless runtime probe and confirmed the real failure was not spawn or damage tuning: the enemy chase-state updater was resetting attack prep every physics frame whenever the player was not currently detectable.
+- That continuously canceled two-stage structure attacks before they could finish windup, which is why walls and doors showed neither attack tell nor damage after the recent attack-state refactors.
+- Fixed the chase-state logic so attack prep is only reset when an actual player-alert or player-chase state is being lost, not every frame while the enemy is structure-focused.
+
+Validation:
+- Headless Godot project load succeeded after the structure-attack root cause fix.
+- A headless near-wall runtime probe confirmed a zombie next to `wall_n` now counts down prep and damages the wall from `120` to `117`.
+
+### HUD Visual Upgrade
+- Reworked the top-left HUD into a cleaner game-style status card with colored health and energy bars instead of a single plain-text vitals line.
+- Tightened the information hierarchy so vitals, wave/phase, base integrity, resources, status text, and interaction prompt each have clearer visual separation and stronger color cues.
+- Made the interaction callout hide itself when empty so the upgraded HUD does not carry an always-visible blank action panel.
+
+Validation:
+- Headless Godot project load succeeded after the HUD visual upgrade.
+
+### Review Workflow Hardening Follow-Up
+- Strengthened the documented picky-review rule so it now explicitly requires an adversarial reviewer stance instead of a soft confirmatory pass.
+- Added a runtime-probe requirement for gameplay, AI, combat, collision, spawn, reset, and phase/state-machine changes when feasible.
+- Updated the visible README checklist so the repo workflow now treats static review alone as insufficient for risky gameplay changes.

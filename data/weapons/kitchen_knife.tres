@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="WeaponDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/weapon_definition.gd" id="1_weapon"]
+
+[resource]
+script = ExtResource("1_weapon")
+weapon_id = &"kitchen_knife"
+display_name = "Kitchen Knife"
+damage = 25
+damage_type = &"melee"
+energy_cost = 1
+attack_cooldown = 0.45
+miss_recovery_time = 0.12
+attack_windup = 0.14
+attack_area_size = Vector2(28, 18)
+attack_area_offset = Vector2(0, -24)
+attack_flash_color = Color(1, 0.9, 0.62, 0.75)
+attack_flash_start_scale = Vector2(0.72, 0.72)
+attack_flash_peak_scale = Vector2(1.12, 1.12)
+attack_flash_duration = 0.06
+attack_indicator_windup_color = Color(0.98, 0.92, 0.68, 0.24)
+attack_indicator_strike_color = Color(1, 0.99, 0.9, 0.96)
+attack_indicator_windup_start_scale = Vector2(0.9, 0.9)
+attack_indicator_strike_peak_scale = Vector2(1.1, 1.1)
+attack_indicator_lead_time = 0.08
+attack_indicator_windup_start_alpha = 0.28
+attack_indicator_windup_end_alpha = 0.76
+attack_indicator_strike_alpha = 0.98
+attack_indicator_strike_fade_duration = 0.06

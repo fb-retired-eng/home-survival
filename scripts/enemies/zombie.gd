@@ -16,18 +16,35 @@ signal died(zombie: Zombie)
 @export var structure_damage: int = 10
 @export var structure_damage_type: StringName = &"impact"
 @export var attack_cooldown: float = 1.0
+@export var attack_prep_time: float = 0.25
 
 var current_health: int
 var _damage_cooldown_remaining: float = 0.0
 var _base_color: Color
 var _behavior_context: StringName = &"exploration"
-var _wave_player
+var _player_ref
 var _wave_sockets: Array = []
 var _player_obstructing_this_frame: bool = false
 var _preferred_socket_ids: PackedStringArray = []
+var _facing_direction: Vector2 = Vector2.DOWN
+var _is_chasing_player: bool = false
+var _is_exploration_suspended: bool = false
+var _is_alerted_to_player: bool = false
+var _attack_prep_remaining: float = 0.0
+var _attack_prep_armed: bool = false
+var _attack_prep_target_id: int = 0
+var _attack_prep_lost_target_grace_remaining: float = 0.0
+var _damage_feedback_tween: Tween
+var _exploration_anchor_position: Vector2 = Vector2.ZERO
+var _exploration_anchor_facing: Vector2 = Vector2.ZERO
+var _has_exploration_anchor: bool = false
 
 @onready var body_visual: Polygon2D = $Body
+@onready var facing_marker: Polygon2D = $FacingMarker
+@onready var attack_flash: Polygon2D = $AttackFlash
 @onready var damage_area: Area2D = $DamageArea
+@onready var body_touch_area: Area2D = $BodyTouchArea
+@onready var collision_shape: CollisionShape2D = $CollisionShape2D
 
 
 func _ready() -> void:
@@ -35,34 +52,146 @@ func _ready() -> void:
 	_apply_definition()
 	current_health = max_health
 	_base_color = body_visual.color
+	_refresh_player_reference()
+	_update_facing_direction(_facing_direction)
 
 
 func configure_wave_context(player_ref, defense_sockets: Array, preferred_socket_ids: PackedStringArray = PackedStringArray()) -> void:
 	_behavior_context = &"wave"
-	_wave_player = player_ref
+	_player_ref = player_ref
 	_wave_sockets = defense_sockets.duplicate()
 	_preferred_socket_ids = preferred_socket_ids
+	_refresh_spawn_facing()
+
+
+func configure_exploration_context(player_ref, initial_facing_direction: Vector2 = Vector2.ZERO, refresh_facing: bool = false, anchor_position: Vector2 = Vector2.ZERO, set_anchor: bool = false) -> void:
+	_behavior_context = &"exploration"
+	_player_ref = player_ref
+	_wave_sockets.clear()
+	_preferred_socket_ids = PackedStringArray()
+	if set_anchor:
+		_exploration_anchor_position = anchor_position
+		_exploration_anchor_facing = initial_facing_direction
+		_has_exploration_anchor = true
+	set_exploration_suspended(false)
+	if refresh_facing:
+		_refresh_spawn_facing(initial_facing_direction)
+
+
+func has_exploration_anchor() -> bool:
+	return _has_exploration_anchor
+
+
+func get_exploration_anchor_position() -> Vector2:
+	return _exploration_anchor_position
+
+
+func get_exploration_anchor_facing() -> Vector2:
+	return _exploration_anchor_facing
+
+
+func set_exploration_suspended(suspended: bool) -> void:
+	if _behavior_context != &"exploration":
+		return
+
+	_is_exploration_suspended = suspended
+	visible = not suspended
+	set_physics_process(not suspended)
+	velocity = Vector2.ZERO
+	if collision_shape != null:
+		collision_shape.disabled = suspended
+	if damage_area != null:
+		damage_area.monitoring = not suspended
+		damage_area.monitorable = not suspended
+
+
+func is_engaged_with_player() -> bool:
+	var live_player = _get_live_player()
+	if _behavior_context != &"exploration" or _is_exploration_suspended or live_player == null:
+		return false
+
+	return _is_chasing_player or _is_player_body_touching(live_player)
 
 
 func _physics_process(delta: float) -> void:
 	_damage_cooldown_remaining = max(_damage_cooldown_remaining - delta, 0.0)
+	_attack_prep_remaining = max(_attack_prep_remaining - delta, 0.0)
+	_attack_prep_lost_target_grace_remaining = max(_attack_prep_lost_target_grace_remaining - delta, 0.0)
+	_update_player_chase_state()
 	var primary_target = _get_current_target()
 	_player_obstructing_this_frame = false
 	if primary_target != null and is_instance_valid(primary_target) and not _is_target_in_damage_range(primary_target):
-		var target_offset: Vector2 = primary_target.global_position - global_position
-		velocity = target_offset.normalized() * move_speed if not target_offset.is_zero_approx() else Vector2.ZERO
+		velocity = _compute_move_velocity(primary_target)
+		if not velocity.is_zero_approx():
+			_update_facing_direction(velocity)
 	else:
+		if primary_target != null and is_instance_valid(primary_target):
+			_update_facing_direction(_get_target_point(primary_target) - global_position)
 		velocity = Vector2.ZERO
 
 	move_and_slide()
 	_player_obstructing_this_frame = _is_player_obstructing(primary_target)
 
+	var attack_target = _get_attack_target(primary_target)
+	var is_attack_delayed := _process_attack_prep(attack_target)
+	_update_attack_prep_visual()
 	if _damage_cooldown_remaining > 0.0:
 		return
-
-	var attack_target = _get_attack_target(primary_target)
+	if is_attack_delayed:
+		return
 	if _try_damage_target(attack_target):
 		_damage_cooldown_remaining = attack_cooldown
+		_reset_attack_prep()
+		return
+	if _attack_prep_armed:
+		_reset_attack_prep()
+
+
+func _compute_move_velocity(primary_target) -> Vector2:
+	if primary_target == null or not is_instance_valid(primary_target):
+		return Vector2.ZERO
+
+	var target_offset: Vector2 = _get_target_point(primary_target) - global_position
+	if target_offset.is_zero_approx():
+		return Vector2.ZERO
+
+	var move_direction := target_offset.normalized()
+	var separation := _get_enemy_separation_vector()
+	if not separation.is_zero_approx():
+		move_direction += separation * _get_separation_weight()
+
+	var sidestep := _get_enemy_block_sidestep(primary_target, target_offset)
+	if not sidestep.is_zero_approx():
+		move_direction += sidestep * _get_sidestep_weight()
+
+	if move_direction.is_zero_approx():
+		return Vector2.ZERO
+
+	return move_direction.normalized() * move_speed
+
+
+func _update_facing_direction(direction: Vector2) -> void:
+	if direction.is_zero_approx():
+		return
+
+	_facing_direction = direction.normalized()
+	body_visual.rotation = _facing_direction.angle() - PI / 2.0
+	facing_marker.rotation = _facing_direction.angle() + PI / 2.0
+	attack_flash.rotation = facing_marker.rotation
+
+
+func _refresh_spawn_facing(preferred_direction: Vector2 = Vector2.ZERO) -> void:
+	if not preferred_direction.is_zero_approx():
+		_update_facing_direction(preferred_direction)
+		return
+
+	var primary_target = _get_current_target()
+	if primary_target != null and is_instance_valid(primary_target):
+		_update_facing_direction(_get_target_point(primary_target) - global_position)
+		return
+
+	var random_direction := Vector2.RIGHT.rotated(randf() * TAU)
+	_update_facing_direction(random_direction)
 
 
 func take_damage(amount: int, _source: Variant = null) -> void:
@@ -73,8 +202,11 @@ func take_damage(amount: int, _source: Variant = null) -> void:
 	if damage_amount <= 0:
 		return
 
+	_alert_to_player_from_source(_source)
+
 	current_health = max(current_health - damage_amount, 0)
 	_flash_body(Color(1.0, 0.55, 0.55, 1.0))
+	_play_damage_feedback(_source)
 
 	if current_health == 0:
 		_spawn_death_drop()
@@ -83,24 +215,48 @@ func take_damage(amount: int, _source: Variant = null) -> void:
 
 
 func _get_current_target():
-	if _behavior_context == &"wave":
-		var socket = _get_closest_intact_socket()
-		if socket != null:
+	var live_player = _get_live_player()
+	var target_mode := _get_target_mode_for_context()
+	if _is_chasing_player and live_player != null and _does_chase_override_target_mode(target_mode):
+		return live_player
+
+	if _behavior_context != &"wave" and _should_idle_until_player_detected() and not _is_chasing_player:
+		return null
+
+	var socket = _get_closest_intact_socket()
+	match target_mode:
+		EnemyDefinitionResource.WaveTargetMode.SOCKET_THEN_PLAYER:
+			if socket != null:
+				return socket
+			return live_player
+		EnemyDefinitionResource.WaveTargetMode.PLAYER_THEN_SOCKET:
+			if live_player != null:
+				return live_player
 			return socket
+		EnemyDefinitionResource.WaveTargetMode.SOCKET_ONLY:
+			if socket != null:
+				return socket
+			if _should_fallback_to_player_when_no_sockets():
+				return live_player
+			return null
+		EnemyDefinitionResource.WaveTargetMode.PLAYER_ONLY:
+			return live_player
 
-	if _wave_player != null and is_instance_valid(_wave_player) and not _wave_player.is_dead:
-		return _wave_player
-
-	return null
+	return live_player
 
 
 func _get_attack_target(primary_target):
+	var live_player = _get_live_player()
+	if _should_attack_player_on_contact() and live_player != null and _is_player_body_touching(live_player):
+		if primary_target == null or primary_target != live_player:
+			return live_player
+
 	if primary_target == null:
 		return null
 
 	if _behavior_context == &"wave":
-		if _player_obstructing_this_frame and _wave_player != null and is_instance_valid(_wave_player):
-			return _wave_player
+		if _should_attack_obstructing_player() and _player_obstructing_this_frame and live_player != null:
+			return live_player
 
 	return primary_target
 
@@ -162,6 +318,9 @@ func _is_target_in_damage_range(target) -> bool:
 	if target == null or not is_instance_valid(target):
 		return false
 
+	if target.is_in_group("defense_sockets"):
+		return global_position.distance_to(_get_target_point(target)) <= _get_damage_range_estimate()
+
 	if target is PhysicsBody2D:
 		return damage_area.overlaps_body(target)
 
@@ -172,13 +331,7 @@ func _is_target_in_damage_range(target) -> bool:
 
 
 func _try_damage_target(target) -> bool:
-	if target == null or not is_instance_valid(target):
-		return false
-
-	if not target.has_method("take_damage"):
-		return false
-
-	if not _is_target_in_damage_range(target):
+	if not _can_execute_attack(target):
 		return false
 
 	var damage_amount := _get_damage_amount_for_target(target)
@@ -189,17 +342,63 @@ func _try_damage_target(target) -> bool:
 		})
 	else:
 		target.take_damage(damage_amount, self)
+	_play_attack_flash()
 	return true
 
 
-func _is_player_obstructing(primary_target) -> bool:
-	if _wave_player == null or not is_instance_valid(_wave_player) or _wave_player.is_dead:
+func _can_execute_attack(target) -> bool:
+	if target == null or not is_instance_valid(target):
 		return false
 
-	if primary_target == _wave_player:
+	if not target.has_method("take_damage"):
+		return false
+
+	if not _is_target_in_damage_range(target):
+		return false
+
+	if target.is_in_group("defense_sockets"):
 		return true
 
-	if not _is_target_in_damage_range(_wave_player):
+	if not _has_clear_attack_path(target):
+		return false
+
+	if not _is_facing_target_for_attack(target):
+		return false
+
+	return true
+
+
+func _can_begin_attack_prep(target) -> bool:
+	if target == null or not is_instance_valid(target):
+		return false
+
+	if not target.has_method("take_damage"):
+		return false
+
+	if not _is_target_in_damage_range(target):
+		return false
+
+	if target.is_in_group("defense_sockets"):
+		return true
+
+	if not _is_facing_target_for_attack(target):
+		return false
+
+	if target.is_in_group("player") and _is_player_body_touching(target):
+		return true
+
+	return _has_clear_attack_path(target)
+
+
+func _is_player_obstructing(primary_target) -> bool:
+	var live_player = _get_live_player()
+	if not _should_attack_obstructing_player() or live_player == null:
+		return false
+
+	if primary_target == live_player:
+		return true
+
+	if not _is_target_in_damage_range(live_player):
 		return false
 
 	for collision_index in get_slide_collision_count():
@@ -207,7 +406,7 @@ func _is_player_obstructing(primary_target) -> bool:
 		if collision == null:
 			continue
 
-		if collision.get_collider() == _wave_player:
+		if collision.get_collider() == live_player:
 			return true
 
 	return _is_player_between_target(primary_target)
@@ -234,6 +433,7 @@ func _apply_definition() -> void:
 	structure_damage = definition.structure_damage
 	structure_damage_type = definition.structure_damage_type
 	attack_cooldown = definition.attack_interval
+	attack_prep_time = definition.attack_prep_time
 
 
 func _resolve_damage_taken(base_damage: int, source: Variant) -> int:
@@ -252,8 +452,12 @@ func _is_player_between_target(primary_target) -> bool:
 	if primary_target == null or not is_instance_valid(primary_target):
 		return false
 
-	var target_vector: Vector2 = primary_target.global_position - global_position
-	var player_vector: Vector2 = _wave_player.global_position - global_position
+	var live_player = _get_live_player()
+	if live_player == null:
+		return false
+
+	var target_vector: Vector2 = _get_target_point(primary_target) - global_position
+	var player_vector: Vector2 = live_player.global_position - global_position
 	var target_length := target_vector.length()
 	if target_length <= 0.001:
 		return false
@@ -264,23 +468,547 @@ func _is_player_between_target(primary_target) -> bool:
 		return false
 
 	var closest_point := global_position + target_direction * projection
-	if closest_point.distance_to(_wave_player.global_position) > 18.0:
+	if closest_point.distance_to(live_player.global_position) > _get_obstruction_width():
 		return false
 
-	return _has_clear_line_to_player()
+	return _has_clear_line_to_target(live_player, true)
 
 
-func _has_clear_line_to_player() -> bool:
-	if _wave_player == null or not is_instance_valid(_wave_player):
+func _get_live_player():
+	_refresh_player_reference()
+	if _player_ref == null or not is_instance_valid(_player_ref) or _player_ref.is_dead:
+		return null
+	return _player_ref
+
+
+func _update_player_chase_state() -> void:
+	var live_player = _get_live_player()
+	var was_alerted := _is_alerted_to_player
+	var was_chasing := _is_chasing_player
+	if live_player == null:
+		_is_chasing_player = false
+		_is_alerted_to_player = false
+		if was_alerted or was_chasing:
+			_reset_attack_prep()
+		return
+
+	var distance_to_player: float = global_position.distance_to(live_player.global_position)
+	if _is_player_body_touching(live_player):
+		_alert_to_player(live_player)
+
+	if _is_alerted_to_player:
+		_is_chasing_player = distance_to_player <= _get_player_chase_break_radius()
+		if not _is_chasing_player:
+			_is_alerted_to_player = false
+			_reset_attack_prep()
+		return
+
+	if not _should_chase_player_when_nearby() or not _can_detect_player_for_chase(live_player):
+		_is_chasing_player = false
+		if was_alerted or was_chasing:
+			_is_alerted_to_player = false
+			_reset_attack_prep()
+		return
+
+	if _is_chasing_player:
+		_is_chasing_player = distance_to_player <= _get_player_chase_break_radius()
+		return
+
+	if distance_to_player <= _get_player_detection_radius():
+		_alert_to_player(live_player)
+		_is_chasing_player = true
+
+
+func _process_attack_prep(attack_target) -> bool:
+	if _damage_cooldown_remaining > 0.0:
+		_reset_attack_prep()
 		return false
 
-	var query := PhysicsRayQueryParameters2D.create(global_position, _wave_player.global_position)
+	if not _can_begin_attack_prep(attack_target):
+		if _attack_prep_armed and _attack_prep_lost_target_grace_remaining > 0.0:
+			return _attack_prep_remaining > 0.0
+		_reset_attack_prep()
+		return false
+
+	var target_id: int = attack_target.get_instance_id()
+	if not _attack_prep_armed or _attack_prep_target_id != target_id:
+		_attack_prep_armed = true
+		_attack_prep_target_id = target_id
+		_attack_prep_remaining = _get_attack_prep_time()
+
+	_attack_prep_lost_target_grace_remaining = 0.08
+	return _attack_prep_remaining > 0.0
+
+
+func _reset_attack_prep() -> void:
+	_attack_prep_armed = false
+	_attack_prep_remaining = 0.0
+	_attack_prep_target_id = 0
+	_attack_prep_lost_target_grace_remaining = 0.0
+	if _damage_cooldown_remaining <= 0.0:
+		attack_flash.visible = false
+		attack_flash.scale = Vector2.ONE
+		attack_flash.modulate = Color(
+			_get_attack_tell_color().r,
+			_get_attack_tell_color().g,
+			_get_attack_tell_color().b,
+			_get_attack_tell_start_alpha()
+		)
+
+
+func _update_attack_prep_visual() -> void:
+	if _damage_cooldown_remaining > 0.0:
+		return
+
+	if not _attack_prep_armed:
+		attack_flash.visible = false
+		attack_flash.scale = Vector2.ONE
+		attack_flash.modulate = Color(
+			_get_attack_tell_color().r,
+			_get_attack_tell_color().g,
+			_get_attack_tell_color().b,
+			_get_attack_tell_start_alpha()
+		)
+		return
+
+	var tell_lead_time := _get_attack_tell_lead_time()
+	if tell_lead_time <= 0.0 or _attack_prep_remaining > tell_lead_time:
+		attack_flash.visible = false
+		return
+
+	var progress: float = clamp(1.0 - (_attack_prep_remaining / tell_lead_time), 0.0, 1.0)
+	attack_flash.visible = true
+	var tell_color := _get_attack_tell_color()
+	var start_scale := _get_attack_tell_start_scale()
+	var ready_scale := _get_attack_tell_ready_scale()
+	attack_flash.scale = start_scale.lerp(ready_scale, progress)
+	attack_flash.modulate = Color(
+		tell_color.r,
+		tell_color.g,
+		tell_color.b,
+		lerpf(_get_attack_tell_start_alpha(), _get_attack_tell_ready_alpha(), progress)
+	)
+
+
+func _alert_to_player_from_source(source: Variant) -> void:
+	var live_player = _get_live_player()
+	if live_player == null:
+		return
+
+	if source is Dictionary:
+		var attacker = source.get("attacker")
+		if attacker != null and is_instance_valid(attacker) and attacker.is_in_group("player"):
+			_player_ref = attacker
+			_alert_to_player(attacker)
+
+
+func _is_player_body_touching(player_target) -> bool:
+	if player_target == null or not is_instance_valid(player_target):
+		return false
+	if body_touch_area == null:
+		return false
+
+	return body_touch_area.overlaps_body(player_target)
+
+
+func _refresh_player_reference() -> void:
+	if _player_ref != null and is_instance_valid(_player_ref) and not _player_ref.is_dead:
+		return
+
+	var candidate = get_tree().get_first_node_in_group("player")
+	if candidate != null and is_instance_valid(candidate):
+		_player_ref = candidate
+
+
+func _get_target_mode_for_context() -> int:
+	if definition == null:
+		if _behavior_context == &"wave":
+			return EnemyDefinitionResource.WaveTargetMode.SOCKET_THEN_PLAYER
+		return EnemyDefinitionResource.WaveTargetMode.PLAYER_ONLY
+
+	if _behavior_context == &"wave":
+		return definition.wave_target_mode
+	return definition.exploration_target_mode
+
+
+func _does_chase_override_target_mode(target_mode: int) -> bool:
+	if definition == null:
+		return (
+			target_mode == EnemyDefinitionResource.WaveTargetMode.PLAYER_THEN_SOCKET
+			or target_mode == EnemyDefinitionResource.WaveTargetMode.PLAYER_ONLY
+		)
+
+	if definition.chase_overrides_target_mode:
+		return true
+
+	return (
+		target_mode == EnemyDefinitionResource.WaveTargetMode.PLAYER_THEN_SOCKET
+		or target_mode == EnemyDefinitionResource.WaveTargetMode.PLAYER_ONLY
+	)
+
+
+func _should_fallback_to_player_when_no_sockets() -> bool:
+	if definition == null:
+		return true
+	return definition.fallback_to_player_when_no_sockets
+
+
+func _should_chase_player_when_nearby() -> bool:
+	if definition == null:
+		return true
+	return definition.chase_player_when_nearby
+
+
+func _should_idle_until_player_detected() -> bool:
+	if definition == null:
+		return false
+	return definition.idle_until_player_detected
+
+
+func _get_player_detection_radius() -> float:
+	if definition == null:
+		return 88.0
+	return definition.player_detection_radius
+
+
+func _should_alert_nearby_enemies() -> bool:
+	if definition == null:
+		return true
+	return definition.alert_nearby_enemies
+
+
+func _get_ally_alert_radius() -> float:
+	if definition == null:
+		return 84.0
+	return definition.ally_alert_radius
+
+
+func _get_player_chase_break_radius() -> float:
+	if definition == null:
+		return 128.0
+	return definition.player_chase_break_radius
+
+
+func _get_attack_prep_time() -> float:
+	if definition == null:
+		return attack_prep_time
+	return definition.attack_prep_time
+
+
+func _should_attack_obstructing_player() -> bool:
+	if definition == null:
+		return true
+	return definition.attack_player_when_obstructing
+
+
+func _should_attack_player_on_contact() -> bool:
+	if definition == null:
+		return true
+	return definition.attack_player_on_contact
+
+
+func _get_obstruction_width() -> float:
+	if definition == null:
+		return 18.0
+	return definition.obstruction_width
+
+
+func _get_separation_radius() -> float:
+	if definition == null:
+		return 30.0
+	return definition.separation_radius
+
+
+func _get_separation_weight() -> float:
+	if definition == null:
+		return 1.0
+	return definition.separation_weight
+
+
+func _get_sidestep_weight() -> float:
+	if definition == null:
+		return 0.9
+	return definition.sidestep_weight
+
+
+func _get_attack_facing_dot_threshold() -> float:
+	if definition == null:
+		return 0.25
+	return definition.attack_facing_dot_threshold
+
+
+func _get_attack_tell_color() -> Color:
+	if definition == null:
+		return Color(1.0, 0.82, 0.42, 0.72)
+	return definition.attack_tell_color
+
+
+func _get_attack_tell_start_scale() -> Vector2:
+	if definition == null:
+		return Vector2(0.62, 0.62)
+	return definition.attack_tell_start_scale
+
+
+func _get_attack_tell_ready_scale() -> Vector2:
+	if definition == null:
+		return Vector2(0.98, 0.98)
+	return definition.attack_tell_ready_scale
+
+
+func _get_attack_tell_start_alpha() -> float:
+	if definition == null:
+		return 0.18
+	return definition.attack_tell_start_alpha
+
+
+func _get_attack_tell_ready_alpha() -> float:
+	if definition == null:
+		return 0.72
+	return definition.attack_tell_ready_alpha
+
+
+func _get_attack_tell_lead_time() -> float:
+	var prep_time := _get_attack_prep_time()
+	if definition == null:
+		return min(0.3, prep_time)
+	return min(definition.attack_tell_lead_time, prep_time)
+
+
+func _get_attack_flash_peak_scale() -> Vector2:
+	if definition == null:
+		return Vector2(1.08, 1.08)
+	return definition.attack_flash_peak_scale
+
+
+func _get_attack_flash_start_scale() -> Vector2:
+	if definition == null:
+		return Vector2(0.78, 0.78)
+	return definition.attack_flash_start_scale
+
+
+func _get_attack_strike_color() -> Color:
+	if definition == null:
+		return Color(1.0, 0.98, 0.86, 0.98)
+	return definition.attack_strike_color
+
+
+func _get_attack_flash_duration() -> float:
+	if definition == null:
+		return 0.08
+	return definition.attack_flash_duration
+
+
+func _get_detection_facing_dot_threshold() -> float:
+	if definition == null:
+		return 0.0
+	return definition.detection_facing_dot_threshold
+
+
+func _is_facing_target_for_detection(target) -> bool:
+	if target == null or not is_instance_valid(target):
+		return false
+
+	var to_target: Vector2 = _get_target_point(target) - global_position
+	if to_target.is_zero_approx():
+		return true
+
+	var target_direction: Vector2 = to_target.normalized()
+	return _facing_direction.dot(target_direction) >= _get_detection_facing_dot_threshold()
+
+
+func _is_facing_target_for_attack(target) -> bool:
+	if target == null or not is_instance_valid(target):
+		return false
+
+	var to_target: Vector2 = target.global_position - global_position
+	if to_target.is_zero_approx():
+		return true
+
+	var target_direction: Vector2 = to_target.normalized()
+	return _facing_direction.dot(target_direction) >= _get_attack_facing_dot_threshold()
+
+
+func _can_detect_player_for_chase(player_target) -> bool:
+	if player_target == null or not is_instance_valid(player_target):
+		return false
+
+	if not _is_facing_target_for_detection(player_target):
+		return false
+
+	return _has_clear_line_to_target(player_target, true)
+
+
+func _has_clear_line_to_target(target, ignore_other_enemies: bool = false) -> bool:
+	if target == null or not is_instance_valid(target):
+		return false
+
+	return _has_clear_line_to_point(target, target.global_position, ignore_other_enemies)
+
+
+func _has_clear_line_to_point(target, target_point: Vector2, ignore_other_enemies: bool = false) -> bool:
+	if target == null or not is_instance_valid(target):
+		return false
+
+	var query := PhysicsRayQueryParameters2D.create(global_position, target_point)
 	query.exclude = [self]
+	if ignore_other_enemies:
+		for enemy in get_tree().get_nodes_in_group("enemies"):
+			if enemy == self or enemy == target or not is_instance_valid(enemy):
+				continue
+			query.exclude.append(enemy)
 	var hit := get_world_2d().direct_space_state.intersect_ray(query)
 	if hit.is_empty():
 		return true
 
-	return hit.get("collider") == _wave_player
+	return hit.get("collider") == target
+
+
+func _get_enemy_separation_vector() -> Vector2:
+	var radius := _get_separation_radius()
+	if radius <= 0.0:
+		return Vector2.ZERO
+
+	var push := Vector2.ZERO
+	for enemy in get_tree().get_nodes_in_group("enemies"):
+		if enemy == self or not is_instance_valid(enemy):
+			continue
+		if not (enemy is Node2D):
+			continue
+		if not enemy.visible:
+			continue
+
+		var offset: Vector2 = global_position - enemy.global_position
+		var distance := offset.length()
+		if distance <= 0.001 or distance >= radius:
+			continue
+
+		push += offset.normalized() * ((radius - distance) / radius)
+
+	if push.is_zero_approx():
+		return Vector2.ZERO
+
+	return push.normalized()
+
+
+func _get_enemy_block_sidestep(primary_target, target_offset: Vector2) -> Vector2:
+	if primary_target == null or not is_instance_valid(primary_target):
+		return Vector2.ZERO
+
+	var blocker = _get_enemy_blocking_path(primary_target)
+	if blocker == null:
+		return Vector2.ZERO
+
+	var forward := target_offset.normalized()
+	var blocker_offset: Vector2 = blocker.global_position - global_position
+	var cross := 0.0
+	if not blocker_offset.is_zero_approx():
+		cross = forward.cross(blocker_offset.normalized())
+
+	var side_sign := 1.0 if int(get_instance_id()) % 2 == 0 else -1.0
+	if abs(cross) > 0.01:
+		side_sign = -sign(cross)
+
+	return forward.orthogonal() * side_sign
+
+
+func _get_enemy_blocking_path(primary_target):
+	if primary_target == null or not is_instance_valid(primary_target):
+		return null
+
+	var target_point := _get_target_point(primary_target)
+	var query := PhysicsRayQueryParameters2D.create(global_position, target_point)
+	query.exclude = [self, primary_target]
+	var hit := get_world_2d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return null
+
+	var collider = hit.get("collider")
+	if collider != null and is_instance_valid(collider) and collider.is_in_group("enemies"):
+		if not (collider is Node2D):
+			return null
+		if collider.global_position.distance_to(target_point) > _get_damage_range_estimate() * 1.25:
+			return null
+		return collider
+
+	return null
+
+
+func _has_clear_attack_path(target) -> bool:
+	if target == null or not is_instance_valid(target):
+		return false
+
+	if target.is_in_group("defense_sockets"):
+		return _has_clear_structure_attack_path(target)
+
+	return _has_clear_line_to_point(target, _get_target_point(target), false)
+
+
+func _get_target_point(target) -> Vector2:
+	if target == null or not is_instance_valid(target):
+		return global_position
+
+	if target.has_method("get_attack_aim_point"):
+		return target.get_attack_aim_point(global_position)
+
+	return target.global_position
+
+
+func _has_clear_structure_attack_path(target) -> bool:
+	if target == null or not is_instance_valid(target):
+		return false
+
+	return true
+
+
+func _get_damage_range_estimate() -> float:
+	if damage_area == null:
+		return 18.0
+
+	var area_shape: CollisionShape2D = damage_area.get_node_or_null("CollisionShape2D")
+	if area_shape == null or area_shape.shape == null:
+		return 18.0
+
+	if area_shape.shape is CircleShape2D:
+		return area_shape.shape.radius
+
+	return 18.0
+
+
+func _alert_to_player(player_ref, propagate: bool = true) -> void:
+	if player_ref == null or not is_instance_valid(player_ref):
+		return
+
+	_player_ref = player_ref
+	var was_alerted := _is_alerted_to_player
+	_is_alerted_to_player = true
+	_is_chasing_player = true
+	if not was_alerted and propagate:
+		_alert_nearby_enemies(player_ref)
+
+
+func _alert_nearby_enemies(player_ref) -> void:
+	if not _should_alert_nearby_enemies():
+		return
+
+	var alert_radius := _get_ally_alert_radius()
+	if alert_radius <= 0.0:
+		return
+
+	for enemy in get_tree().get_nodes_in_group("enemies"):
+		if enemy == self or not is_instance_valid(enemy):
+			continue
+		if not (enemy is Zombie):
+			continue
+		if enemy.global_position.distance_to(global_position) > alert_radius:
+			continue
+
+		enemy.receive_ally_alert(player_ref)
+
+
+func receive_ally_alert(player_ref) -> void:
+	if player_ref == null or not is_instance_valid(player_ref):
+		return
+	_alert_to_player(player_ref, false)
 
 
 func _spawn_death_drop() -> void:
@@ -310,3 +1038,55 @@ func _flash_body(flash_color: Color) -> void:
 	body_visual.color = flash_color
 	var tween := create_tween()
 	tween.tween_property(body_visual, "color", _base_color, 0.12)
+
+
+func _play_damage_feedback(source: Variant) -> void:
+	if _damage_feedback_tween != null and is_instance_valid(_damage_feedback_tween):
+		_damage_feedback_tween.kill()
+
+	var knock_direction := _get_damage_knock_direction(source)
+	body_visual.position = knock_direction * 4.0
+	body_visual.scale = Vector2(1.06, 0.94)
+	facing_marker.position = knock_direction * 4.0
+	facing_marker.scale = Vector2(1.06, 0.94)
+
+	_damage_feedback_tween = create_tween()
+	_damage_feedback_tween.parallel().tween_property(body_visual, "position", Vector2.ZERO, 0.12)
+	_damage_feedback_tween.parallel().tween_property(body_visual, "scale", Vector2.ONE, 0.12)
+	_damage_feedback_tween.parallel().tween_property(facing_marker, "position", Vector2.ZERO, 0.12)
+	_damage_feedback_tween.parallel().tween_property(facing_marker, "scale", Vector2.ONE, 0.12)
+
+
+func _get_damage_knock_direction(source: Variant) -> Vector2:
+	var attacker_position := global_position
+	if source is Dictionary:
+		var attacker = source.get("attacker")
+		if attacker != null and is_instance_valid(attacker) and attacker is Node2D:
+			attacker_position = attacker.global_position
+	elif source != null and is_instance_valid(source) and source is Node2D:
+		attacker_position = source.global_position
+
+	var knock_direction := global_position - attacker_position
+	if knock_direction.is_zero_approx():
+		return Vector2(0.0, 1.0)
+	return knock_direction.normalized()
+
+
+func _play_attack_flash() -> void:
+	attack_flash.visible = true
+	attack_flash.scale = _get_attack_flash_start_scale()
+	var strike_color := _get_attack_strike_color()
+	attack_flash.modulate = Color(strike_color.r, strike_color.g, strike_color.b, 1.0)
+	var tween := create_tween()
+	tween.parallel().tween_property(attack_flash, "scale", _get_attack_flash_peak_scale(), _get_attack_flash_duration())
+	tween.parallel().tween_property(attack_flash, "modulate:a", 0.0, _get_attack_flash_duration())
+	tween.finished.connect(func() -> void:
+		attack_flash.visible = false
+		attack_flash.scale = Vector2.ONE
+		attack_flash.modulate = Color(
+			_get_attack_tell_color().r,
+			_get_attack_tell_color().g,
+			_get_attack_tell_color().b,
+			_get_attack_tell_start_alpha()
+		)
+	)

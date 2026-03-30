@@ -1,6 +1,7 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
+[ext_resource type="Resource" path="res://data/weapons/kitchen_knife.tres" id="2_weapon"]
 
 [sub_resource type="RectangleShape2D" id="1_body_shape"]
 size = Vector2(24, 24)
@@ -16,9 +17,10 @@ radius = 44.0
 
 [node name="Player" type="CharacterBody2D"]
 script = ExtResource("1_player")
-position = Vector2(640, 360)
+position = Vector2(960, 540)
 collision_layer = 1
-collision_mask = 2
+collision_mask = 10
+equipped_weapon = ExtResource("2_weapon")
 
 [node name="Body" type="Polygon2D" parent="."]
 color = Color(0.88, 0.92, 0.96, 1)
@@ -41,6 +43,17 @@ zoom = Vector2(1, 1)
 
 [node name="AttackArea" type="Area2D" parent="AttackPivot"]
 position = Vector2(0, -24)
+collision_mask = 8
+
+[node name="AttackIndicator" type="Polygon2D" parent="AttackPivot"]
+visible = false
+color = Color(1, 0.9, 0.62, 0.22)
+polygon = PackedVector2Array(-14, -9, 14, -9, 14, 9, -14, 9)
+
+[node name="AttackFlash" type="Polygon2D" parent="AttackPivot"]
+visible = false
+color = Color(1, 0.83, 0.42, 0.75)
+polygon = PackedVector2Array(-12, -34, 12, -34, 20, -10, 0, 8, -20, -10)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="AttackPivot/AttackArea"]
 shape = SubResource("2_attack_shape")
@@ -56,4 +69,7 @@ shape = SubResource("3_pickup_shape")
 shape = SubResource("4_interaction_shape")
 
 [node name="ActionTimer" type="Timer" parent="."]
+one_shot = true
+
+[node name="AttackWindupTimer" type="Timer" parent="."]
 one_shot = true

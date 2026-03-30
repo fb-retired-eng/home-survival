@@ -11,6 +11,8 @@ const ENEMY_DEFINITION_SCRIPT := preload("res://scripts/data/enemy_definition.gd
 
 @export var zombie_scene: PackedScene
 @export var wave_set_definition: Resource
+@export_range(0.0, 128.0, 1.0) var spawn_jitter_radius: float = 32.0
+@export_range(1, 12, 1) var spawn_jitter_attempts: int = 6
 
 var active_wave: int = 0
 var active_enemies: int = 0
@@ -25,7 +27,6 @@ var _wave_definitions: Dictionary = {}
 
 
 func _ready() -> void:
-	_rebuild_wave_definition_cache()
 	_spawn_timer = Timer.new()
 	_spawn_timer.one_shot = true
 	add_child(_spawn_timer)
@@ -37,6 +38,7 @@ func configure(spawn_markers: Dictionary, enemy_parent: Node2D, player_ref, sock
 	_enemy_parent = enemy_parent
 	_player = player_ref
 	_socket_container = socket_container
+	_rebuild_wave_definition_cache()
 
 
 func has_wave_definition(wave_number: int) -> bool:
@@ -216,6 +218,12 @@ func _rebuild_wave_definition_cache() -> void:
 		push_warning("WaveManager wave_set_definition is not a WaveSetDefinition resource")
 		return
 
+	var valid_socket_ids := {}
+	for socket in _get_defense_sockets():
+		if not is_instance_valid(socket):
+			continue
+		valid_socket_ids[String(socket.socket_id)] = true
+
 	for wave_resource in wave_set_definition.waves:
 		if wave_resource == null:
 			push_warning("Wave set contains a null wave resource")
@@ -258,15 +266,25 @@ func _rebuild_wave_definition_cache() -> void:
 				wave_is_valid = false
 				break
 
-				if lane_resource.enemy_definition == null or lane_resource.enemy_definition.get_script() != ENEMY_DEFINITION_SCRIPT:
-					push_warning("Wave %d lane %s is missing a valid enemy_definition" % [wave_number, lane_id])
+			if lane_resource.enemy_definition == null or lane_resource.enemy_definition.get_script() != ENEMY_DEFINITION_SCRIPT:
+				push_warning("Wave %d lane %s is missing a valid enemy_definition" % [wave_number, lane_id])
+				wave_is_valid = false
+				break
+
+			if not lane_resource.enemy_definition.is_valid_definition():
+				push_warning("Wave %d lane %s has an invalid enemy_definition resource" % [wave_number, lane_id])
+				wave_is_valid = false
+				break
+
+			for preferred_socket_id in lane_resource.preferred_socket_ids:
+				var socket_id := String(preferred_socket_id)
+				if socket_id.is_empty() or not valid_socket_ids.has(socket_id):
+					push_warning("Wave %d lane %s references unknown preferred socket %s" % [wave_number, lane_id, socket_id])
 					wave_is_valid = false
 					break
 
-				if not lane_resource.enemy_definition.is_valid_definition():
-					push_warning("Wave %d lane %s has an invalid enemy_definition resource" % [wave_number, lane_id])
-					wave_is_valid = false
-					break
+			if not wave_is_valid:
+				break
 
 			lanes.append({
 				"id": lane_id,
@@ -303,18 +321,19 @@ func _spawn_next_enemy() -> void:
 	var spawn_entry: Dictionary = _spawn_queue.pop_front()
 	var lane_id := String(spawn_entry.get("lane_id", ""))
 	var marker: Node2D = _spawn_markers.get(lane_id, null)
+	var preferred_socket_ids := PackedStringArray(Array(spawn_entry.get("preferred_socket_ids", [])))
 	if marker == null:
 		push_warning("Missing spawn marker for lane %s" % lane_id)
 	else:
 		var zombie = zombie_scene.instantiate()
 		zombie.definition = spawn_entry.get("enemy_definition")
 		_enemy_parent.add_child(zombie)
-		zombie.global_position = marker.global_position
+		zombie.global_position = _get_spawn_position(marker, preferred_socket_ids)
 		if zombie.has_method("configure_wave_context"):
 			zombie.configure_wave_context(
 				_player,
 				_get_defense_sockets(),
-				PackedStringArray(Array(spawn_entry.get("preferred_socket_ids", [])))
+				preferred_socket_ids
 			)
 		if zombie.has_signal("died"):
 			zombie.died.connect(_on_zombie_died)
@@ -337,6 +356,83 @@ func _get_defense_sockets() -> Array:
 		sockets.append(child)
 
 	return sockets
+
+
+func _get_spawn_position(marker: Node2D, preferred_socket_ids: PackedStringArray = PackedStringArray()) -> Vector2:
+	if marker == null:
+		return Vector2.ZERO
+
+	if spawn_jitter_radius <= 0.0 or _enemy_parent == null:
+		return marker.global_position
+
+	var forward: Vector2 = _get_spawn_forward_direction(marker, preferred_socket_ids)
+	var lateral: Vector2 = forward.orthogonal()
+	var best_position: Vector2 = marker.global_position
+	var best_score: float = -INF
+	for _attempt in spawn_jitter_attempts:
+		var lateral_offset: float = randf_range(-spawn_jitter_radius, spawn_jitter_radius)
+		var forward_offset: float = randf_range(-spawn_jitter_radius * 0.2, spawn_jitter_radius * 0.35)
+		var candidate: Vector2 = marker.global_position + lateral * lateral_offset + forward * forward_offset
+		var score: float = _score_spawn_position(candidate) - abs(forward_offset) * 0.1
+		if score > best_score:
+			best_score = score
+			best_position = candidate
+
+	return best_position
+
+
+func _get_spawn_forward_direction(marker: Node2D, preferred_socket_ids: PackedStringArray) -> Vector2:
+	var target_sockets: Array = _get_spawn_target_sockets(preferred_socket_ids)
+	var closest_socket = null
+	var best_distance := INF
+
+	for socket in target_sockets:
+		if not is_instance_valid(socket):
+			continue
+
+		var distance: float = marker.global_position.distance_squared_to(socket.global_position)
+		if distance < best_distance:
+			best_distance = distance
+			closest_socket = socket
+
+	if closest_socket == null:
+		return Vector2.DOWN
+
+	var direction: Vector2 = closest_socket.global_position - marker.global_position
+	if direction.is_zero_approx():
+		return Vector2.DOWN
+
+	return direction.normalized()
+
+
+func _get_spawn_target_sockets(preferred_socket_ids: PackedStringArray) -> Array:
+	var sockets := _get_defense_sockets()
+	if preferred_socket_ids.is_empty():
+		return sockets
+
+	var preferred: Array = []
+	for socket in sockets:
+		if not is_instance_valid(socket):
+			continue
+		if preferred_socket_ids.has(String(socket.socket_id)):
+			preferred.append(socket)
+
+	if preferred.is_empty():
+		return sockets
+
+	return preferred
+
+
+func _score_spawn_position(candidate: Vector2) -> float:
+	var best_distance := spawn_jitter_radius
+	for child in _enemy_parent.get_children():
+		if not (child is Node2D):
+			continue
+
+		var enemy_position: Vector2 = child.global_position
+		best_distance = min(best_distance, candidate.distance_to(enemy_position))
+
+	return best_distance
 
 
 func _on_spawn_timer_timeout() -> void:

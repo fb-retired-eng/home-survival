@@ -2,6 +2,16 @@ extends CharacterBody2D
 class_name Player
 
 const RESOURCE_IDS := ["salvage", "parts", "medicine"]
+const DEFAULT_ATTACK_FLASH_COLOR := Color(1.0, 0.83, 0.42, 0.75)
+const DEFAULT_ATTACK_FLASH_START_SCALE := Vector2(0.8, 0.8)
+const DEFAULT_ATTACK_FLASH_PEAK_SCALE := Vector2(1.1, 1.1)
+const DEFAULT_ATTACK_FLASH_DURATION := 0.08
+const DEFAULT_ATTACK_INDICATOR_WINDUP_COLOR := Color(1.0, 0.9, 0.62, 0.22)
+const DEFAULT_ATTACK_INDICATOR_STRIKE_COLOR := Color(1.0, 0.98, 0.88, 0.9)
+const DEFAULT_ATTACK_INDICATOR_WINDUP_START_SCALE := Vector2(0.82, 0.82)
+const DEFAULT_ATTACK_INDICATOR_STRIKE_PEAK_SCALE := Vector2(1.05, 1.05)
+const WEAPON_DEFINITION_SCRIPT := preload("res://scripts/data/weapon_definition.gd")
+const DEFAULT_WEAPON_RESOURCE := preload("res://data/weapons/kitchen_knife.tres")
 
 signal health_changed(current: int, maximum: int)
 signal energy_changed(current: int, maximum: int)
@@ -13,11 +23,16 @@ signal interaction_prompt_changed(text: String)
 @export var max_health: int = 100
 @export var max_energy: int = 100
 @export var move_speed: float = 180.0
-@export var melee_damage: int = 25
-@export var melee_damage_type: StringName = &"melee"
-@export var melee_energy_cost: int = 5
-@export var melee_cooldown: float = 0.45
 @export var medicine_heal_amount: int = 35
+var _equipped_weapon: Resource
+@export var equipped_weapon: Resource:
+	get:
+		return _equipped_weapon
+	set(value):
+		_equipped_weapon = value
+		if is_node_ready():
+			_cancel_attack_windup()
+			_apply_equipped_weapon()
 
 var current_health: int
 var current_energy: int
@@ -36,14 +51,37 @@ var _nearby_interactables: Array[Node2D] = []
 var _busy_label: String = ""
 var _action_complete_callback: Callable
 var _interaction_gate_callback: Callable
+var _attack_windup_pending: bool = false
+var _attack_windup_weapon: Resource
+var _attack_windup_visual_only: bool = false
+var _attack_flash_color: Color = DEFAULT_ATTACK_FLASH_COLOR
+var _attack_flash_start_scale: Vector2 = DEFAULT_ATTACK_FLASH_START_SCALE
+var _attack_flash_peak_scale: Vector2 = DEFAULT_ATTACK_FLASH_PEAK_SCALE
+var _attack_flash_duration: float = DEFAULT_ATTACK_FLASH_DURATION
+var _attack_indicator_windup_color: Color = DEFAULT_ATTACK_INDICATOR_WINDUP_COLOR
+var _attack_indicator_strike_color: Color = DEFAULT_ATTACK_INDICATOR_STRIKE_COLOR
+var _attack_indicator_windup_start_scale: Vector2 = DEFAULT_ATTACK_INDICATOR_WINDUP_START_SCALE
+var _attack_indicator_strike_peak_scale: Vector2 = DEFAULT_ATTACK_INDICATOR_STRIKE_PEAK_SCALE
+var _attack_indicator_lead_time: float = 0.12
+var _attack_indicator_windup_start_alpha: float = 0.45
+var _attack_indicator_windup_end_alpha: float = 1.0
+var _attack_indicator_strike_alpha: float = 0.95
+var _attack_indicator_strike_fade_duration: float = 0.10
+var _attack_indicator_tween: Tween
+var _invalid_weapon_warning_emitted: bool = false
+var _damage_feedback_tween: Tween
 
 @onready var body_visual: Polygon2D = $Body
 @onready var facing_marker: Polygon2D = $FacingMarker
 @onready var attack_pivot: Node2D = $AttackPivot
 @onready var attack_area: Area2D = $AttackPivot/AttackArea
+@onready var attack_area_shape: CollisionShape2D = $AttackPivot/AttackArea/CollisionShape2D
+@onready var attack_indicator: Polygon2D = $AttackPivot/AttackIndicator
+@onready var attack_flash: Polygon2D = $AttackPivot/AttackFlash
 @onready var pickup_detector: Area2D = $PickupDetector
 @onready var interaction_detector: Area2D = $InteractionDetector
 @onready var action_timer: Timer = $ActionTimer
+@onready var attack_windup_timer: Timer = $AttackWindupTimer
 
 var _spawn_position: Vector2
 
@@ -54,12 +92,16 @@ func _ready() -> void:
 	current_health = max_health
 	current_energy = max_energy
 	_base_body_color = body_visual.color
+	if attack_area_shape.shape != null:
+		attack_area_shape.shape = attack_area_shape.shape.duplicate()
+	_apply_equipped_weapon()
 	pickup_detector.area_entered.connect(_on_pickup_detector_area_entered)
 	interaction_detector.area_entered.connect(_on_interaction_detector_area_entered)
 	interaction_detector.area_exited.connect(_on_interaction_detector_area_exited)
 	interaction_detector.body_entered.connect(_on_interaction_detector_body_entered)
 	interaction_detector.body_exited.connect(_on_interaction_detector_body_exited)
 	action_timer.timeout.connect(_on_action_timer_timeout)
+	attack_windup_timer.timeout.connect(_on_attack_windup_timer_timeout)
 	_emit_full_state()
 	_update_interaction_prompt()
 	_update_render_order()
@@ -227,6 +269,7 @@ func take_damage(amount: int, _source: Variant = null) -> void:
 	current_health = max(current_health - amount, 0)
 	health_changed.emit(current_health, max_health)
 	_flash_body(Color(1.0, 0.45, 0.45, 1.0))
+	_play_damage_feedback(_source)
 
 	if current_health == 0:
 		_die()
@@ -254,42 +297,42 @@ func _handle_movement() -> void:
 
 
 func _attempt_attack() -> void:
-	if attack_cooldown_remaining > 0.0:
-		return
-	
-	if current_energy < melee_energy_cost:
-		message_requested.emit("Too tired")
+	if attack_cooldown_remaining > 0.0 or _attack_windup_pending:
 		return
 
-	var hit_targets: Array = []
-	for body in attack_area.get_overlapping_bodies():
-		if body == self:
-			continue
+	var weapon: Resource = _get_equipped_weapon()
+	if weapon == null:
+		return
 
-		if not body.is_in_group("enemies"):
-			continue
-
-		if not body.has_method("take_damage"):
-			continue
-
-		hit_targets.append(body)
+	var hit_targets := _get_attack_targets()
 
 	if hit_targets.is_empty():
+		_start_attack_sequence(weapon, true)
 		return
-	
-	if not spend_energy(melee_energy_cost):
+
+	if current_energy < weapon.energy_cost:
 		message_requested.emit("Too tired")
 		return
-	
-	attack_cooldown_remaining = melee_cooldown
-	_flash_body(Color(1.0, 0.82, 0.54, 1.0))
-	
-	for body in hit_targets:
-		if is_instance_valid(body):
-			body.take_damage(melee_damage, {
-				"attacker": self,
-				"damage_type": melee_damage_type,
-			})
+
+	if not spend_energy(weapon.energy_cost):
+		message_requested.emit("Too tired")
+		return
+	_start_attack_sequence(weapon, false)
+
+
+func _play_attack_flash() -> void:
+	attack_flash.visible = true
+	attack_flash.scale = _attack_flash_start_scale
+	attack_flash.modulate = Color(_attack_flash_color.r, _attack_flash_color.g, _attack_flash_color.b, 1.0)
+	var tween := create_tween()
+	tween.parallel().tween_property(attack_flash, "scale", _attack_flash_peak_scale, _attack_flash_duration)
+	tween.parallel().tween_property(attack_flash, "modulate:a", 0.0, _attack_flash_duration)
+	tween.finished.connect(func() -> void:
+		attack_flash.visible = false
+		attack_flash.scale = Vector2.ONE
+		attack_flash.modulate = Color(_attack_flash_color.r, _attack_flash_color.g, _attack_flash_color.b, 1.0)
+	)
+	_show_attack_indicator_strike()
 
 
 func _attempt_use_medicine() -> void:
@@ -323,6 +366,7 @@ func _attempt_interact() -> void:
 func _die() -> void:
 	is_dead = true
 	cancel_timed_action()
+	_cancel_attack_windup()
 	velocity = Vector2.ZERO
 	message_requested.emit("You died")
 	player_died.emit()
@@ -339,10 +383,12 @@ func reset_for_new_run() -> void:
 		"parts": 0,
 		"medicine": 0,
 	}
+	_cancel_attack_windup()
 	attack_cooldown_remaining = 0.0
 	velocity = Vector2.ZERO
 	_nearby_interactables.clear()
 	global_position = _spawn_position
+	_apply_equipped_weapon()
 	_emit_full_state()
 	_update_interaction_prompt()
 	_update_render_order()
@@ -358,6 +404,38 @@ func _flash_body(flash_color: Color) -> void:
 	body_visual.color = flash_color
 	var tween := create_tween()
 	tween.tween_property(body_visual, "color", _base_body_color, 0.12)
+
+
+func _play_damage_feedback(source: Variant) -> void:
+	if _damage_feedback_tween != null and is_instance_valid(_damage_feedback_tween):
+		_damage_feedback_tween.kill()
+
+	var knock_direction := _get_damage_knock_direction(source)
+	body_visual.position = knock_direction * 5.0
+	body_visual.scale = Vector2(1.08, 0.92)
+	facing_marker.position = knock_direction * 5.0
+	facing_marker.scale = Vector2(1.08, 0.92)
+
+	_damage_feedback_tween = create_tween()
+	_damage_feedback_tween.parallel().tween_property(body_visual, "position", Vector2.ZERO, 0.12)
+	_damage_feedback_tween.parallel().tween_property(body_visual, "scale", Vector2.ONE, 0.12)
+	_damage_feedback_tween.parallel().tween_property(facing_marker, "position", Vector2.ZERO, 0.12)
+	_damage_feedback_tween.parallel().tween_property(facing_marker, "scale", Vector2.ONE, 0.12)
+
+
+func _get_damage_knock_direction(source: Variant) -> Vector2:
+	var attacker_position := global_position
+	if source is Dictionary:
+		var attacker = source.get("attacker")
+		if attacker != null and is_instance_valid(attacker) and attacker is Node2D:
+			attacker_position = attacker.global_position
+	elif source != null and is_instance_valid(source) and source is Node2D:
+		attacker_position = source.global_position
+
+	var knock_direction := global_position - attacker_position
+	if knock_direction.is_zero_approx():
+		return Vector2(0.0, 1.0)
+	return knock_direction.normalized()
 
 
 func _on_pickup_detector_area_entered(area: Area2D) -> void:
@@ -389,6 +467,24 @@ func _on_action_timer_timeout() -> void:
 	if callback.is_valid() and not is_dead:
 		callback.call()
 	_update_interaction_prompt()
+
+
+func _on_attack_windup_timer_timeout() -> void:
+	if is_dead:
+		_cancel_attack_windup()
+		return
+
+	_attack_windup_pending = false
+	if _attack_windup_visual_only:
+		var windup_weapon := _attack_windup_weapon
+		_attack_windup_weapon = null
+		_attack_windup_visual_only = false
+		_play_attack_flash()
+		_flash_body(Color(1.0, 0.82, 0.54, 1.0))
+		_apply_miss_recovery(windup_weapon)
+		return
+
+	_commit_attack(_attack_windup_weapon)
 
 
 func _get_active_interactable() -> Node2D:
@@ -457,3 +553,192 @@ func _unregister_interactable(interactable: Node2D) -> void:
 
 func _update_render_order() -> void:
 	z_index = int(round(global_position.y))
+
+
+func _get_equipped_weapon() -> Resource:
+	if _is_valid_weapon_resource(equipped_weapon):
+		_invalid_weapon_warning_emitted = false
+		return equipped_weapon
+	if _is_valid_weapon_resource(DEFAULT_WEAPON_RESOURCE):
+		if not _invalid_weapon_warning_emitted:
+			push_warning("Player equipped_weapon is invalid; falling back to kitchen_knife.")
+			_invalid_weapon_warning_emitted = true
+		return DEFAULT_WEAPON_RESOURCE
+	return null
+
+
+func _apply_equipped_weapon() -> void:
+	var weapon: Resource = _get_equipped_weapon()
+	if weapon == null:
+		return
+
+	attack_area.position = weapon.attack_area_offset
+	attack_indicator.position = weapon.attack_area_offset
+	if attack_area_shape.shape is RectangleShape2D:
+		var shape := attack_area_shape.shape as RectangleShape2D
+		shape.size = weapon.attack_area_size
+		attack_indicator.polygon = PackedVector2Array([
+			Vector2(-weapon.attack_area_size.x * 0.5, -weapon.attack_area_size.y * 0.5),
+			Vector2(weapon.attack_area_size.x * 0.5, -weapon.attack_area_size.y * 0.5),
+			Vector2(weapon.attack_area_size.x * 0.5, weapon.attack_area_size.y * 0.5),
+			Vector2(-weapon.attack_area_size.x * 0.5, weapon.attack_area_size.y * 0.5)
+		])
+	_attack_flash_color = weapon.attack_flash_color
+	_attack_flash_start_scale = weapon.attack_flash_start_scale
+	_attack_indicator_windup_color = weapon.attack_indicator_windup_color
+	_attack_indicator_strike_color = weapon.attack_indicator_strike_color
+	_attack_indicator_windup_start_scale = weapon.attack_indicator_windup_start_scale
+	_attack_indicator_strike_peak_scale = weapon.attack_indicator_strike_peak_scale
+	_attack_indicator_lead_time = min(weapon.attack_indicator_lead_time, weapon.attack_windup)
+	_attack_indicator_windup_start_alpha = weapon.attack_indicator_windup_start_alpha
+	_attack_indicator_windup_end_alpha = weapon.attack_indicator_windup_end_alpha
+	_attack_indicator_strike_alpha = weapon.attack_indicator_strike_alpha
+	_attack_indicator_strike_fade_duration = weapon.attack_indicator_strike_fade_duration
+	attack_indicator.color = weapon.attack_indicator_windup_color
+	attack_indicator.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	attack_indicator.scale = Vector2.ONE
+	attack_flash.color = weapon.attack_flash_color
+	attack_flash.modulate = Color(weapon.attack_flash_color.r, weapon.attack_flash_color.g, weapon.attack_flash_color.b, 1.0)
+	_attack_flash_peak_scale = weapon.attack_flash_peak_scale
+	_attack_flash_duration = weapon.attack_flash_duration
+
+
+func _get_attack_targets() -> Array:
+	var hit_targets: Array = []
+	for body in attack_area.get_overlapping_bodies():
+		if body == self:
+			continue
+		if not body.is_in_group("enemies"):
+			continue
+		if not body.has_method("take_damage"):
+			continue
+		hit_targets.append(body)
+	return hit_targets
+
+
+func _commit_attack(weapon_override: Resource = null) -> void:
+	var weapon: Resource = weapon_override
+	if weapon == null:
+		weapon = _get_equipped_weapon()
+	if weapon == null:
+		return
+
+	var hit_targets := _get_attack_targets()
+	if hit_targets.is_empty():
+		_play_attack_flash()
+		_flash_body(Color(1.0, 0.82, 0.54, 1.0))
+		if _attack_windup_weapon != null:
+			restore_energy(int(weapon.energy_cost))
+		_apply_miss_recovery(weapon)
+		attack_windup_timer.stop()
+		_attack_windup_pending = false
+		_attack_windup_weapon = null
+		_attack_windup_visual_only = false
+		return
+
+	_play_attack_flash()
+	attack_cooldown_remaining = weapon.attack_cooldown
+	_flash_body(Color(1.0, 0.82, 0.54, 1.0))
+
+	for body in hit_targets:
+		if is_instance_valid(body):
+			body.take_damage(weapon.damage, {
+				"attacker": self,
+				"damage_type": weapon.damage_type,
+			})
+	_attack_windup_weapon = null
+	_attack_windup_visual_only = false
+
+
+func _cancel_attack_windup() -> void:
+	attack_windup_timer.stop()
+	_attack_windup_pending = false
+	_attack_windup_weapon = null
+	_attack_windup_visual_only = false
+	_hide_attack_indicator()
+
+
+func _show_attack_indicator_windup(duration: float) -> void:
+	_stop_attack_indicator_tween()
+	attack_indicator.color = _attack_indicator_windup_color
+	attack_indicator.scale = _attack_indicator_windup_start_scale
+	attack_indicator.modulate = Color(1.0, 1.0, 1.0, _attack_indicator_windup_start_alpha)
+	attack_indicator.visible = false
+	if duration <= 0.0:
+		return
+	var tell_duration: float = min(_attack_indicator_lead_time, duration)
+	if tell_duration <= 0.0:
+		return
+	var tell_delay: float = max(duration - tell_duration, 0.0)
+	_attack_indicator_tween = create_tween()
+	if tell_delay > 0.0:
+		_attack_indicator_tween.tween_interval(tell_delay)
+	_attack_indicator_tween.tween_callback(func() -> void:
+		attack_indicator.visible = true
+		attack_indicator.color = _attack_indicator_windup_color
+		attack_indicator.scale = _attack_indicator_windup_start_scale
+		attack_indicator.modulate = Color(1.0, 1.0, 1.0, _attack_indicator_windup_start_alpha)
+	)
+	_attack_indicator_tween.parallel().tween_property(attack_indicator, "scale", Vector2.ONE, max(tell_duration, 0.05))
+	_attack_indicator_tween.parallel().tween_property(attack_indicator, "modulate:a", _attack_indicator_windup_end_alpha, max(tell_duration, 0.05))
+
+
+func _show_attack_indicator_strike() -> void:
+	_stop_attack_indicator_tween()
+	attack_indicator.visible = true
+	attack_indicator.color = _attack_indicator_strike_color
+	attack_indicator.scale = _attack_indicator_strike_peak_scale
+	attack_indicator.modulate = Color(1.0, 1.0, 1.0, _attack_indicator_strike_alpha)
+	_attack_indicator_tween = create_tween()
+	_attack_indicator_tween.parallel().tween_property(attack_indicator, "scale", Vector2.ONE, _attack_indicator_strike_fade_duration)
+	_attack_indicator_tween.parallel().tween_property(attack_indicator, "modulate:a", 0.0, _attack_indicator_strike_fade_duration)
+	_attack_indicator_tween.finished.connect(func() -> void:
+		_hide_attack_indicator()
+	)
+
+
+func _hide_attack_indicator() -> void:
+	_stop_attack_indicator_tween()
+	attack_indicator.visible = false
+	attack_indicator.color = _attack_indicator_windup_color
+	attack_indicator.scale = Vector2.ONE
+	attack_indicator.modulate = Color(1.0, 1.0, 1.0, 1.0)
+
+
+func _stop_attack_indicator_tween() -> void:
+	if _attack_indicator_tween != null and is_instance_valid(_attack_indicator_tween):
+		_attack_indicator_tween.kill()
+	_attack_indicator_tween = null
+
+
+func _is_valid_weapon_resource(resource: Resource) -> bool:
+	if resource == null:
+		return false
+	if resource.get_script() != WEAPON_DEFINITION_SCRIPT and not resource.is_class("WeaponDefinition"):
+		return false
+	if not resource.has_method("is_valid_definition"):
+		return false
+	return resource.is_valid_definition()
+
+
+func _apply_miss_recovery(weapon: Resource) -> void:
+	if weapon == null:
+		return
+	attack_cooldown_remaining = max(attack_cooldown_remaining, float(weapon.miss_recovery_time))
+
+
+func _start_attack_sequence(weapon: Resource, visual_only: bool) -> void:
+	if weapon.attack_windup <= 0.0:
+		if visual_only:
+			_play_attack_flash()
+			_flash_body(Color(1.0, 0.82, 0.54, 1.0))
+			_apply_miss_recovery(weapon)
+			return
+		_commit_attack(weapon)
+		return
+
+	_attack_windup_pending = true
+	_attack_windup_weapon = weapon
+	_attack_windup_visual_only = visual_only
+	_show_attack_indicator_windup(weapon.attack_windup)
+	attack_windup_timer.start(weapon.attack_windup)

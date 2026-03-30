@@ -2,15 +2,27 @@ extends CanvasLayer
 class_name HUD
 
 var player
+var _health_current: int = 0
+var _health_maximum: int = 0
+var _energy_current: int = 0
+var _energy_maximum: int = 0
+var _wave_current: int = 0
+var _wave_final: int = 0
+var _phase_text: String = "Pre-Wave"
 
-@onready var health_label: Label = %HealthLabel
-@onready var energy_label: Label = %EnergyLabel
+@onready var health_value_label: Label = %HealthValueLabel
+@onready var health_bar: ProgressBar = %HealthBar
+@onready var energy_value_label: Label = %EnergyValueLabel
+@onready var energy_bar: ProgressBar = %EnergyBar
 @onready var wave_label: Label = %WaveLabel
-@onready var phase_label: Label = %PhaseLabel
 @onready var base_label: Label = %BaseLabel
 @onready var resources_label: Label = %ResourcesLabel
 @onready var status_label: Label = %StatusLabel
+@onready var interaction_panel: PanelContainer = %InteractionLabel.get_parent()
 @onready var interaction_label: Label = %InteractionLabel
+@onready var end_overlay: Control = %EndOverlay
+@onready var end_title_label: Label = %EndTitleLabel
+@onready var end_message_label: Label = %EndMessageLabel
 
 
 func bind_player(target) -> void:
@@ -31,31 +43,63 @@ func set_status(text: String) -> void:
 
 func set_interaction_prompt(text: String) -> void:
 	interaction_label.text = text
+	interaction_panel.visible = not text.is_empty()
+
+
+func show_end_overlay(title: String, message: String, accent: Color) -> void:
+	end_title_label.text = title
+	end_title_label.add_theme_color_override("font_color", accent)
+	end_message_label.text = message
+	end_overlay.visible = true
+
+
+func hide_end_overlay() -> void:
+	end_overlay.visible = false
 
 
 func set_wave(current_wave: int, final_wave: int) -> void:
-	wave_label.text = "Wave: %d / %d" % [current_wave, final_wave]
+	_wave_current = current_wave
+	_wave_final = final_wave
+	_refresh_progress()
 
 
 func set_phase(text: String) -> void:
-	phase_label.text = text
+	_phase_text = text.replace("Phase: ", "")
+	_refresh_progress()
 
 
 func set_base_status(intact_count: int, breached_count: int, hp_percent: int) -> void:
-	base_label.text = "Base: %d intact, %d breached, %d%% HP" % [intact_count, breached_count, hp_percent]
+	base_label.text = "Base %d intact  |  %d breached  |  %d%% integrity" % [intact_count, breached_count, hp_percent]
 
 
 func _on_health_changed(current: int, maximum: int) -> void:
-	health_label.text = "Health: %d / %d" % [current, maximum]
+	_health_current = current
+	_health_maximum = maximum
+	_refresh_vitals()
 
 
 func _on_energy_changed(current: int, maximum: int) -> void:
-	energy_label.text = "Energy: %d / %d" % [current, maximum]
+	_energy_current = current
+	_energy_maximum = maximum
+	_refresh_vitals()
 
 
 func _on_resources_changed(resources: Dictionary) -> void:
-	resources_label.text = "Salvage: %d   Parts: %d   Medicine: %d" % [
+	resources_label.text = "Salvage %d   |   Parts %d   |   Medicine %d" % [
 		int(resources.get("salvage", 0)),
 		int(resources.get("parts", 0)),
 		int(resources.get("medicine", 0)),
 	]
+
+
+func _refresh_vitals() -> void:
+	health_value_label.text = "%d / %d" % [_health_current, _health_maximum]
+	energy_value_label.text = "%d / %d" % [_energy_current, _energy_maximum]
+	health_bar.max_value = max(_health_maximum, 1)
+	health_bar.value = clamp(_health_current, 0, _health_maximum)
+	energy_bar.max_value = max(_energy_maximum, 1)
+	energy_bar.value = clamp(_energy_current, 0, _energy_maximum)
+
+
+func _refresh_progress() -> void:
+	wave_label.text = "Wave %d / %d   |   %s" % [_wave_current, _wave_final, _phase_text]

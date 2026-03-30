@@ -4,9 +4,12 @@ class_name Game
 const BASE_PERIMETER_DEFINITION_SCRIPT := preload("res://scripts/data/base_perimeter_definition.gd")
 const PERIMETER_SEGMENT_DEFINITION_SCRIPT := preload("res://scripts/data/perimeter_segment_definition.gd")
 const STRUCTURE_PROFILE_SCRIPT := preload("res://scripts/data/structure_profile.gd")
+const EXPLORATION_SPAWN_POINT_SCRIPT := preload("res://scripts/world/exploration_spawn_point.gd")
 
 @export var defense_socket_scene: PackedScene
+@export var exploration_enemy_scene: PackedScene
 @export var perimeter_definition: Resource
+@export var sleep_heal_amount: int = 25
 
 @onready var game_manager = $GameManager
 @onready var player = $Player
@@ -15,12 +18,20 @@ const STRUCTURE_PROFILE_SCRIPT := preload("res://scripts/data/structure_profile.
 @onready var sleep_point: Area2D = $World/SleepPoint
 @onready var spawn_markers_root: Node2D = $World/SpawnMarkers
 @onready var defense_sockets: Node2D = $World/DefenseSockets
+@onready var exploration_spawn_points_root: Node2D = $World/ExplorationSpawnPoints
+@onready var exploration_enemy_layer: Node2D = $World/ExplorationEnemies
 @onready var wave_enemy_layer: Node2D = $World/WaveEnemies
+
+var _defeated_exploration_spawn_ids: Dictionary = {}
+var _exploration_spawn_counts: Dictionary = {}
+var _defeated_exploration_enemy_counts: Dictionary = {}
+var _is_resetting_run: bool = false
 
 
 func _ready() -> void:
 	randomize()
 	_build_defense_sockets()
+	_validate_exploration_spawn_points()
 	player.set_interaction_gate(Callable(self, "_can_player_interact_with"))
 	sleep_point.configure(Callable(self, "_can_player_sleep"), Callable(self, "_get_sleep_label"))
 	hud.bind_player(player)
@@ -126,6 +137,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	get_viewport().set_input_as_handled()
+	_is_resetting_run = true
 	game_manager.reset_run()
 
 
@@ -136,7 +148,9 @@ func _on_player_died() -> void:
 func _on_run_state_changed(new_state: int) -> void:
 	if new_state == game_manager.RunState.LOSS:
 		wave_manager.reset()
+		_clear_exploration_enemies()
 		player.cancel_timed_action()
+		hud.show_end_overlay("Run Failed", "You died.\nPress R to restart.", Color(0.94, 0.42, 0.38, 1.0))
 		hud.set_phase("Phase: Loss")
 		hud.set_status("You died")
 		hud.set_interaction_prompt("Press R to restart")
@@ -144,18 +158,26 @@ func _on_run_state_changed(new_state: int) -> void:
 
 	if new_state == game_manager.RunState.WIN:
 		wave_manager.reset()
+		_clear_exploration_enemies()
+		hud.show_end_overlay("Victory", "You survived all %d waves.\nPress R to restart." % game_manager.final_wave, Color(0.96, 0.84, 0.42, 1.0))
 		hud.set_phase("Phase: Victory")
-		hud.set_status("You survived all 3 waves")
+		hud.set_status("You survived all %d waves" % game_manager.final_wave)
 		hud.set_interaction_prompt("Press R to restart")
 		return
 
+	hud.hide_end_overlay()
+
 	if new_state == game_manager.RunState.ACTIVE_WAVE:
+		_set_exploration_enemies_suspended(true)
 		hud.set_phase("Phase: Active Wave")
 		hud.set_status("Wave %d in progress. Defend the base." % game_manager.current_wave)
 		player.refresh_interaction_prompt()
 		return
 
 	if new_state == game_manager.RunState.PRE_WAVE:
+		if _is_resetting_run:
+			return
+		_sync_exploration_enemies()
 		hud.set_phase("Phase: Pre-Wave")
 		player.refresh_interaction_prompt()
 		_refresh_phase_status()
@@ -172,7 +194,7 @@ func _refresh_phase_status() -> void:
 		return
 	
 	if game_manager.current_wave <= 0:
-		hud.set_status("Safe before first wave. Scavenge, strengthen, then sleep.")
+		hud.set_status("Scavenge carefully. POIs may already have enemies. Strengthen, then sleep.")
 	elif game_manager.current_wave < game_manager.final_wave:
 		hud.set_status("Wave %d cleared. Repair, strengthen, scavenge, then sleep for wave %d." % [game_manager.current_wave, game_manager.current_wave + 1])
 	else:
@@ -184,12 +206,15 @@ func _can_player_interact_with(_interactable) -> bool:
 
 
 func _can_player_sleep(_player) -> bool:
-	return game_manager.can_start_next_wave()
+	return game_manager.can_start_next_wave() and not _has_sleep_blocking_exploration_threat()
 
 
 func _get_sleep_label(_player) -> String:
 	if not game_manager.can_start_next_wave():
 		return ""
+
+	if _has_sleep_blocking_exploration_threat():
+		return "Enemies too close to sleep"
 
 	var next_wave: int = game_manager.current_wave + 1
 	if not wave_manager.can_start_wave(next_wave):
@@ -200,6 +225,11 @@ func _get_sleep_label(_player) -> String:
 
 func _on_sleep_requested(_player) -> void:
 	var next_wave: int = game_manager.current_wave + 1
+	if _has_sleep_blocking_exploration_threat():
+		hud.set_status("Enemies too close to sleep")
+		player.refresh_interaction_prompt()
+		return
+
 	if not _can_player_sleep(_player):
 		hud.set_status("Wave %d is not configured" % next_wave)
 		return
@@ -214,6 +244,7 @@ func _on_sleep_requested(_player) -> void:
 		return
 
 	player.restore_full_energy()
+	player.heal(sleep_heal_amount)
 	game_manager.set_wave(next_wave)
 	game_manager.set_run_state(game_manager.RunState.ACTIVE_WAVE)
 
@@ -229,6 +260,10 @@ func _on_wave_cleared(_wave_number: int) -> void:
 
 func _on_run_reset() -> void:
 	wave_manager.reset()
+	_clear_exploration_enemies()
+	_defeated_exploration_spawn_ids.clear()
+	_exploration_spawn_counts.clear()
+	_defeated_exploration_enemy_counts.clear()
 	for pickup in get_tree().get_nodes_in_group("pickups"):
 		pickup.queue_free()
 	player.reset_for_new_run()
@@ -238,8 +273,176 @@ func _on_run_reset() -> void:
 	for node in get_tree().get_nodes_in_group("scavenge_nodes"):
 		if node.has_method("reset_for_new_run"):
 			node.reset_for_new_run()
+	_sync_exploration_enemies()
 	_refresh_base_status()
+	_refresh_phase_status()
 	player.refresh_interaction_prompt()
+	_is_resetting_run = false
+
+
+func _sync_exploration_enemies() -> void:
+	if game_manager.run_state != game_manager.RunState.PRE_WAVE:
+		return
+
+	if exploration_enemy_scene == null or exploration_spawn_points_root == null or exploration_enemy_layer == null:
+		return
+
+	var existing_by_spawn_id := {}
+	for existing_enemy in exploration_enemy_layer.get_children():
+		if not is_instance_valid(existing_enemy):
+			continue
+		if existing_enemy.is_queued_for_deletion():
+			continue
+
+		var existing_spawn_id := String(existing_enemy.get_meta("spawn_id", ""))
+		if existing_spawn_id.is_empty():
+			continue
+
+		if not existing_by_spawn_id.has(existing_spawn_id):
+			existing_by_spawn_id[existing_spawn_id] = []
+		existing_by_spawn_id[existing_spawn_id].append(existing_enemy)
+		if existing_enemy.has_method("set_exploration_suspended"):
+			existing_enemy.set_exploration_suspended(false)
+			if existing_enemy.has_method("configure_exploration_context"):
+				var stored_facing: Vector2 = existing_enemy.get_meta("spawn_facing", Vector2.ZERO)
+				var stored_anchor: Vector2 = existing_enemy.get_meta("spawn_anchor", existing_enemy.global_position)
+				existing_enemy.configure_exploration_context(player, stored_facing, false, stored_anchor, false)
+
+	var seen_spawn_ids := {}
+	for child in exploration_spawn_points_root.get_children():
+		if child == null or child.get_script() != EXPLORATION_SPAWN_POINT_SCRIPT:
+			continue
+
+		if not child.is_valid_spawn_point():
+			push_warning("Invalid exploration spawn point: %s" % child.name)
+			continue
+
+		var spawn_id := String(child.spawn_id)
+		if seen_spawn_ids.has(spawn_id):
+			push_warning("Duplicate exploration spawn_id skipped: %s" % spawn_id)
+			continue
+		seen_spawn_ids[spawn_id] = true
+		if _defeated_exploration_spawn_ids.has(spawn_id):
+			continue
+
+		var target_count: int = _get_or_roll_exploration_spawn_count(child)
+		var defeated_count := int(_defeated_exploration_enemy_counts.get(spawn_id, 0))
+		var existing_count: int = 0
+		if existing_by_spawn_id.has(spawn_id):
+			existing_count = Array(existing_by_spawn_id.get(spawn_id, [])).size()
+
+		var missing_count: int = max(target_count - defeated_count - existing_count, 0)
+		for _spawn_index in range(missing_count):
+			var enemy = exploration_enemy_scene.instantiate()
+			enemy.definition = child.enemy_definition
+			exploration_enemy_layer.add_child(enemy)
+			enemy.global_position = _get_exploration_spawn_position(child)
+			enemy.set_meta("spawn_id", spawn_id)
+			var initial_facing: Vector2 = Vector2.ZERO
+			if child.has_method("get_initial_facing_vector"):
+				initial_facing = child.get_initial_facing_vector()
+			var anchor_position: Vector2 = enemy.global_position
+			if child.has_method("get_anchor_position"):
+				anchor_position = child.get_anchor_position()
+			enemy.set_meta("spawn_facing", initial_facing)
+			enemy.set_meta("spawn_anchor", anchor_position)
+			if enemy.has_method("configure_exploration_context"):
+				enemy.configure_exploration_context(player, initial_facing, true, anchor_position, true)
+			if enemy.has_signal("died"):
+				enemy.died.connect(_on_exploration_enemy_died.bind(spawn_id))
+
+
+func _clear_exploration_enemies() -> void:
+	if exploration_enemy_layer == null:
+		return
+
+	for child in exploration_enemy_layer.get_children():
+		child.queue_free()
+
+
+func _set_exploration_enemies_suspended(suspended: bool) -> void:
+	if exploration_enemy_layer == null:
+		return
+
+	for child in exploration_enemy_layer.get_children():
+		if child.has_method("set_exploration_suspended"):
+			child.set_exploration_suspended(suspended)
+
+
+func _has_sleep_blocking_exploration_threat() -> bool:
+	if exploration_enemy_layer == null:
+		return false
+
+	for child in exploration_enemy_layer.get_children():
+		if not is_instance_valid(child):
+			continue
+		if child.has_method("is_engaged_with_player") and child.is_engaged_with_player():
+			return true
+
+	return false
+
+
+func _on_exploration_enemy_died(_enemy, spawn_id: String) -> void:
+	var defeated_count := int(_defeated_exploration_enemy_counts.get(spawn_id, 0)) + 1
+	_defeated_exploration_enemy_counts[spawn_id] = defeated_count
+	var target_count := int(_exploration_spawn_counts.get(spawn_id, 1))
+	if defeated_count >= target_count:
+		_defeated_exploration_spawn_ids[spawn_id] = true
+
+
+func _get_or_roll_exploration_spawn_count(spawn_point) -> int:
+	var spawn_id := String(spawn_point.spawn_id)
+	if _exploration_spawn_counts.has(spawn_id):
+		return int(_exploration_spawn_counts[spawn_id])
+
+	var rolled_count := randi_range(int(spawn_point.min_count), int(spawn_point.max_count))
+	_exploration_spawn_counts[spawn_id] = rolled_count
+	return rolled_count
+
+
+func _get_exploration_spawn_position(spawn_point) -> Vector2:
+	var base_position: Vector2 = spawn_point.global_position
+	var scatter_radius: float = float(spawn_point.scatter_radius)
+	if scatter_radius <= 0.0:
+		return base_position
+
+	var best_position := base_position
+	var best_distance := -INF
+	for _attempt in range(8):
+		var angle := randf() * TAU
+		var distance := randf() * scatter_radius
+		var candidate := base_position + Vector2.RIGHT.rotated(angle) * distance
+		var nearest_distance := scatter_radius
+		for child in exploration_enemy_layer.get_children():
+			if not is_instance_valid(child):
+				continue
+			nearest_distance = min(nearest_distance, candidate.distance_to(child.global_position))
+		if nearest_distance > best_distance:
+			best_distance = nearest_distance
+			best_position = candidate
+
+	return best_position
+
+
+func _validate_exploration_spawn_points() -> void:
+	if exploration_spawn_points_root == null:
+		return
+
+	var seen_spawn_ids := {}
+	for child in exploration_spawn_points_root.get_children():
+		if child == null or child.get_script() != EXPLORATION_SPAWN_POINT_SCRIPT:
+			continue
+
+		if not child.is_valid_spawn_point():
+			push_warning("Invalid exploration spawn point: %s" % child.name)
+			continue
+
+		var spawn_id := String(child.spawn_id)
+		if seen_spawn_ids.has(spawn_id):
+			push_warning("Duplicate exploration spawn_id in scene: %s" % spawn_id)
+			continue
+
+		seen_spawn_ids[spawn_id] = true
 
 
 func _collect_spawn_markers() -> Dictionary:

@@ -1,31 +1,89 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_hud"]
 
 [sub_resource type="StyleBoxFlat" id="1_hud_panel"]
-bg_color = Color(0.06, 0.08, 0.09, 0.82)
+bg_color = Color(0.05, 0.08, 0.11, 0.9)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.88, 0.92, 0.96, 0.12)
-corner_radius_top_left = 12
-corner_radius_top_right = 12
-corner_radius_bottom_right = 12
-corner_radius_bottom_left = 12
-content_margin_left = 16.0
+border_color = Color(0.76, 0.88, 0.96, 0.14)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
+content_margin_left = 18.0
 content_margin_top = 16.0
-content_margin_right = 16.0
+content_margin_right = 18.0
 content_margin_bottom = 16.0
+
+[sub_resource type="StyleBoxFlat" id="2_stat_track"]
+bg_color = Color(0.13, 0.17, 0.2, 0.95)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+content_margin_left = 2.0
+content_margin_top = 2.0
+content_margin_right = 2.0
+content_margin_bottom = 2.0
+
+[sub_resource type="StyleBoxFlat" id="3_health_fill"]
+bg_color = Color(0.83, 0.22, 0.26, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="4_energy_fill"]
+bg_color = Color(0.27, 0.74, 0.88, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="5_interaction_panel"]
+bg_color = Color(0.18, 0.13, 0.06, 0.92)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.95, 0.79, 0.33, 0.34)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+content_margin_left = 12.0
+content_margin_top = 10.0
+content_margin_right = 12.0
+content_margin_bottom = 10.0
+
+[sub_resource type="StyleBoxFlat" id="6_end_panel"]
+bg_color = Color(0.06, 0.08, 0.09, 0.94)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.96, 0.84, 0.42, 0.65)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+content_margin_left = 28.0
+content_margin_top = 24.0
+content_margin_right = 28.0
+content_margin_bottom = 24.0
 
 [node name="HUD" type="CanvasLayer"]
 script = ExtResource("1_hud")
 
 [node name="PanelContainer" type="PanelContainer" parent="."]
-offset_left = 20.0
-offset_top = 20.0
-offset_right = 430.0
-offset_bottom = 300.0
+custom_minimum_size = Vector2(396, 0)
+offset_left = 18.0
+offset_top = 18.0
+offset_right = 414.0
+offset_bottom = 356.0
 theme_override_styles/panel = SubResource("1_hud_panel")
 
 [node name="MarginContainer" type="MarginContainer" parent="PanelContainer"]
@@ -34,38 +92,150 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 
 [node name="VBoxContainer" type="VBoxContainer" parent="PanelContainer/MarginContainer"]
-theme_override_constants/separation = 12
+theme_override_constants/separation = 10
 
-[node name="HealthLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer"]
-unique_name_in_owner = true
-text = "Health: 100 / 100"
+[node name="TitleLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer"]
+theme_override_font_sizes/font_size = 13
+theme_override_colors/font_color = Color(0.69, 0.82, 0.91, 0.86)
+text = "SURVIVAL STATUS"
 
-[node name="EnergyLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer"]
+[node name="HealthBlock" type="VBoxContainer" parent="PanelContainer/MarginContainer/VBoxContainer"]
+theme_override_constants/separation = 4
+
+[node name="HealthHeader" type="HBoxContainer" parent="PanelContainer/MarginContainer/VBoxContainer/HealthBlock"]
+theme_override_constants/separation = 8
+
+[node name="HealthTextLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer/HealthBlock/HealthHeader"]
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.95, 0.56, 0.58, 1)
+text = "HEALTH"
+
+[node name="HealthValueLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer/HealthBlock/HealthHeader"]
 unique_name_in_owner = true
-text = "Energy: 100 / 100"
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 2
+text = "100 / 100"
+
+[node name="HealthBar" type="ProgressBar" parent="PanelContainer/MarginContainer/VBoxContainer/HealthBlock"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 16)
+theme_override_styles/background = SubResource("2_stat_track")
+theme_override_styles/fill = SubResource("3_health_fill")
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="EnergyBlock" type="VBoxContainer" parent="PanelContainer/MarginContainer/VBoxContainer"]
+theme_override_constants/separation = 4
+
+[node name="EnergyHeader" type="HBoxContainer" parent="PanelContainer/MarginContainer/VBoxContainer/EnergyBlock"]
+theme_override_constants/separation = 8
+
+[node name="EnergyTextLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer/EnergyBlock/EnergyHeader"]
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.48, 0.84, 0.95, 1)
+text = "ENERGY"
+
+[node name="EnergyValueLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer/EnergyBlock/EnergyHeader"]
+unique_name_in_owner = true
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 2
+text = "100 / 100"
+
+[node name="EnergyBar" type="ProgressBar" parent="PanelContainer/MarginContainer/VBoxContainer/EnergyBlock"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 16)
+theme_override_styles/background = SubResource("2_stat_track")
+theme_override_styles/fill = SubResource("4_energy_fill")
+max_value = 100.0
+value = 100.0
+show_percentage = false
 
 [node name="WaveLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer"]
 unique_name_in_owner = true
-text = "Wave: 0 / 3"
-
-[node name="PhaseLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer"]
-unique_name_in_owner = true
-text = "Phase: Pre-Wave"
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.94, 0.95, 0.97, 1)
+text = "Wave 0/3   Pre-Wave"
 
 [node name="BaseLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer"]
 unique_name_in_owner = true
-text = "Base: 6 intact, 0 breached"
+theme_override_font_sizes/font_size = 15
+theme_override_colors/font_color = Color(0.82, 0.9, 0.75, 1)
+text = "Base 4 intact 0 breached 100%"
 
 [node name="ResourcesLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer"]
 unique_name_in_owner = true
-text = "Salvage: 0   Parts: 0   Medicine: 0"
+theme_override_font_sizes/font_size = 15
+theme_override_colors/font_color = Color(0.94, 0.88, 0.69, 1)
+text = "Salvage 0   Parts 0   Medicine 0"
 
 [node name="StatusLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer"]
 unique_name_in_owner = true
+theme_override_font_sizes/font_size = 15
+theme_override_colors/font_color = Color(0.92, 0.95, 0.97, 0.94)
 autowrap_mode = 3
-text = "Safe before first wave"
+text = "Scavenge carefully. POIs may already have enemies."
 
-[node name="InteractionLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer"]
+[node name="InteractionPanel" type="PanelContainer" parent="PanelContainer/MarginContainer/VBoxContainer"]
+theme_override_styles/panel = SubResource("5_interaction_panel")
+
+[node name="InteractionLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer/InteractionPanel"]
 unique_name_in_owner = true
+theme_override_font_sizes/font_size = 15
+theme_override_colors/font_color = Color(1, 0.9, 0.5, 1)
 autowrap_mode = 3
 text = ""
+
+[node name="EndOverlay" type="Control" parent="."]
+visible = false
+unique_name_in_owner = true
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="ColorRect" type="ColorRect" parent="EndOverlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.02, 0.04, 0.05, 0.72)
+
+[node name="CenterContainer" type="CenterContainer" parent="EndOverlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="PanelContainer" type="PanelContainer" parent="EndOverlay/CenterContainer"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("6_end_panel")
+
+[node name="MarginContainer" type="MarginContainer" parent="EndOverlay/CenterContainer/PanelContainer"]
+layout_mode = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="EndOverlay/CenterContainer/PanelContainer/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 14
+alignment = 1
+
+[node name="EndTitleLabel" type="Label" parent="EndOverlay/CenterContainer/PanelContainer/MarginContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 34
+theme_override_colors/font_color = Color(0.96, 0.84, 0.42, 1)
+horizontal_alignment = 1
+text = "Victory"
+
+[node name="EndMessageLabel" type="Label" parent="EndOverlay/CenterContainer/PanelContainer/MarginContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+horizontal_alignment = 1
+autowrap_mode = 3
+text = "You survived all 3 waves.\nPress R to restart."

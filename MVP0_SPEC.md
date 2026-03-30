@@ -28,13 +28,13 @@ These decisions resolve ambiguities from the earlier docs.
 - The run starts with no enemies present before the first wave.
 - After wave `1` is cleared, `PRE_WAVE` exploration may include limited ambient enemies near POIs.
 - Ambient exploration enemies do not target the base or defense sockets.
-- Sleeping restores energy only. It does not restore health.
+- Sleeping restores energy to full and restores a small amount of health.
 - Defense sockets have 2 upgrade tiers: `damaged` and `reinforced`.
 - `Broken` is not a third tier. It is any socket whose current HP reaches `0`.
 - All POI nodes are finite for the entire run and only reset on full restart.
 - Scavenging rewards use a deterministic baseline plus small bonus variance so every run keeps a valid win path.
 - Core systems should stay small in MVP0, but data IDs and script boundaries should be stable enough to support additional content later.
-- Wave 3 uses all 3 spawn lanes.
+- Wave 3 and later waves can use all 3 spawn lanes.
 
 ## Pillars
 - Readability over simulation.
@@ -60,10 +60,10 @@ The run begins in a calm phase at wave `0`.
 3. Player scavenges POI nodes to collect `Salvage`, `Parts`, and rare `Medicine`.
 4. After wave `1`, later `PRE_WAVE` phases may include ambient exploration enemies around POIs.
 5. Player returns to base and improves defense sockets.
-6. Player sleeps to start the next wave and restore energy to full.
+6. Player sleeps to start the next wave, restore energy to full, and restore a small amount of HP.
 7. Player survives the wave.
 8. On wave clear, the game returns to calm phase.
-9. The run ends when the player clears wave `3` or dies.
+9. The run ends when the player clears the final authored wave or dies.
 
 ## Run States
 Use explicit run states:
@@ -142,24 +142,22 @@ This avoids enum churn later if more resources are added.
 
 ## Map
 ### Structure
-- One compact authored map
+- One larger authored map
 - One central abstract base
-- Two authored POIs outside the base
+- Four authored POIs outside the base
 - Three authored zombie spawn lanes at map edges
 
 ### Base
 The base contains:
-- 6 defense sockets
+- 4 defense sockets
 - 1 sleep point at the interior center
 - open interior circulation so the player can rotate during waves
 
 ### Socket IDs
 Use fixed IDs so wave targeting and reset logic stay simple:
 
-- `wall_nw`
-- `wall_ne`
-- `wall_sw`
-- `wall_se`
+- `wall_n`
+- `wall_s`
 - `door_w`
 - `door_e`
 
@@ -168,10 +166,10 @@ The final art layout can be asymmetrical, but these IDs should remain stable in 
 ### Content IDs
 Use stable IDs for authored content. MVP0 only needs a few, but the pattern should hold:
 
-- POIs: `poi_a`, `poi_b`
+- POIs: `poi_a`, `poi_b`, `poi_c`, `poi_d`
 - spawn lanes: `north`, `east`, `west`
-- enemy archetype: `zombie_basic`
-- socket IDs: the 6 fixed socket IDs listed above
+- enemy archetypes: `zombie_basic`, `zombie_brute`
+- socket IDs: the 4 fixed socket IDs listed above
 
 Future systems should refer to these IDs, not scene paths or display names.
 
@@ -182,13 +180,23 @@ Future systems should refer to these IDs, not scene paths or display names.
   - safer
   - favors `Salvage`
 - `POI_B`
-  - farther
+  - upper-right
   - favors `Parts`
   - lower raw `Salvage`
+- `POI_C`
+  - lower-left
+  - favors `Salvage`
+  - includes one medicine node
+- `POI_D`
+  - lower-right
+  - favors `Parts`
+  - includes one medicine node
 
 ### Node Rules
 - `POI_A` has `4` searchable nodes.
 - `POI_B` has `4` searchable nodes.
+- `POI_C` has `4` searchable nodes.
+- `POI_D` has `4` searchable nodes.
 - Search time: `0.9s`
 - Search energy cost: `15`
 - A searched node becomes depleted for the rest of the run.
@@ -214,6 +222,18 @@ Use authored baseline rewards per node.
 - node 3: `1 Parts`
 - node 4: `2 Parts`
 
+`POI_C` baseline nodes
+- node 1: `3 Salvage`
+- node 2: `2 Salvage + 1 Parts`
+- node 3: `2 Salvage + 1 Medicine`
+- node 4: `2 Salvage + 1 Parts`
+
+`POI_D` baseline nodes
+- node 1: `1 Parts`
+- node 2: `1 Salvage + 2 Parts`
+- node 3: `1 Parts + 1 Medicine`
+- node 4: `2 Parts`
+
 Optional bonus roll after baseline reward:
 
 `POI_A` bonus table
@@ -229,11 +249,11 @@ Optional bonus roll after baseline reward:
 - `5%`: `+1 Medicine`
 
 Intent:
-- Minimum guaranteed rewards across both POIs are `10 Salvage`, `6 Parts`, and `1 Medicine`.
+- Minimum guaranteed rewards across all POIs are `20 Salvage`, `14 Parts`, and `3 Medicine`.
 - That baseline must preserve a valid win path if the player manages combat and spending well.
 - Bonus rolls improve margins and recovery without deciding whether the run is fundamentally winnable.
-- `POI_A` mainly funds repairs and one early upgrade.
-- `POI_B` mainly funds upgrade progression.
+- `POI_A` and `POI_C` mainly fund repairs and recovery.
+- `POI_B` and `POI_D` mainly fund upgrade progression.
 
 ## Defense Sockets
 ### Tier Model
@@ -249,23 +269,21 @@ Implementation note:
 - Do not infer gameplay behavior from node names or art variants.
 
 ### Max HP By Type And Tier
-- Wall damaged HP: `90`
-- Wall reinforced HP: `180`
-- Door damaged HP: `60`
-- Door reinforced HP: `130`
+- Wall damaged HP: `120`
+- Wall reinforced HP: `240`
+- Door damaged HP: `90`
+- Door reinforced HP: `170`
 
 ### Starting Setup
-All 6 sockets begin in the `damaged` tier.
+All 4 sockets begin in the `damaged` tier.
 
 Starting HP:
-- `wall_nw`: `90 / 90`
-- `wall_ne`: `60 / 90`
-- `wall_sw`: `90 / 90`
-- `wall_se`: `60 / 90`
-- `door_w`: `45 / 60`
-- `door_e`: `30 / 60`
+- `wall_n`: `120 / 120`
+- `wall_s`: `120 / 120`
+- `door_w`: `90 / 90`
+- `door_e`: `90 / 90`
 
-This preserves the intended uneven starting defense without introducing a third gameplay state.
+The run starts with a fully repaired but unreinforced perimeter.
 
 ### Actions
 Expose one context-sensitive interaction at each socket.
@@ -420,9 +438,7 @@ Always show:
 Support temporary messages for:
 - `Not enough resources`
 - `Too tired`
-- `Wave 1 started`
-- `Wave 2 started`
-- `Wave 3 started`
+- `Wave N started`
 - `Wave cleared`
 - `Base strengthened`
 - `Base repaired`
