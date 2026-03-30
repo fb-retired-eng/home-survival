@@ -41,6 +41,11 @@ zoom = Vector2(1, 1)
 
 [node name="AttackPivot" type="Node2D" parent="."]
 
+[node name="WeaponVisual" type="Polygon2D" parent="AttackPivot"]
+color = Color(0.84, 0.86, 0.92, 1)
+position = Vector2(9, -12)
+polygon = PackedVector2Array(-2, -10, 2, -10, 3, 4, 0, 10, -3, 4)
+
 [node name="AttackArea" type="Area2D" parent="AttackPivot"]
 position = Vector2(0, -24)
 collision_mask = 8

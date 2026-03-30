@@ -18,8 +18,11 @@ enum WaveTargetMode {
 @export var damage_taken_modifiers: Array[Resource] = []
 @export var move_speed: float = 70.0
 @export var player_damage: int = 10
+@export_range(0.0, 1200.0, 10.0) var player_knockback_force: float = 90.0
 @export var structure_damage: int = 10
 @export var structure_damage_type: StringName = &"impact"
+@export_range(0.0, 2.0, 0.05) var knockback_multiplier: float = 1.0
+@export_range(0.0, 4000.0, 10.0) var knockback_decay: float = 900.0
 @export var attack_interval: float = 1.0
 @export_range(0.0, 2.0, 0.05) var attack_prep_time: float = 0.25
 @export_enum("socket_then_player", "player_then_socket", "socket_only", "player_only") var wave_target_mode: int = WaveTargetMode.SOCKET_THEN_PLAYER
@@ -63,6 +66,12 @@ func is_valid_definition() -> bool:
 	if move_speed < 0.0:
 		return false
 	if player_damage < 0 or structure_damage < 0:
+		return false
+	if player_knockback_force < 0.0:
+		return false
+	if knockback_multiplier < 0.0:
+		return false
+	if knockback_decay < 0.0:
 		return false
 	if attack_interval <= 0.0:
 		return false

@@ -835,3 +835,30 @@ Validation:
 
 Validation:
 - Headless Godot project load succeeded after the HUD compactness and readability pass.
+
+### Baseball Bat Weapon Upgrade
+- Added a second melee weapon, `Baseball Bat`, as a data-defined weapon resource with heavier impact damage, longer reach, longer windup, and slower recovery than the starting kitchen knife.
+- Extended scavenge nodes so a POI search can grant a weapon reward and immediately equip it, then authored `poi_b_4` to award the baseball bat as a standout parts-heavy loot find.
+- Hardened player weapon flow so run resets restore the starting kitchen knife instead of carrying the upgraded weapon across runs.
+- Added data-driven weapon knockback and enemy knockback resistance so the baseball bat can launch regular enemies, only slightly move brutes, and support future bosses with full knockback immunity via config.
+- Fixed the first knockback integration pass so knocked-back enemies no longer keep attacking during the shove, enemy hits now use the same knockback metadata path on the player side, and zero-damage armored hits can still apply a partial shove when the config allows it.
+- Added a per-run obtained-weapon list so the player can switch between unlocked weapons after finding them, with `X` cycling the current loadout and run reset restoring the starting knife-only inventory.
+- Hardened the documented picky-review rule so zero-finding reviews now require explicit negative checks or runtime-probe results instead of a generic `no issue found`.
+
+Validation:
+- Headless Godot project load succeeded after the baseball bat weapon integration.
+- Headless runtime probe confirmed the player starts with `kitchen_knife`, switches to `baseball_bat` after searching `poi_b_4`, and resets back to `kitchen_knife` on run restart.
+- Headless runtime probe confirmed the same knockback hit moved a regular zombie by about `51.75px` while only moving a brute by about `6.18px`, matching the intended regular-versus-elite split.
+- Headless runtime probe confirmed a knocked-back enemy did not damage `wall_n` during the shove window (`117 -> 117`), enemy attacks now physically moved the player by about `3.46px`, and a brute still moved by about `8.23px` on a zero-damage bat-style hit.
+- Headless runtime probe confirmed the player can obtain the baseball bat, cycle `kitchen_knife -> baseball_bat -> kitchen_knife`, and that run reset restores knife-only inventory.
+- Headless runtime probe confirmed weapon switching is blocked during active cooldown, still works once cooldown clears, and invalid weapon resources now fail closed instead of silently collapsing to the kitchen knife.
+
+### Weapon POI And Held-Weapon Visual Pass
+- Gave the baseball-bat POI a distinct visual identity so the weapon location reads differently from the normal scavenging POIs.
+- Added simple data-driven held-weapon visuals to the player, with weapon-specific polygon, offset, and color fields authored in weapon config instead of hardcoded in player logic.
+- Tuned both starting weapons so the kitchen knife and baseball bat read differently in the player hand, then corrected their local facing so the visible weapon points in the attack direction.
+- Added a reusable headless runtime probe for weapon visuals to confirm the held-weapon illustration updates when the equipped weapon changes.
+
+Validation:
+- Headless Godot project load succeeded after the weapon-POI and held-weapon visual pass.
+- Headless runtime probe confirmed the player-held weapon visual changes at runtime from knife to bat, including distinct color and offset values.

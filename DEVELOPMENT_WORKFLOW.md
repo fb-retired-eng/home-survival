@@ -69,6 +69,7 @@ The review should be picky and focus on:
 
 Reviews should prioritize findings over summaries.
 Reviews should not praise the implementation or default to agreement.
+Reviews should not use generic lines like `no issue found` without concrete evidence.
 
 Preferred reviewer framing:
 
@@ -96,6 +97,25 @@ Good probe examples for this repo:
 - prep/wave transition probes that verify enemy suspension, respawn, and resume behavior
 
 If a runtime probe is not used, the review result should explicitly say that confidence is lower and that behavior was not runtime-verified.
+
+## Review Output Standard
+
+A picky review must include one of these:
+- concrete findings with file references and failure scenarios
+- explicit negative checks that were performed and passed
+- runtime-probe results with the observed output
+
+If the review concludes that nothing actionable was found, it must still state:
+- what files or systems were checked
+- what negative scenarios were tested
+- whether runtime behavior was actually probed or only statically reviewed
+- what residual risks remain
+
+Do not accept these as sufficient review output by themselves:
+- `no issue found`
+- `looks good`
+- `passes validation`
+- `no blocking issue found`
 
 ## Expected Follow-Up
 

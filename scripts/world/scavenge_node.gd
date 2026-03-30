@@ -1,6 +1,8 @@
 extends Area2D
 class_name ScavengeNode
 
+const WEAPON_DEFINITION_SCRIPT := preload("res://scripts/data/weapon_definition.gd")
+
 @export var node_id: StringName
 @export var poi_id: StringName
 @export var search_duration: float = 0.9
@@ -8,6 +10,7 @@ class_name ScavengeNode
 @export var reward_salvage: int = 0
 @export var reward_parts: int = 0
 @export var reward_medicine: int = 0
+@export var weapon_reward: Resource
 @export var bonus_table: Resource
 
 var is_depleted: bool = false
@@ -19,6 +22,8 @@ var _is_searching: bool = false
 
 func _ready() -> void:
 	add_to_group("scavenge_nodes")
+	if weapon_reward != null and _get_valid_weapon_reward() == null:
+		push_warning("ScavengeNode %s has invalid weapon_reward." % String(node_id))
 	_refresh_visuals()
 
 
@@ -98,10 +103,31 @@ func _grant_rewards(player, rewards: Dictionary) -> void:
 		player.add_resource(resource_id, amount, false)
 		reward_summary.append("%s +%d" % [resource_id.capitalize(), amount])
 
+	var granted_weapon := _get_valid_weapon_reward()
+	if granted_weapon != null:
+		if player.has_method("obtain_weapon"):
+			if player.obtain_weapon(granted_weapon, true, false):
+				reward_summary.append("%s obtained" % granted_weapon.display_name)
+		elif player.has_method("equip_weapon"):
+			if player.equip_weapon(granted_weapon, false):
+				reward_summary.append("%s equipped" % granted_weapon.display_name)
+
 	if reward_summary.is_empty():
 		player.message_requested.emit("Searched node")
 	else:
 		player.message_requested.emit(", ".join(reward_summary))
+
+
+func _get_valid_weapon_reward() -> Resource:
+	if weapon_reward == null:
+		return null
+	if weapon_reward.get_script() != WEAPON_DEFINITION_SCRIPT and not weapon_reward.is_class("WeaponDefinition"):
+		return null
+	if not weapon_reward.has_method("is_valid_definition"):
+		return null
+	if not weapon_reward.is_valid_definition():
+		return null
+	return weapon_reward
 
 
 func _refresh_visuals() -> void:

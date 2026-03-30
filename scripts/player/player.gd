@@ -10,6 +10,8 @@ const DEFAULT_ATTACK_INDICATOR_WINDUP_COLOR := Color(1.0, 0.9, 0.62, 0.22)
 const DEFAULT_ATTACK_INDICATOR_STRIKE_COLOR := Color(1.0, 0.98, 0.88, 0.9)
 const DEFAULT_ATTACK_INDICATOR_WINDUP_START_SCALE := Vector2(0.82, 0.82)
 const DEFAULT_ATTACK_INDICATOR_STRIKE_PEAK_SCALE := Vector2(1.05, 1.05)
+const DEFAULT_HELD_WEAPON_OFFSET := Vector2(10.0, -10.0)
+const DEFAULT_HELD_WEAPON_COLOR := Color(0.86, 0.86, 0.9, 1.0)
 const WEAPON_DEFINITION_SCRIPT := preload("res://scripts/data/weapon_definition.gd")
 const DEFAULT_WEAPON_RESOURCE := preload("res://data/weapons/kitchen_knife.tres")
 
@@ -24,6 +26,7 @@ signal interaction_prompt_changed(text: String)
 @export var max_energy: int = 100
 @export var move_speed: float = 180.0
 @export var medicine_heal_amount: int = 35
+@export_range(0.0, 4000.0, 10.0) var knockback_decay: float = 1500.0
 var _equipped_weapon: Resource
 @export var equipped_weapon: Resource:
 	get:
@@ -70,10 +73,14 @@ var _attack_indicator_strike_fade_duration: float = 0.10
 var _attack_indicator_tween: Tween
 var _invalid_weapon_warning_emitted: bool = false
 var _damage_feedback_tween: Tween
+var _starting_weapon: Resource
+var _knockback_velocity: Vector2 = Vector2.ZERO
+var _obtained_weapons: Array[Resource] = []
 
 @onready var body_visual: Polygon2D = $Body
 @onready var facing_marker: Polygon2D = $FacingMarker
 @onready var attack_pivot: Node2D = $AttackPivot
+@onready var weapon_visual: Polygon2D = $AttackPivot/WeaponVisual
 @onready var attack_area: Area2D = $AttackPivot/AttackArea
 @onready var attack_area_shape: CollisionShape2D = $AttackPivot/AttackArea/CollisionShape2D
 @onready var attack_indicator: Polygon2D = $AttackPivot/AttackIndicator
@@ -94,7 +101,12 @@ func _ready() -> void:
 	_base_body_color = body_visual.color
 	if attack_area_shape.shape != null:
 		attack_area_shape.shape = attack_area_shape.shape.duplicate()
+	_starting_weapon = _resolve_valid_weapon_resource(equipped_weapon)
+	_equipped_weapon = _starting_weapon
+	if _starting_weapon != null:
+		_obtained_weapons = [_starting_weapon]
 	_apply_equipped_weapon()
+	_update_facing_visuals()
 	pickup_detector.area_entered.connect(_on_pickup_detector_area_entered)
 	interaction_detector.area_entered.connect(_on_interaction_detector_area_entered)
 	interaction_detector.area_exited.connect(_on_interaction_detector_area_exited)
@@ -108,6 +120,7 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_decay_knockback(delta)
 	if is_dead:
 		velocity = Vector2.ZERO
 		move_and_slide()
@@ -115,13 +128,14 @@ func _physics_process(delta: float) -> void:
 		return
 	
 	if is_busy:
-		velocity = Vector2.ZERO
+		velocity = _knockback_velocity
 		move_and_slide()
 		_update_render_order()
 		return
 
 	attack_cooldown_remaining = max(attack_cooldown_remaining - delta, 0.0)
 	_handle_movement()
+	velocity += _knockback_velocity
 	move_and_slide()
 	_update_render_order()
 
@@ -133,6 +147,9 @@ func _physics_process(delta: float) -> void:
 
 	if Input.is_action_just_pressed("use_medicine"):
 		_attempt_use_medicine()
+
+	if Input.is_action_just_pressed("switch_weapon"):
+		_attempt_switch_weapon()
 
 
 func add_resource(resource_id: String, amount: int, show_message: bool = true) -> bool:
@@ -266,6 +283,7 @@ func take_damage(amount: int, _source: Variant = null) -> void:
 	if is_dead or amount <= 0:
 		return
 
+	_apply_knockback_from_source(_source)
 	current_health = max(current_health - amount, 0)
 	health_changed.emit(current_health, max_health)
 	_flash_body(Color(1.0, 0.45, 0.45, 1.0))
@@ -284,6 +302,55 @@ func heal(amount: int) -> void:
 	_flash_body(Color(0.52, 0.87, 0.62, 1.0))
 
 
+func equip_weapon(weapon: Resource, show_message: bool = true) -> bool:
+	var resolved_weapon := _resolve_strict_weapon_resource(weapon)
+	if resolved_weapon == null:
+		if show_message:
+			message_requested.emit("Invalid weapon")
+		return false
+
+	if not _has_obtained_weapon_id(resolved_weapon.weapon_id):
+		_obtained_weapons.append(resolved_weapon)
+
+	var current_weapon := _get_equipped_weapon()
+	if current_weapon != null and current_weapon.weapon_id == resolved_weapon.weapon_id:
+		if show_message:
+			message_requested.emit("%s ready" % resolved_weapon.display_name)
+		return false
+
+	equipped_weapon = resolved_weapon
+	if show_message:
+		message_requested.emit("Equipped %s" % resolved_weapon.display_name)
+	return true
+
+
+func obtain_weapon(weapon: Resource, auto_equip: bool = true, show_message: bool = true) -> bool:
+	var resolved_weapon := _resolve_strict_weapon_resource(weapon)
+	if resolved_weapon == null:
+		if show_message:
+			message_requested.emit("Invalid weapon")
+		return false
+
+	var already_owned := _has_obtained_weapon_id(resolved_weapon.weapon_id)
+	if not already_owned:
+		_obtained_weapons.append(resolved_weapon)
+
+	if auto_equip:
+		var equipped := equip_weapon(resolved_weapon, false)
+		if show_message:
+			if not already_owned:
+				message_requested.emit("Found %s" % resolved_weapon.display_name)
+			elif equipped:
+				message_requested.emit("Switched to %s" % resolved_weapon.display_name)
+			else:
+				message_requested.emit("%s ready" % resolved_weapon.display_name)
+		return equipped or not already_owned
+
+	if show_message and not already_owned:
+		message_requested.emit("Found %s" % resolved_weapon.display_name)
+	return not already_owned
+
+
 func _handle_movement() -> void:
 	var input_vector := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	velocity = input_vector * move_speed
@@ -292,8 +359,7 @@ func _handle_movement() -> void:
 		return
 
 	facing_direction = input_vector.normalized()
-	attack_pivot.rotation = facing_direction.angle() + PI / 2.0
-	facing_marker.rotation = attack_pivot.rotation
+	_update_facing_visuals()
 
 
 func _attempt_attack() -> void:
@@ -354,6 +420,29 @@ func _attempt_use_medicine() -> void:
 	_update_interaction_prompt()
 
 
+func _attempt_switch_weapon() -> void:
+	if is_dead or is_busy or _attack_windup_pending:
+		return
+
+	var current_weapon := _get_equipped_weapon()
+	if current_weapon == null:
+		return
+
+	if attack_cooldown_remaining > 0.0:
+		return
+
+	if _obtained_weapons.size() <= 1:
+		message_requested.emit("Only %s available" % current_weapon.display_name)
+		return
+
+	var current_index := _get_obtained_weapon_index(current_weapon.weapon_id)
+	if current_index < 0:
+		current_index = 0
+
+	var next_index := (current_index + 1) % _obtained_weapons.size()
+	equip_weapon(_obtained_weapons[next_index], true)
+
+
 func _attempt_interact() -> void:
 	var interactable := _get_active_interactable()
 	if interactable == null:
@@ -385,10 +474,14 @@ func reset_for_new_run() -> void:
 	}
 	_cancel_attack_windup()
 	attack_cooldown_remaining = 0.0
+	_knockback_velocity = Vector2.ZERO
 	velocity = Vector2.ZERO
 	_nearby_interactables.clear()
+	_obtained_weapons.clear()
+	if _starting_weapon != null:
+		_obtained_weapons.append(_starting_weapon)
+		equipped_weapon = _starting_weapon
 	global_position = _spawn_position
-	_apply_equipped_weapon()
 	_emit_full_state()
 	_update_interaction_prompt()
 	_update_render_order()
@@ -436,6 +529,40 @@ func _get_damage_knock_direction(source: Variant) -> Vector2:
 	if knock_direction.is_zero_approx():
 		return Vector2(0.0, 1.0)
 	return knock_direction.normalized()
+
+
+func _apply_knockback_from_source(source: Variant) -> void:
+	if not (source is Dictionary):
+		return
+
+	var base_force := float(source.get("knockback_force", 0.0))
+	if base_force <= 0.0:
+		return
+
+	var knockback_direction := Vector2.ZERO
+	var source_direction = source.get("knockback_direction", Vector2.ZERO)
+	if source_direction is Vector2 and not (source_direction as Vector2).is_zero_approx():
+		knockback_direction = (source_direction as Vector2).normalized()
+	else:
+		knockback_direction = _get_damage_knock_direction(source)
+
+	if knockback_direction.is_zero_approx():
+		return
+
+	_knockback_velocity = knockback_direction * base_force
+
+
+func _decay_knockback(delta: float) -> void:
+	if _knockback_velocity.is_zero_approx():
+		_knockback_velocity = Vector2.ZERO
+		return
+
+	var decayed_speed := move_toward(_knockback_velocity.length(), 0.0, knockback_decay * delta)
+	if decayed_speed <= 0.01:
+		_knockback_velocity = Vector2.ZERO
+		return
+
+	_knockback_velocity = _knockback_velocity.normalized() * decayed_speed
 
 
 func _on_pickup_detector_area_entered(area: Area2D) -> void:
@@ -555,6 +682,11 @@ func _update_render_order() -> void:
 	z_index = int(round(global_position.y))
 
 
+func _update_facing_visuals() -> void:
+	attack_pivot.rotation = facing_direction.angle() + PI / 2.0
+	facing_marker.rotation = attack_pivot.rotation
+
+
 func _get_equipped_weapon() -> Resource:
 	if _is_valid_weapon_resource(equipped_weapon):
 		_invalid_weapon_warning_emitted = false
@@ -567,11 +699,40 @@ func _get_equipped_weapon() -> Resource:
 	return null
 
 
+func _resolve_valid_weapon_resource(resource: Resource) -> Resource:
+	if _is_valid_weapon_resource(resource):
+		return resource
+	if _is_valid_weapon_resource(DEFAULT_WEAPON_RESOURCE):
+		return DEFAULT_WEAPON_RESOURCE
+	return null
+
+
+func _resolve_strict_weapon_resource(resource: Resource) -> Resource:
+	if _is_valid_weapon_resource(resource):
+		return resource
+	return null
+
+
+func _has_obtained_weapon_id(weapon_id: StringName) -> bool:
+	return _get_obtained_weapon_index(weapon_id) >= 0
+
+
+func _get_obtained_weapon_index(weapon_id: StringName) -> int:
+	for index in _obtained_weapons.size():
+		var weapon: Resource = _obtained_weapons[index]
+		if weapon != null and weapon.weapon_id == weapon_id:
+			return index
+	return -1
+
+
 func _apply_equipped_weapon() -> void:
 	var weapon: Resource = _get_equipped_weapon()
 	if weapon == null:
 		return
 
+	weapon_visual.position = weapon.held_visual_offset if weapon.held_visual_polygon.size() >= 3 else DEFAULT_HELD_WEAPON_OFFSET
+	weapon_visual.polygon = weapon.held_visual_polygon if weapon.held_visual_polygon.size() >= 3 else _get_default_held_weapon_polygon()
+	weapon_visual.color = weapon.held_visual_color if weapon.held_visual_polygon.size() >= 3 else DEFAULT_HELD_WEAPON_COLOR
 	attack_area.position = weapon.attack_area_offset
 	attack_indicator.position = weapon.attack_area_offset
 	if attack_area_shape.shape is RectangleShape2D:
@@ -645,6 +806,8 @@ func _commit_attack(weapon_override: Resource = null) -> void:
 			body.take_damage(weapon.damage, {
 				"attacker": self,
 				"damage_type": weapon.damage_type,
+				"knockback_force": weapon.knockback_force,
+				"knockback_direction": facing_direction,
 			})
 	_attack_windup_weapon = null
 	_attack_windup_visual_only = false
@@ -719,6 +882,15 @@ func _is_valid_weapon_resource(resource: Resource) -> bool:
 	if not resource.has_method("is_valid_definition"):
 		return false
 	return resource.is_valid_definition()
+
+
+func _get_default_held_weapon_polygon() -> PackedVector2Array:
+	return PackedVector2Array([
+		Vector2(-2, -10),
+		Vector2(2, -10),
+		Vector2(2, 8),
+		Vector2(-2, 8),
+	])
 
 
 func _apply_miss_recovery(weapon: Resource) -> void:

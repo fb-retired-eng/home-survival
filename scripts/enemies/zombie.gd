@@ -13,8 +13,11 @@ signal died(zombie: Zombie)
 @export_range(0.0, 4.0, 0.05) var defense_multiplier: float = 1.0
 @export var move_speed: float = 70.0
 @export var player_damage: int = 10
+@export_range(0.0, 1200.0, 10.0) var player_knockback_force: float = 90.0
 @export var structure_damage: int = 10
 @export var structure_damage_type: StringName = &"impact"
+@export_range(0.0, 2.0, 0.05) var knockback_multiplier: float = 1.0
+@export_range(0.0, 4000.0, 10.0) var knockback_decay: float = 900.0
 @export var attack_cooldown: float = 1.0
 @export var attack_prep_time: float = 0.25
 
@@ -38,6 +41,7 @@ var _damage_feedback_tween: Tween
 var _exploration_anchor_position: Vector2 = Vector2.ZERO
 var _exploration_anchor_facing: Vector2 = Vector2.ZERO
 var _has_exploration_anchor: bool = false
+var _knockback_velocity: Vector2 = Vector2.ZERO
 
 @onready var body_visual: Polygon2D = $Body
 @onready var facing_marker: Polygon2D = $FacingMarker
@@ -98,6 +102,7 @@ func set_exploration_suspended(suspended: bool) -> void:
 	visible = not suspended
 	set_physics_process(not suspended)
 	velocity = Vector2.ZERO
+	_knockback_velocity = Vector2.ZERO
 	if collision_shape != null:
 		collision_shape.disabled = suspended
 	if damage_area != null:
@@ -117,10 +122,13 @@ func _physics_process(delta: float) -> void:
 	_damage_cooldown_remaining = max(_damage_cooldown_remaining - delta, 0.0)
 	_attack_prep_remaining = max(_attack_prep_remaining - delta, 0.0)
 	_attack_prep_lost_target_grace_remaining = max(_attack_prep_lost_target_grace_remaining - delta, 0.0)
+	_decay_knockback(delta)
 	_update_player_chase_state()
 	var primary_target = _get_current_target()
 	_player_obstructing_this_frame = false
-	if primary_target != null and is_instance_valid(primary_target) and not _is_target_in_damage_range(primary_target):
+	if _knockback_velocity.length_squared() > 0.01:
+		velocity = _knockback_velocity
+	elif primary_target != null and is_instance_valid(primary_target) and not _is_target_in_damage_range(primary_target):
 		velocity = _compute_move_velocity(primary_target)
 		if not velocity.is_zero_approx():
 			_update_facing_direction(velocity)
@@ -131,6 +139,11 @@ func _physics_process(delta: float) -> void:
 
 	move_and_slide()
 	_player_obstructing_this_frame = _is_player_obstructing(primary_target)
+
+	if _is_under_knockback():
+		if _attack_prep_armed:
+			_reset_attack_prep()
+		return
 
 	var attack_target = _get_attack_target(primary_target)
 	var is_attack_delayed := _process_attack_prep(attack_target)
@@ -198,11 +211,11 @@ func take_damage(amount: int, _source: Variant = null) -> void:
 	if amount <= 0:
 		return
 
+	_alert_to_player_from_source(_source)
+	_apply_knockback_from_source(_source)
 	var damage_amount := _resolve_damage_taken(amount, _source)
 	if damage_amount <= 0:
 		return
-
-	_alert_to_player_from_source(_source)
 
 	current_health = max(current_health - damage_amount, 0)
 	_flash_body(Color(1.0, 0.55, 0.55, 1.0))
@@ -341,7 +354,12 @@ func _try_damage_target(target) -> bool:
 			"damage_type": structure_damage_type,
 		})
 	else:
-		target.take_damage(damage_amount, self)
+		target.take_damage(damage_amount, {
+			"attacker": self,
+			"damage_type": structure_damage_type,
+			"knockback_force": player_knockback_force,
+			"knockback_direction": _facing_direction,
+		})
 	_play_attack_flash()
 	return true
 
@@ -430,10 +448,47 @@ func _apply_definition() -> void:
 	defense_multiplier = definition.defense_multiplier
 	move_speed = definition.move_speed
 	player_damage = definition.player_damage
+	player_knockback_force = definition.player_knockback_force
 	structure_damage = definition.structure_damage
 	structure_damage_type = definition.structure_damage_type
+	knockback_multiplier = definition.knockback_multiplier
+	knockback_decay = definition.knockback_decay
 	attack_cooldown = definition.attack_interval
 	attack_prep_time = definition.attack_prep_time
+
+
+func _apply_knockback_from_source(source: Variant) -> void:
+	if knockback_multiplier <= 0.0:
+		return
+	if not (source is Dictionary):
+		return
+
+	var base_force := float(source.get("knockback_force", 0.0))
+	if base_force <= 0.0:
+		return
+
+	var knockback_direction := Vector2.ZERO
+	var source_direction = source.get("knockback_direction", Vector2.ZERO)
+	if source_direction is Vector2 and not (source_direction as Vector2).is_zero_approx():
+		knockback_direction = (source_direction as Vector2).normalized()
+	else:
+		var attacker = source.get("attacker")
+		if attacker != null and is_instance_valid(attacker) and attacker is Node2D:
+			knockback_direction = (global_position - attacker.global_position).normalized()
+
+	if knockback_direction.is_zero_approx():
+		return
+
+	var applied_force := base_force * knockback_multiplier
+	if applied_force <= 0.0:
+		return
+
+	_knockback_velocity = knockback_direction * applied_force
+	_reset_attack_prep()
+
+
+func _is_under_knockback() -> bool:
+	return _knockback_velocity.length_squared() > 0.01
 
 
 func _resolve_damage_taken(base_damage: int, source: Variant) -> int:
@@ -618,6 +673,19 @@ func _refresh_player_reference() -> void:
 	var candidate = get_tree().get_first_node_in_group("player")
 	if candidate != null and is_instance_valid(candidate):
 		_player_ref = candidate
+
+
+func _decay_knockback(delta: float) -> void:
+	if _knockback_velocity.is_zero_approx():
+		_knockback_velocity = Vector2.ZERO
+		return
+
+	var decayed_speed := move_toward(_knockback_velocity.length(), 0.0, knockback_decay * delta)
+	if decayed_speed <= 0.01:
+		_knockback_velocity = Vector2.ZERO
+		return
+
+	_knockback_velocity = _knockback_velocity.normalized() * decayed_speed
 
 
 func _get_target_mode_for_context() -> int:

@@ -1,4 +1,4 @@
-[gd_scene load_steps=18 format=3]
+[gd_scene load_steps=19 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/player/Player.tscn" id="1_player_scene"]
 [ext_resource type="PackedScene" path="res://scenes/ui/HUD.tscn" id="2_hud_scene"]
@@ -15,6 +15,7 @@
 [ext_resource type="Resource" path="res://data/waves/mvp0_waves.tres" id="14_waves"]
 [ext_resource type="Script" path="res://scripts/world/exploration_spawn_point.gd" id="15_exploration_spawn"]
 [ext_resource type="Resource" path="res://data/enemies/zombie_basic.tres" id="16_basic_enemy"]
+[ext_resource type="Resource" path="res://data/weapons/baseball_bat.tres" id="17_baseball_bat"]
 
 [sub_resource type="RectangleShape2D" id="1_horizontal_wall"]
 size = Vector2(1920, 32)
@@ -122,7 +123,7 @@ bonus_table = ExtResource("7_poi_a_bonus")
 position = Vector2(1600, 250)
 
 [node name="Marker" type="Polygon2D" parent="World/POI_B"]
-color = Color(0.81, 0.55, 0.26, 1)
+color = Color(0.72, 0.31, 0.18, 1)
 polygon = PackedVector2Array(0, -28, 24, 0, 0, 28, -24, 0)
 
 [node name="Label" type="Label" parent="World/POI_B"]
@@ -131,6 +132,7 @@ offset_top = 40.0
 offset_right = 36.0
 offset_bottom = 63.0
 text = "POI B"
+theme_override_colors/font_color = Color(0.92, 0.72, 0.54, 1)
 
 [node name="Node1" parent="World/POI_B" instance=ExtResource("6_scavenge_scene")]
 position = Vector2(-54, -20)
@@ -159,6 +161,7 @@ position = Vector2(50, 58)
 node_id = &"poi_b_4"
 poi_id = &"poi_b"
 reward_parts = 2
+weapon_reward = ExtResource("17_baseball_bat")
 bonus_table = ExtResource("10_poi_b_bonus")
 
 [node name="POI_C" type="Node2D" parent="World"]

@@ -21,6 +21,7 @@ The intended run starts safe before the first wave. Later daytime exploration ph
 The repo currently includes:
 - project scaffold and main scene setup
 - player movement, health, energy, melee attack, medicine use, and inventory tracking
+- multiple melee weapons, including a POI-obtained baseball bat upgrade, weapon switching, and simple on-player weapon illustrations
 - HUD for core status display
 - placeholder world scenes for sockets, scavenging nodes, sleep point, pickups, and zombie enemy
 - consolidated MVP0 design/spec documentation
@@ -51,6 +52,7 @@ godot --headless --path . --quit
 - Attack: `Space` or left mouse
 - Interact: `E`
 - Use medicine: `F` or `Q`
+- Switch weapon: `X`
 - Restart after win/loss: `R`
 
 ## Important Docs
@@ -66,6 +68,7 @@ godot --headless --path . --quit
 - Prefer an independent reviewer subagent for the picky review rather than only a same-context self-check
 - Picky review should be adversarial: assume the change is wrong and look for regressions, state-machine bugs, reset-order bugs, and config drift
 - For gameplay, AI, combat, collision, spawn, or reset changes, run a targeted runtime probe when feasible, not just a static code review
+- A zero-finding review still needs evidence: list the negative checks or runtime-probe results instead of saying only `no issue found`
 - Fix review findings, re-run validation, then review again if the fixes are substantial
 
 ## Repo Structure
