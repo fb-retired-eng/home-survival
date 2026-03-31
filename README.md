@@ -23,8 +23,9 @@ The repo currently includes:
 - player movement, health, energy, melee/ranged attack, medicine use, and inventory tracking
 - multiple weapons, including POI-obtained baseball bat, pistol, and shotgun upgrades, bullet pickups, weapon switching, reloadable firearm behavior, and simple on-player weapon illustrations
 - food as a prep resource, a table interaction that converts food into full energy, and bed-based wave start with partial HP restore
-- six authored POIs, eight authored waves, roaming prep-stage exploration spawns, and four enemy definitions in the live data set
+- six authored POIs, eight authored waves, roaming prep-stage exploration spawns, and five live enemy definitions including an elite spitter variant
 - fortified wall/door upgrades beyond the original reinforced tier
+- review-driven guardrails around elite-only weapon drops, spitter structure range, and reset-state UI consistency
 - HUD for core status display, including the currently equipped weapon
 - placeholder world scenes for sockets, scavenging nodes, bed/table interactions, pickups, and zombie enemy
 - consolidated MVP0 design/spec documentation
@@ -86,5 +87,6 @@ godot --headless --path . --quit
 - tune food scarcity versus prep energy demands
 - balance roaming prep spawns and the full 8-wave run
 - tune elite weapon-drop odds and duplicate-conversion economy
+- decide whether elite variants stay data-only or get stronger visual differentiation in play
 - decide whether the next content step is enemy patrols, reserve-ammo scarcity, or the fifth weapon pickup
 - continue UI and readability polish from playtest feedback

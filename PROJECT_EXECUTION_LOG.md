@@ -1047,3 +1047,10 @@ Validation:
   - `fortified_mitigation_probe_damaged=16`
   - `fortified_mitigation_probe_reinforced=14`
   - `fortified_mitigation_probe_fortified=12`
+
+### Docs Sync Pass
+- Updated `README.md` so the shipped expansion summary matches the live repo more accurately:
+  - five live enemy definitions instead of four
+  - explicit note about the elite spitter variant
+  - explicit note about the reviewed guardrails around elite drops, spitter siege range, and reset-state UI
+- Updated `MVP0_SPEC.md` so the authored enemy list explicitly includes the current elite spitter variant.
