@@ -4,7 +4,7 @@
 
 The current MVP0 goal is to prove this loop:
 
-`scavenge -> eat -> sleep -> defend -> repeat`
+`day prep -> dinner -> night defense -> sleep -> repeat`
 
 ## MVP0 Summary
 - Desktop-first Godot 4 project
@@ -22,7 +22,7 @@ The repo currently includes:
 - project scaffold and main scene setup
 - player movement, health, energy, melee/ranged attack, medicine use, and inventory tracking
 - multiple weapons, including POI-obtained baseball bat, pistol, and shotgun upgrades, bullet pickups, weapon switching, reloadable firearm behavior, and simple on-player weapon illustrations
-- food as a prep resource, a table interaction that converts food into full energy, and bed-based wave start with partial HP restore
+- food as a prep resource, a dinner-at-table transition that starts the night wave, and bed-based sleep that returns the run to the next day with partial HP restore
 - six authored POIs, eight authored waves, roaming prep-stage exploration spawns, and five live enemy definitions including an elite spitter variant
 - fortified wall/door upgrades beyond the original reinforced tier
 - review-driven guardrails around elite-only weapon drops, spitter structure range, and reset-state UI consistency
@@ -58,7 +58,7 @@ godot --headless --path . --quit
 - Use medicine: `F` or `Q`
 - Switch weapon: `X`
 - Reload firearm: `C`
-- Eat at table / sleep on bed: `E` when in range
+- Eat dinner at table / sleep on bed: `E` when in range
 - Restart after win/loss: `R`
 
 ## Important Docs

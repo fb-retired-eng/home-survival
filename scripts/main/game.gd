@@ -186,19 +186,21 @@ func _on_run_state_changed(new_state: int) -> void:
 	if new_state == game_manager.RunState.ACTIVE_WAVE:
 		_clear_roaming_exploration_enemies()
 		_set_exploration_enemies_suspended(true)
-		hud.set_phase("Phase: Active Wave")
-		hud.set_status("Wave %d in progress. Defend the base." % game_manager.current_wave)
+		hud.set_phase("Phase: Night")
+		hud.set_status("Night %d in progress. Hold the base." % game_manager.current_wave)
+		player.refresh_interaction_prompt()
+		return
+
+	if new_state == game_manager.RunState.POST_WAVE:
+		hud.set_phase("Phase: Post-Wave")
+		hud.set_status("Night %d cleared. Sleep on the bed to start the next day." % game_manager.current_wave)
 		player.refresh_interaction_prompt()
 		return
 
 	if new_state == game_manager.RunState.PRE_WAVE:
 		if _is_resetting_run:
 			return
-		_sync_exploration_enemies()
-		_spawn_roaming_exploration_enemies()
-		hud.set_phase("Phase: Pre-Wave")
-		player.refresh_interaction_prompt()
-		_refresh_phase_status()
+		_enter_day_phase()
 
 
 func _on_wave_changed(new_wave: int) -> void:
@@ -212,121 +214,105 @@ func _refresh_phase_status() -> void:
 		return
 	
 	if game_manager.current_wave <= 0:
-		hud.set_status("Scavenge carefully. POIs may already have enemies. Eat at the table, then sleep to start wave 1.")
-	elif game_manager.current_wave < game_manager.final_wave:
-		hud.set_status("Wave %d cleared. Repair, fortify, scavenge, eat, then sleep for wave %d." % [game_manager.current_wave, game_manager.current_wave + 1])
+		hud.set_status("Day 1. Scavenge carefully, build up, and eat dinner at the table to start night 1.")
+	elif game_manager.current_wave < game_manager.final_wave - 1:
+		hud.set_status("Day %d. Explore, build, and eat dinner at the table to start night %d." % [game_manager.current_wave + 1, game_manager.current_wave + 1])
 	else:
-		hud.set_status("Wave %d cleared. Final repairs, food, and prep before wave %d." % [game_manager.current_wave, game_manager.current_wave + 1])
+		hud.set_status("Final day. Make repairs, gather food, and eat dinner before the last night.")
 
 
 func _can_player_interact_with(_interactable) -> bool:
-	return game_manager.run_state == game_manager.RunState.PRE_WAVE
+	if game_manager.run_state == game_manager.RunState.PRE_WAVE:
+		return true
+	if game_manager.run_state == game_manager.RunState.POST_WAVE:
+		return _interactable == sleep_point
+	return false
 
 
 func _can_player_eat(_player) -> bool:
-	return game_manager.run_state == game_manager.RunState.PRE_WAVE and _get_missing_food_units_for_full_energy() > 0
+	return game_manager.run_state == game_manager.RunState.PRE_WAVE and game_manager.can_start_next_wave()
 
 
 func _get_food_table_label(_player) -> String:
 	if game_manager.run_state != game_manager.RunState.PRE_WAVE:
 		return ""
 
+	var next_wave: int = game_manager.current_wave + 1
+	if not game_manager.can_start_next_wave():
+		return ""
+	if _has_sleep_blocking_exploration_threat():
+		return "Enemies too close for dinner"
+	if not wave_manager.can_start_wave(next_wave):
+		return "Night %d not configured" % next_wave
+
 	var food_needed := _get_missing_food_units_for_full_energy()
 	if food_needed <= 0:
-		return "Energy already full"
+		return "Eat dinner to start night %d" % next_wave
 
 	var current_food := int(player.resources.get("food", 0))
 	if current_food < food_needed:
-		return "Need %d food to eat" % food_needed
+		return "Need %d food for dinner" % food_needed
 
-	return "Eat %d food to fill energy" % food_needed
+	return "Eat %d food and start night %d" % [food_needed, next_wave]
 
 
 func _can_player_sleep(_player) -> bool:
-	return game_manager.can_start_next_wave() and not _has_sleep_blocking_exploration_threat() and _is_ready_for_bed_transition()
+	return game_manager.run_state == game_manager.RunState.POST_WAVE
 
 
 func _get_sleep_label(_player) -> String:
-	if not game_manager.can_start_next_wave():
+	if game_manager.run_state != game_manager.RunState.POST_WAVE:
 		return ""
-
-	if _has_sleep_blocking_exploration_threat():
-		return "Enemies too close to sleep"
-
-	if not _is_ready_for_bed_transition():
-		var food_needed := _get_missing_food_units_for_full_energy()
-		if food_needed > 0:
-			if int(player.resources.get("food", 0)) >= food_needed:
-				return "Eat at table before bed"
-			return "Need %d food before bed" % food_needed
-		return "Eat before bed"
-
-	var next_wave: int = game_manager.current_wave + 1
-	if not wave_manager.can_start_wave(next_wave):
-		return "Wave %d not configured" % next_wave
-
-	return "Sleep on bed for wave %d" % (game_manager.current_wave + 1)
+	return "Sleep on bed until morning"
 
 
 func _on_food_table_requested(_player) -> void:
-	var food_needed := _get_missing_food_units_for_full_energy()
-	if food_needed <= 0:
-		hud.set_status("Energy already full")
-		player.refresh_interaction_prompt()
-		return
-
-	if int(player.resources.get("food", 0)) < food_needed:
-		hud.set_status("Need %d food to fill energy" % food_needed)
-		player.refresh_interaction_prompt()
-		return
-
-	if not player.spend_resource("food", food_needed):
-		hud.set_status("Not enough food")
-		player.refresh_interaction_prompt()
-		return
-
-	player.restore_full_energy()
-	hud.set_status("Ate %d food and restored energy" % food_needed)
-	player.refresh_interaction_prompt()
-
-
-func _on_sleep_requested(_player) -> void:
 	var next_wave: int = game_manager.current_wave + 1
+	if game_manager.run_state != game_manager.RunState.PRE_WAVE or not game_manager.can_start_next_wave():
+		return
 	if _has_sleep_blocking_exploration_threat():
-		hud.set_status("Enemies too close to sleep")
+		hud.set_status("Enemies too close for dinner")
 		player.refresh_interaction_prompt()
 		return
-
-	if not _is_ready_for_bed_transition():
-		var food_needed := _get_missing_food_units_for_full_energy()
-		if food_needed > 0:
-			hud.set_status("Eat %d food at the table before bed" % food_needed)
-		else:
-			hud.set_status("Energy must be full before bed")
-		player.refresh_interaction_prompt()
-		return
-
-	if not _can_player_sleep(_player):
-		hud.set_status("Wave %d is not configured" % next_wave)
-		return
-
 	if not wave_manager.can_start_wave(next_wave):
-		hud.set_status("Wave %d is not configured" % next_wave)
+		hud.set_status("Night %d is not configured" % next_wave)
 		player.refresh_interaction_prompt()
 		return
+
+	var food_needed := _get_missing_food_units_for_full_energy()
+	if food_needed > 0:
+		if int(player.resources.get("food", 0)) < food_needed:
+			hud.set_status("Need %d food for dinner" % food_needed)
+			player.refresh_interaction_prompt()
+			return
+		if not player.spend_resource("food", food_needed):
+			hud.set_status("Not enough food")
+			player.refresh_interaction_prompt()
+			return
+		player.restore_full_energy()
 
 	if not wave_manager.start_wave(next_wave):
-		hud.set_status("Wave %d failed to start" % next_wave)
+		if food_needed > 0:
+			player.add_resource("food", food_needed, false)
+		hud.set_status("Night %d failed to start" % next_wave)
+		player.refresh_interaction_prompt()
 		return
 
-	player.heal(sleep_heal_amount)
 	game_manager.set_wave(next_wave)
 	game_manager.set_run_state(game_manager.RunState.ACTIVE_WAVE)
 
 
+func _on_sleep_requested(_player) -> void:
+	if game_manager.run_state != game_manager.RunState.POST_WAVE:
+		return
+
+	player.heal(sleep_heal_amount)
+	game_manager.set_run_state(game_manager.RunState.PRE_WAVE)
+
+
 func _on_wave_started(wave_number: int) -> void:
-	hud.set_phase("Phase: Active Wave")
-	hud.set_status("Wave %d incoming. Hold the perimeter." % wave_number)
+	hud.set_phase("Phase: Night")
+	hud.set_status("Night %d incoming. Hold the perimeter." % wave_number)
 
 
 func _on_wave_cleared(_wave_number: int) -> void:
@@ -349,12 +335,8 @@ func _on_run_reset() -> void:
 	for node in get_tree().get_nodes_in_group("scavenge_nodes"):
 		if node.has_method("reset_for_new_run"):
 			node.reset_for_new_run()
-	hud.set_phase("Phase: Pre-Wave")
-	_sync_exploration_enemies()
-	_spawn_roaming_exploration_enemies()
+	_enter_day_phase()
 	_refresh_base_status()
-	_refresh_phase_status()
-	player.refresh_interaction_prompt()
 	_is_resetting_run = false
 
 
@@ -368,6 +350,14 @@ func _apply_test_mode_loadout() -> void:
 		player.add_resource("bullets", test_mode_bullets, false)
 	if test_mode_food > 0:
 		player.add_resource("food", test_mode_food, false)
+
+
+func _enter_day_phase() -> void:
+	_sync_exploration_enemies()
+	_spawn_roaming_exploration_enemies()
+	hud.set_phase("Phase: Day")
+	player.refresh_interaction_prompt()
+	_refresh_phase_status()
 
 
 func _sync_exploration_enemies() -> void:
@@ -530,10 +520,6 @@ func _get_missing_food_units_for_full_energy() -> int:
 	if missing_energy <= 0:
 		return 0
 	return int(ceili(float(missing_energy) / float(max(food_energy_per_unit, 1))))
-
-
-func _is_ready_for_bed_transition() -> bool:
-	return player.current_energy >= player.max_energy
 
 
 func _on_exploration_enemy_died(_enemy, spawn_id: String) -> void:

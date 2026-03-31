@@ -9,6 +9,8 @@ func _init() -> void:
 	await physics_frame
 	await process_frame
 
+	game.player.resources["food"] = 0
+	game.player.resources_changed.emit(game.player.resources.duplicate(true))
 	game.player.current_energy = 55
 	game.player.energy_changed.emit(game.player.current_energy, game.player.max_energy)
 	game.player.add_resource("food", 3, false)
@@ -20,7 +22,11 @@ func _init() -> void:
 
 	game._on_food_table_requested(game.player)
 	await process_frame
+	await physics_frame
+	await process_frame
 
 	print("food_table_probe_after_energy=%d" % game.player.current_energy)
 	print("food_table_probe_after_food=%d" % int(game.player.resources.get("food", 0)))
+	print("food_table_probe_after_wave=%d" % game.game_manager.current_wave)
+	print("food_table_probe_after_state=%d" % game.game_manager.run_state)
 	quit()

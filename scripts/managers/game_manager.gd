@@ -8,6 +8,7 @@ signal run_reset()
 enum RunState {
 	PRE_WAVE,
 	ACTIVE_WAVE,
+	POST_WAVE,
 	WIN,
 	LOSS,
 }
@@ -68,4 +69,4 @@ func complete_active_wave() -> void:
 		set_run_state(RunState.WIN)
 		return
 
-	set_run_state(RunState.PRE_WAVE)
+	set_run_state(RunState.POST_WAVE)

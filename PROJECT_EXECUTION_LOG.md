@@ -1054,3 +1054,64 @@ Validation:
   - explicit note about the elite spitter variant
   - explicit note about the reviewed guardrails around elite drops, spitter siege range, and reset-state UI
 - Updated `MVP0_SPEC.md` so the authored enemy list explicitly includes the current elite spitter variant.
+
+### Day Night Loop Pass
+- Reworked the daily routine so the run now flows:
+  - day = exploration and construction
+  - dinner at the table = exact food-to-full-energy conversion plus night-wave start
+  - cleared night wave = bed sleep
+  - bed sleep = next day plus partial HP restore
+- Added a `POST_WAVE` state so sleeping happens after the night wave instead of before it.
+
+Validation:
+- Headless Godot project load succeeded after the day/night loop pass.
+- Headless food-table probe confirmed:
+  - `food_table_probe_before_energy=55`
+  - `food_table_probe_before_food=3`
+  - `food_table_probe_after_energy=100`
+  - `food_table_probe_after_food=0`
+  - `food_table_probe_after_wave=1`
+  - `food_table_probe_after_state=1`
+- Headless bed-gate probe confirmed:
+  - `bed_gate_probe_can_sleep_before=false`
+  - `bed_gate_probe_can_sleep_after=true`
+  - `bed_gate_probe_after_sleep_state=0`
+- Headless day-night cycle probe confirmed:
+  - `day_night_cycle_probe_day_state=0`
+  - `day_night_cycle_probe_after_dinner_state=1`
+  - `day_night_cycle_probe_after_wave_state=2`
+  - `day_night_cycle_probe_after_sleep_state=0`
+
+### Day Entry Follow-Up Fix
+- Fixed the new day-entry path so startup and post-sleep `PRE_WAVE` both run the real day setup again:
+  - exploration enemies sync correctly
+  - roaming enemies spawn correctly
+  - HUD phase returns to `Day`
+  - interaction/status refresh runs again
+- Consolidated that setup into a shared day-entry helper to avoid `_ready()`, reset, and sleep transitions drifting apart.
+- Strengthened the bed/day-cycle probes so they now verify real day-side effects, not just enum transitions.
+
+Validation:
+- Headless Godot project load still succeeded.
+- Strengthened day-night cycle probe confirmed:
+  - `day_night_cycle_probe_day_phase=Wave 0 / 8   |   Day`
+  - `day_night_cycle_probe_day_enemy_count=19`
+  - `day_night_cycle_probe_after_sleep_phase=Wave 1 / 8   |   Day`
+  - `day_night_cycle_probe_after_sleep_enemy_count=20`
+- Strengthened bed-gate probe confirmed:
+  - `bed_gate_probe_after_sleep_phase=Wave 1 / 8   |   Day`
+  - `bed_gate_probe_after_sleep_enemy_count=27`
+
+### Day Night Probe Hardening
+- Removed dead success-status writes from the dinner/sleep handlers so state transitions, not immediately overwritten messages, own the visible HUD text.
+- Updated the day-night probes to clear waves through `WaveManager.clear_wave()` instead of bypassing the real night-end signal path with manual reset/callback calls.
+
+Validation:
+- Headless Godot project load still succeeded.
+- Updated day-night cycle probe still confirmed:
+  - `day_night_cycle_probe_after_dinner_state=1`
+  - `day_night_cycle_probe_after_wave_state=2`
+  - `day_night_cycle_probe_after_sleep_state=0`
+- Updated bed-gate probe still confirmed:
+  - `bed_gate_probe_can_sleep_before=false`
+  - `bed_gate_probe_can_sleep_after=true`

@@ -5,7 +5,7 @@ This document is the implementation source of truth for MVP0. It consolidates th
 ## Purpose
 Build a desktop-first Godot 4 prototype that proves this loop:
 
-`scavenge -> eat -> sleep -> defend -> repeat`
+`day prep -> dinner -> night defense -> sleep -> repeat`
 
 The prototype is successful if a first-time player can understand the loop without explanation, survive or fail a full run in about 10-20 minutes, and clearly feel that scavenging improves their odds in the next wave.
 
@@ -26,8 +26,8 @@ These decisions resolve ambiguities from the earlier docs.
 - This file overrides the older MVP0 docs for implementation details.
 - `PRE_WAVE` exploration can include ambient enemies near POIs from the start of the run.
 - Ambient exploration enemies do not target the base or defense sockets.
-- Eating at the table restores energy to full by consuming the exact food needed from inventory.
-- Sleeping on the bed starts the next wave and restores a small amount of health.
+- Eating dinner at the table restores energy to full by consuming the exact food needed from inventory and then starts the next night wave.
+- Sleeping on the bed after a cleared night wave restores a small amount of health and returns the run to the next day.
 - Sleeping currently restores `25` HP.
 - Defense sockets now have 3 progression states: `damaged`, `reinforced`, and `fortified`.
 - `Broken` is not a third tier. It is any socket whose current HP reaches `0`.
@@ -64,10 +64,10 @@ The run begins in `PRE_WAVE` at wave `0`.
 2. The opening exploration phase may already have hostile POIs away from the base.
 3. Player scavenges POI nodes to collect `Salvage`, `Parts`, `Medicine`, `Bullets`, and `Food`.
 4. Exploration enemies persist across prep phases unless killed and suspend during active waves.
-5. Player returns to base, improves defense sockets, and eats at the table to refill energy.
-6. Player sleeps on the bed to start the next wave and restore a small amount of HP.
-7. Player survives the wave.
-8. On wave clear, the game returns to calm phase.
+5. Player returns to base, improves defense sockets, and eats dinner at the table to refill energy and begin the night wave.
+6. Player survives the night wave.
+7. On wave clear, the player sleeps on the bed to restore a small amount of HP and begin the next day.
+8. The game returns to calm day phase.
 9. The run ends when the player clears the final authored wave or dies.
 
 ## Run States
@@ -79,7 +79,8 @@ Use explicit run states:
 - `LOSS`
 
 Rules:
-- Scavenging, strengthening, eating, and sleeping are only available in `PRE_WAVE`.
+- Scavenging, strengthening, and eating dinner are only available in `PRE_WAVE`.
+- Sleeping on the bed is available after a cleared wave, before the next day begins.
 - `PRE_WAVE` can contain ambient exploration enemies away from the base, including before wave `1`.
 - Base-attacking enemies only exist in `ACTIVE_WAVE`.
 - Restart is available in `WIN` and `LOSS`.
@@ -112,7 +113,7 @@ Rules:
 - At `0` energy the player can still move, interact, return home, and sleep.
 - At `0` energy the player cannot attack or search nodes.
 - The table restores energy to full by consuming food.
-- Sleep restores a small amount of HP and starts the next wave.
+- Sleep restores a small amount of HP and starts the next day.
 
 ## Resources
 Use only these resources:

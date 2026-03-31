@@ -20,7 +20,6 @@ fortified_max_hp = 250
 damaged_repair_salvage_cost = 1
 reinforced_repair_salvage_cost = 2
 fortified_repair_salvage_cost = 4
-fortified_repair_parts_cost = 1
 strengthen_salvage_cost = 4
 strengthen_parts_cost = 1
 fortify_salvage_cost = 6

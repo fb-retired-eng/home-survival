@@ -3,7 +3,6 @@
 [ext_resource type="PackedScene" path="res://scenes/player/Player.tscn" id="1_player_scene"]
 [ext_resource type="PackedScene" path="res://scenes/ui/HUD.tscn" id="2_hud_scene"]
 [ext_resource type="PackedScene" path="res://scenes/world/SleepPoint.tscn" id="3_sleep_scene"]
-[ext_resource type="PackedScene" path="res://scenes/world/FoodTablePoint.tscn" id="20_food_table_scene"]
 [ext_resource type="Script" uid="uid://bgt3kfxavnrf6" path="res://scripts/managers/game_manager.gd" id="4_game_manager"]
 [ext_resource type="Script" uid="uid://c4dwsxl0tel8y" path="res://scripts/managers/wave_manager.gd" id="5_wave_manager"]
 [ext_resource type="PackedScene" path="res://scenes/world/ScavengeNode.tscn" id="6_scavenge_scene"]
@@ -12,18 +11,19 @@
 [ext_resource type="Resource" path="res://data/pois/poi_b_bonus.tres" id="10_poi_b_bonus"]
 [ext_resource type="PackedScene" path="res://scenes/world/DefenseSocket.tscn" id="11_socket_scene"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/Zombie.tscn" id="12_zombie_scene"]
-[ext_resource type="Resource" path="res://data/resources/mvp0_perimeter.tres" id="13_perimeter"]
-[ext_resource type="Resource" path="res://data/waves/mvp0_waves.tres" id="14_waves"]
+[ext_resource type="Resource" uid="uid://dsae4bgh4ljxr" path="res://data/resources/mvp0_perimeter.tres" id="13_perimeter"]
+[ext_resource type="Resource" uid="uid://bvy1bxxcyjm41" path="res://data/waves/mvp0_waves.tres" id="14_waves"]
 [ext_resource type="Script" uid="uid://dk3o4gu05t36" path="res://scripts/world/exploration_spawn_point.gd" id="15_exploration_spawn"]
 [ext_resource type="Resource" path="res://data/enemies/zombie_basic.tres" id="16_basic_enemy"]
 [ext_resource type="Resource" path="res://data/weapons/baseball_bat.tres" id="17_baseball_bat"]
 [ext_resource type="Resource" path="res://data/weapons/pistol.tres" id="18_pistol"]
 [ext_resource type="Resource" path="res://data/weapons/shotgun.tres" id="19_shotgun"]
+[ext_resource type="PackedScene" path="res://scenes/world/FoodTablePoint.tscn" id="20_food_table_scene"]
 [ext_resource type="Resource" path="res://data/pois/poi_e_bonus.tres" id="21_poi_e_bonus"]
 [ext_resource type="Resource" path="res://data/pois/poi_f_bonus.tres" id="22_poi_f_bonus"]
 [ext_resource type="Resource" path="res://data/enemies/zombie_runner.tres" id="23_runner_enemy"]
 [ext_resource type="Resource" path="res://data/enemies/zombie_spitter.tres" id="24_spitter_enemy"]
-[ext_resource type="Script" path="res://scripts/world/roaming_spawn_zone.gd" id="25_roaming_zone"]
+[ext_resource type="Script" uid="uid://dwa7iri2l2fef" path="res://scripts/world/roaming_spawn_zone.gd" id="25_roaming_zone"]
 [ext_resource type="Resource" path="res://data/enemies/zombie_brute.tres" id="26_brute_enemy"]
 [ext_resource type="Resource" path="res://data/enemies/zombie_elite_spitter.tres" id="27_elite_spitter_enemy"]
 
@@ -38,7 +38,7 @@ script = ExtResource("8_game_script")
 defense_socket_scene = ExtResource("11_socket_scene")
 exploration_enemy_scene = ExtResource("12_zombie_scene")
 perimeter_definition = ExtResource("13_perimeter")
-enable_test_mode = false
+enable_test_mode = true
 test_mode_weapons = Array[Resource]([ExtResource("17_baseball_bat"), ExtResource("18_pistol"), ExtResource("19_shotgun")])
 roaming_early_enemies = Array[Resource]([ExtResource("16_basic_enemy"), ExtResource("23_runner_enemy")])
 roaming_mid_enemies = Array[Resource]([ExtResource("16_basic_enemy"), ExtResource("23_runner_enemy"), ExtResource("26_brute_enemy")])
@@ -279,14 +279,14 @@ reward_bullets = 6
 weapon_reward = ExtResource("18_pistol")
 bonus_table = ExtResource("10_poi_b_bonus")
 
-[node name="POI_E" type="Node2D" parent="World"]
+[node name="POI_E" type="Node2D" parent="World" unique_id=631136876]
 position = Vector2(1280, 220)
 
-[node name="Marker" type="Polygon2D" parent="World/POI_E"]
+[node name="Marker" type="Polygon2D" parent="World/POI_E" unique_id=214485449]
 color = Color(0.78, 0.42, 0.26, 1)
 polygon = PackedVector2Array(0, -28, 24, 0, 0, 28, -24, 0)
 
-[node name="Label" type="Label" parent="World/POI_E"]
+[node name="Label" type="Label" parent="World/POI_E" unique_id=843790103]
 offset_left = -28.0
 offset_top = 40.0
 offset_right = 44.0
@@ -294,46 +294,46 @@ offset_bottom = 63.0
 theme_override_colors/font_color = Color(1, 0.84, 0.68, 1)
 text = "POI E"
 
-[node name="Node1" parent="World/POI_E" instance=ExtResource("6_scavenge_scene")]
+[node name="Node1" parent="World/POI_E" unique_id=1383301538 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(-58, -26)
 node_id = &"poi_e_1"
 poi_id = &"poi_e"
-reward_food = 2
 reward_salvage = 1
+reward_food = 2
 bonus_table = ExtResource("21_poi_e_bonus")
 
-[node name="Node2" parent="World/POI_E" instance=ExtResource("6_scavenge_scene")]
+[node name="Node2" parent="World/POI_E" unique_id=400129542 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(60, -12)
 node_id = &"poi_e_2"
 poi_id = &"poi_e"
-reward_food = 2
 reward_parts = 1
+reward_food = 2
 bonus_table = ExtResource("21_poi_e_bonus")
 
-[node name="Node3" parent="World/POI_E" instance=ExtResource("6_scavenge_scene")]
+[node name="Node3" parent="World/POI_E" unique_id=1207794687 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(-18, 50)
 node_id = &"poi_e_3"
 poi_id = &"poi_e"
-reward_food = 1
 reward_medicine = 1
+reward_food = 1
 bonus_table = ExtResource("21_poi_e_bonus")
 
-[node name="Node4" parent="World/POI_E" instance=ExtResource("6_scavenge_scene")]
+[node name="Node4" parent="World/POI_E" unique_id=72312105 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(52, 64)
 node_id = &"poi_e_4"
 poi_id = &"poi_e"
-reward_food = 3
 reward_parts = 1
+reward_food = 3
 bonus_table = ExtResource("21_poi_e_bonus")
 
-[node name="POI_F" type="Node2D" parent="World"]
+[node name="POI_F" type="Node2D" parent="World" unique_id=136744481]
 position = Vector2(1280, 1220)
 
-[node name="Marker" type="Polygon2D" parent="World/POI_F"]
+[node name="Marker" type="Polygon2D" parent="World/POI_F" unique_id=1092195253]
 color = Color(0.6, 0.18, 0.18, 1)
 polygon = PackedVector2Array(0, -28, 24, 0, 0, 28, -24, 0)
 
-[node name="Label" type="Label" parent="World/POI_F"]
+[node name="Label" type="Label" parent="World/POI_F" unique_id=917367286]
 offset_left = -28.0
 offset_top = 40.0
 offset_right = 44.0
@@ -341,7 +341,7 @@ offset_bottom = 63.0
 theme_override_colors/font_color = Color(1, 0.74, 0.64, 1)
 text = "POI F"
 
-[node name="Node1" parent="World/POI_F" instance=ExtResource("6_scavenge_scene")]
+[node name="Node1" parent="World/POI_F" unique_id=1822834816 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(-62, -34)
 node_id = &"poi_f_1"
 poi_id = &"poi_f"
@@ -349,7 +349,7 @@ reward_parts = 2
 reward_bullets = 2
 bonus_table = ExtResource("22_poi_f_bonus")
 
-[node name="Node2" parent="World/POI_F" instance=ExtResource("6_scavenge_scene")]
+[node name="Node2" parent="World/POI_F" unique_id=677555504 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(56, -18)
 node_id = &"poi_f_2"
 poi_id = &"poi_f"
@@ -358,7 +358,7 @@ reward_parts = 1
 reward_food = 1
 bonus_table = ExtResource("22_poi_f_bonus")
 
-[node name="Node3" parent="World/POI_F" instance=ExtResource("6_scavenge_scene")]
+[node name="Node3" parent="World/POI_F" unique_id=1604277553 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(-20, 52)
 node_id = &"poi_f_3"
 poi_id = &"poi_f"
@@ -366,7 +366,7 @@ reward_medicine = 1
 reward_food = 1
 bonus_table = ExtResource("22_poi_f_bonus")
 
-[node name="Node4" parent="World/POI_F" instance=ExtResource("6_scavenge_scene")]
+[node name="Node4" parent="World/POI_F" unique_id=996463746 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(54, 68)
 node_id = &"poi_f_4"
 poi_id = &"poi_f"
@@ -445,51 +445,51 @@ script = ExtResource("15_exploration_spawn")
 spawn_id = &"explore_guard_d"
 enemy_definition = ExtResource("16_basic_enemy")
 
-[node name="POI_E_Guard" type="Marker2D" parent="World/ExplorationSpawnPoints"]
+[node name="POI_E_Guard" type="Marker2D" parent="World/ExplorationSpawnPoints" unique_id=3365090]
 position = Vector2(1286, 332)
 script = ExtResource("15_exploration_spawn")
 spawn_id = &"explore_guard_e"
 enemy_definition = ExtResource("23_runner_enemy")
 
-[node name="POI_F_Guard" type="Marker2D" parent="World/ExplorationSpawnPoints"]
+[node name="POI_F_Guard" type="Marker2D" parent="World/ExplorationSpawnPoints" unique_id=188126142]
 position = Vector2(1284, 1100)
 script = ExtResource("15_exploration_spawn")
 spawn_id = &"explore_guard_f"
 enemy_definition = ExtResource("27_elite_spitter_enemy")
 
-[node name="RoamingSpawnZones" type="Node2D" parent="World"]
+[node name="RoamingSpawnZones" type="Node2D" parent="World" unique_id=1631930781]
 
-[node name="NorthWestOuter" type="Marker2D" parent="World/RoamingSpawnZones"]
+[node name="NorthWestOuter" type="Marker2D" parent="World/RoamingSpawnZones" unique_id=568450756]
 position = Vector2(720, 220)
 script = ExtResource("25_roaming_zone")
 zone_id = &"roam_nw"
 
-[node name="NorthEastOuter" type="Marker2D" parent="World/RoamingSpawnZones"]
+[node name="NorthEastOuter" type="Marker2D" parent="World/RoamingSpawnZones" unique_id=1074507864]
 position = Vector2(1840, 220)
 script = ExtResource("25_roaming_zone")
 zone_id = &"roam_ne"
 spawn_weight = 0.9
 
-[node name="NorthMidOuter" type="Marker2D" parent="World/RoamingSpawnZones"]
+[node name="NorthMidOuter" type="Marker2D" parent="World/RoamingSpawnZones" unique_id=368854500]
 position = Vector2(1280, 278)
 script = ExtResource("25_roaming_zone")
 zone_id = &"roam_n"
 scatter_radius = 148.0
 spawn_weight = 1.35
 
-[node name="SouthWestOuter" type="Marker2D" parent="World/RoamingSpawnZones"]
+[node name="SouthWestOuter" type="Marker2D" parent="World/RoamingSpawnZones" unique_id=1793730484]
 position = Vector2(720, 1220)
 script = ExtResource("25_roaming_zone")
 zone_id = &"roam_sw"
 spawn_weight = 0.9
 
-[node name="SouthEastOuter" type="Marker2D" parent="World/RoamingSpawnZones"]
+[node name="SouthEastOuter" type="Marker2D" parent="World/RoamingSpawnZones" unique_id=1545835077]
 position = Vector2(1840, 1220)
 script = ExtResource("25_roaming_zone")
 zone_id = &"roam_se"
 spawn_weight = 0.9
 
-[node name="SouthMidOuter" type="Marker2D" parent="World/RoamingSpawnZones"]
+[node name="SouthMidOuter" type="Marker2D" parent="World/RoamingSpawnZones" unique_id=978747866]
 position = Vector2(1280, 1162)
 script = ExtResource("25_roaming_zone")
 zone_id = &"roam_s"
