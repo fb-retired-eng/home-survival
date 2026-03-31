@@ -2,6 +2,7 @@ extends Resource
 class_name EnemyDefinition
 
 const DAMAGE_TYPE_MODIFIER_SCRIPT := preload("res://scripts/data/damage_type_modifier.gd")
+const WEAPON_DEFINITION_SCRIPT := preload("res://scripts/data/weapon_definition.gd")
 
 enum WaveTargetMode {
 	SOCKET_THEN_PLAYER,
@@ -21,6 +22,8 @@ enum WaveTargetMode {
 @export_range(0.0, 1200.0, 10.0) var player_knockback_force: float = 90.0
 @export var structure_damage: int = 10
 @export var structure_damage_type: StringName = &"impact"
+@export_range(0.0, 240.0, 1.0) var attack_range_override: float = 0.0
+@export_range(0.0, 240.0, 1.0) var structure_attack_range_override: float = 0.0
 @export_range(0.0, 2.0, 0.05) var knockback_multiplier: float = 1.0
 @export_range(0.0, 4000.0, 10.0) var knockback_decay: float = 900.0
 @export var attack_interval: float = 1.0
@@ -53,9 +56,15 @@ enum WaveTargetMode {
 @export var attack_flash_start_scale: Vector2 = Vector2(0.78, 0.78)
 @export var attack_flash_peak_scale: Vector2 = Vector2(1.08, 1.08)
 @export_range(0.01, 1.0, 0.01) var attack_flash_duration: float = 0.08
+@export var is_elite: bool = false
 @export var drop_salvage: int = 1
+@export var drop_parts: int = 0
+@export var drop_bullets: int = 0
+@export var drop_food: int = 0
 @export var bonus_salvage: int = 1
 @export_range(0.0, 1.0, 0.01) var bonus_salvage_chance: float = 0.2
+@export var weapon_drop: Resource
+@export_range(0.0, 1.0, 0.01) var weapon_drop_chance: float = 0.0
 
 
 func is_valid_definition() -> bool:
@@ -66,6 +75,10 @@ func is_valid_definition() -> bool:
 	if move_speed < 0.0:
 		return false
 	if player_damage < 0 or structure_damage < 0:
+		return false
+	if attack_range_override < 0.0:
+		return false
+	if structure_attack_range_override < 0.0:
 		return false
 	if player_knockback_force < 0.0:
 		return false
@@ -113,6 +126,19 @@ func is_valid_definition() -> bool:
 		return false
 	if attack_flash_duration <= 0.0:
 		return false
+	if drop_parts < 0 or drop_bullets < 0 or drop_food < 0:
+		return false
+	if weapon_drop_chance < 0.0 or weapon_drop_chance > 1.0:
+		return false
+	if not is_elite and (weapon_drop != null or weapon_drop_chance > 0.0):
+		return false
+	if weapon_drop_chance > 0.0 and weapon_drop == null:
+		return false
+	if weapon_drop != null:
+		if weapon_drop.get_script() != WEAPON_DEFINITION_SCRIPT and not weapon_drop.is_class("WeaponDefinition"):
+			return false
+		if not weapon_drop.has_method("is_valid_definition") or not weapon_drop.is_valid_definition():
+			return false
 
 	for modifier in damage_taken_modifiers:
 		if modifier == null:

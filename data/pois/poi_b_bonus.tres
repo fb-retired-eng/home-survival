@@ -8,3 +8,5 @@ empty_weight = 20.0
 salvage_weight = 35.0
 parts_weight = 40.0
 medicine_weight = 5.0
+food_weight = 6.0
+food_amount = 1

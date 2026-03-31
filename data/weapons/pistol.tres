@@ -1,0 +1,48 @@
+[gd_resource type="Resource" script_class="WeaponDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/weapon_definition.gd" id="1_weapon"]
+
+[resource]
+script = ExtResource("1_weapon")
+weapon_id = &"pistol"
+display_name = "Pistol"
+damage = 24
+damage_type = &"ballistic"
+attack_mode = "hitscan"
+energy_cost = 1
+attack_cooldown = 0.36
+uses_magazine = true
+magazine_size = 6
+reload_time = 1.1
+miss_recovery_time = 0.16
+attack_windup = 0.12
+attack_range = 200.0
+attack_area_size = Vector2(24, 132)
+attack_area_offset = Vector2(0, -92)
+held_visual_offset = Vector2(10, -11)
+held_visual_polygon = PackedVector2Array(-3, -14, 3, -14, 4, -6, 6, -2, 5, 2, 2, 2, 2, 10, -2, 10, -2, 3, -5, 2, -6, -2, -4, -6)
+held_visual_color = Color(0.32, 0.36, 0.42, 1)
+knockback_force = 45.0
+attack_flash_color = Color(1, 0.9, 0.62, 0.82)
+attack_flash_start_scale = Vector2(0.7, 0.7)
+attack_flash_peak_scale = Vector2(1.28, 1.12)
+attack_flash_duration = 0.05
+muzzle_flash_color = Color(1, 0.9, 0.62, 0.96)
+muzzle_flash_scale = Vector2(1.25, 1.1)
+muzzle_flash_duration = 0.05
+tracer_color = Color(1, 0.96, 0.78, 0.92)
+tracer_width = 2.5
+tracer_duration = 0.06
+impact_hit_color = Color(1, 0.72, 0.42, 0.96)
+impact_block_color = Color(0.96, 0.94, 0.88, 0.86)
+impact_flash_scale = 0.92
+impact_flash_duration = 0.06
+attack_indicator_windup_color = Color(1, 0.93, 0.72, 0.18)
+attack_indicator_strike_color = Color(1, 0.98, 0.9, 0.94)
+attack_indicator_windup_start_scale = Vector2(0.94, 0.86)
+attack_indicator_strike_peak_scale = Vector2(1.04, 1.0)
+attack_indicator_lead_time = 0.05
+attack_indicator_windup_start_alpha = 0.18
+attack_indicator_windup_end_alpha = 0.72
+attack_indicator_strike_alpha = 0.98
+attack_indicator_strike_fade_duration = 0.05

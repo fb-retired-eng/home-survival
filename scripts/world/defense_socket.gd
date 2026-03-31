@@ -9,7 +9,7 @@ signal state_changed(socket: DefenseSocket)
 
 @export var socket_id: StringName
 @export_enum("wall", "door") var socket_type: String = "wall"
-@export_enum("damaged", "reinforced") var tier: String = "damaged"
+@export_enum("damaged", "reinforced", "fortified") var tier: String = "damaged"
 @export var current_hp: int = 90
 @export var max_hp: int = 90
 @export var structure_profile: Resource
@@ -60,6 +60,11 @@ func get_interaction_label(player) -> String:
 			if player != null and not player.has_resources(strengthen_cost):
 				return "Strengthen (need %s)" % _format_cost(strengthen_cost)
 			return "Strengthen (%s)" % _format_cost(strengthen_cost)
+		"fortify":
+			var fortify_cost := _get_fortify_cost()
+			if player != null and not player.has_resources(fortify_cost):
+				return "Fortify (need %s)" % _format_cost(fortify_cost)
+			return "Fortify (%s)" % _format_cost(fortify_cost)
 		_:
 			return ""
 
@@ -113,6 +118,15 @@ func interact(player) -> void:
 		max_hp = _get_max_hp_for_tier(tier)
 		current_hp = max_hp
 		player.message_requested.emit("Base strengthened")
+	elif action == "fortify":
+		var fortify_cost := _get_fortify_cost()
+		if not player.spend_resources(fortify_cost):
+			player.message_requested.emit("Not enough resources")
+			return
+		tier = "fortified"
+		max_hp = _get_max_hp_for_tier(tier)
+		current_hp = max_hp
+		player.message_requested.emit("Base fortified")
 
 	_refresh_visuals()
 
@@ -166,6 +180,11 @@ func _get_available_action() -> String:
 
 	if tier == "reinforced" and current_hp < _get_max_hp_for_tier("reinforced"):
 		return "repair"
+	if tier == "reinforced":
+		return "fortify"
+
+	if tier == "fortified" and current_hp < _get_max_hp_for_tier("fortified"):
+		return "repair"
 
 	return ""
 
@@ -191,9 +210,16 @@ func _get_strengthen_cost() -> Dictionary:
 	return {}
 
 
+func _get_fortify_cost() -> Dictionary:
+	if _has_structure_profile():
+		return structure_profile.get_fortify_cost()
+	push_warning("DefenseSocket %s is missing structure_profile for fortify cost lookup" % socket_id)
+	return {}
+
+
 func _format_cost(cost: Dictionary) -> String:
 	var parts: Array[String] = []
-	for resource_id in ["salvage", "parts", "medicine"]:
+	for resource_id in ["salvage", "parts", "medicine", "food", "bullets"]:
 		var amount := int(cost.get(resource_id, 0))
 		if amount <= 0:
 			continue
@@ -278,7 +304,7 @@ func _resolve_damage_taken(base_damage: int, source: Variant) -> int:
 		damage_type = StringName(source.get("damage_type", &"impact"))
 
 	if _has_structure_profile():
-		return int(structure_profile.compute_damage_taken(base_damage, damage_type))
+		return int(structure_profile.compute_damage_taken(base_damage, damage_type, tier))
 
 	return base_damage
 
@@ -293,6 +319,9 @@ func _get_visual_color() -> Color:
 
 	if current_hp <= 0:
 		return structure_profile.breached_color
+
+	if tier == "fortified":
+		return structure_profile.fortified_color
 
 	if tier == "reinforced":
 		return structure_profile.reinforced_color

@@ -5,7 +5,7 @@ This document is the implementation source of truth for MVP0. It consolidates th
 ## Purpose
 Build a desktop-first Godot 4 prototype that proves this loop:
 
-`scavenge -> return -> strengthen base -> sleep -> defend -> repeat`
+`scavenge -> eat -> sleep -> defend -> repeat`
 
 The prototype is successful if a first-time player can understand the loop without explanation, survive or fail a full run in about 10-20 minutes, and clearly feel that scavenging improves their odds in the next wave.
 
@@ -16,7 +16,6 @@ Do not implement for MVP0:
 - save/load
 - traps or turrets
 - freeform building
-- multiple enemy types
 - farming
 - NPCs
 - real-time day/night systems
@@ -25,16 +24,22 @@ Do not implement for MVP0:
 These decisions resolve ambiguities from the earlier docs.
 
 - This file overrides the older MVP0 docs for implementation details.
-- The run starts with no enemies present before the first wave.
-- After wave `1` is cleared, `PRE_WAVE` exploration may include limited ambient enemies near POIs.
+- `PRE_WAVE` exploration can include ambient enemies near POIs from the start of the run.
 - Ambient exploration enemies do not target the base or defense sockets.
-- Sleeping restores energy to full and restores a small amount of health.
-- Defense sockets have 2 upgrade tiers: `damaged` and `reinforced`.
+- Eating at the table restores energy to full by consuming the exact food needed from inventory.
+- Sleeping on the bed starts the next wave and restores a small amount of health.
+- Sleeping currently restores `25` HP.
+- Defense sockets now have 3 progression states: `damaged`, `reinforced`, and `fortified`.
 - `Broken` is not a third tier. It is any socket whose current HP reaches `0`.
 - All POI nodes are finite for the entire run and only reset on full restart.
 - Scavenging rewards use a deterministic baseline plus small bonus variance so every run keeps a valid win path.
 - Core systems should stay small in MVP0, but data IDs and script boundaries should be stable enough to support additional content later.
 - Wave 3 and later waves can use all 3 spawn lanes.
+- The current authored run target is `8` waves.
+- The current weapon set includes the starting `kitchen_knife` plus POI-obtained `baseball_bat`, `pistol`, and `shotgun` upgrades.
+- The current pistol is a simple magazine-based sidearm with a `6`-round magazine, `1.0s` reload, and collectible bullet reserve ammo.
+- The current resource set also includes `food`, used during prep to refill energy at the table.
+- Prep phases now include both authored POI guards and rerolled roaming exploration enemies.
 
 ## Pillars
 - Readability over simulation.
@@ -53,14 +58,14 @@ Build MVP0 in a way that supports richer future iterations without adding specul
 - If a future feature is not used by MVP0, leave a clean extension point rather than a half-built subsystem.
 
 ## Run Structure
-The run begins in a calm phase at wave `0`.
+The run begins in `PRE_WAVE` at wave `0`.
 
 1. Player starts at base with full health and full energy.
-2. The opening exploration phase is safe and has no enemies.
-3. Player scavenges POI nodes to collect `Salvage`, `Parts`, and rare `Medicine`.
-4. After wave `1`, later `PRE_WAVE` phases may include ambient exploration enemies around POIs.
-5. Player returns to base and improves defense sockets.
-6. Player sleeps to start the next wave, restore energy to full, and restore a small amount of HP.
+2. The opening exploration phase may already have hostile POIs away from the base.
+3. Player scavenges POI nodes to collect `Salvage`, `Parts`, `Medicine`, `Bullets`, and `Food`.
+4. Exploration enemies persist across prep phases unless killed and suspend during active waves.
+5. Player returns to base, improves defense sockets, and eats at the table to refill energy.
+6. Player sleeps on the bed to start the next wave and restore a small amount of HP.
 7. Player survives the wave.
 8. On wave clear, the game returns to calm phase.
 9. The run ends when the player clears the final authored wave or dies.
@@ -74,9 +79,8 @@ Use explicit run states:
 - `LOSS`
 
 Rules:
-- Scavenging, strengthening, and sleeping are only available in `PRE_WAVE`.
-- The initial `PRE_WAVE` phase before wave `1` is completely safe.
-- After wave `1`, `PRE_WAVE` may contain ambient exploration enemies away from the base.
+- Scavenging, strengthening, eating, and sleeping are only available in `PRE_WAVE`.
+- `PRE_WAVE` can contain ambient exploration enemies away from the base, including before wave `1`.
 - Base-attacking enemies only exist in `ACTIVE_WAVE`.
 - Restart is available in `WIN` and `LOSS`.
 - The game starts in `PRE_WAVE` with `current_wave = 0`.
@@ -87,23 +91,28 @@ Rules:
 - `interact`
 - `attack`
 - `use_medicine`
+- `switch_weapon`
+- `reload_weapon`
 
 ### Stats
 - Max health: `100`
 - Max energy: `100`
-- Melee damage: `25`
-- Melee energy cost: `5`
-- Melee cooldown: `0.45s`
 - Medicine heal: `35`
+- Sleep heal: `25`
+- Food energy refill: exact-to-full via table interaction
 
 ### Rules
 - Movement costs no energy.
-- Attacking requires at least `5` energy.
+- Attack timing, damage, reach, energy cost, and knockback are weapon-defined.
+- The player starts with `Kitchen Knife`.
+- Additional obtained weapons can be switched during the run.
+- Firearms can define magazine size and reload timing separately from melee timing.
 - Scavenging consumes meaningful energy.
 - Strengthening and repairing cost no energy.
 - At `0` energy the player can still move, interact, return home, and sleep.
 - At `0` energy the player cannot attack or search nodes.
-- Sleep restores energy to full and leaves current health unchanged.
+- The table restores energy to full by consuming food.
+- Sleep restores a small amount of HP and starts the next wave.
 
 ## Resources
 Use only these resources:
@@ -111,6 +120,8 @@ Use only these resources:
 - `Salvage`
 - `Parts`
 - `Medicine`
+- `Bullets`
+- `Food`
 
 ### Roles
 - `Salvage`
@@ -120,12 +131,20 @@ Use only these resources:
   - gained from POIs and zombie drops
 - `Parts`
   - uncommon
-  - required to upgrade damaged sockets into reinforced sockets
-  - gained from POIs only
+  - required for reinforced and fortified upgrades
+  - gained mainly from POIs and some elite drops
 - `Medicine`
   - rare
   - consumed by the player to restore health
   - gained from POIs only
+- `Bullets`
+  - uncommon
+  - consumed by firearm reloads
+  - gained from POIs and some elite drops
+- `Food`
+  - prep-focused
+  - consumed at the table to refill missing energy to full
+  - gained mainly from POIs
 
 ### Inventory
 - Inventory is unlimited.
@@ -137,6 +156,8 @@ Use stable lowercase IDs in code and data even if the HUD shows title case label
 - `salvage`
 - `parts`
 - `medicine`
+- `bullets`
+- `food`
 
 This avoids enum churn later if more resources are added.
 
@@ -144,13 +165,14 @@ This avoids enum churn later if more resources are added.
 ### Structure
 - One larger authored map
 - One central abstract base
-- Four authored POIs outside the base
+- Six authored POIs outside the base
 - Three authored zombie spawn lanes at map edges
 
 ### Base
 The base contains:
 - 4 defense sockets
-- 1 sleep point at the interior center
+- 1 food table near the interior center
+- 1 bed near the interior center
 - open interior circulation so the player can rotate during waves
 
 ### Socket IDs
@@ -166,9 +188,9 @@ The final art layout can be asymmetrical, but these IDs should remain stable in 
 ### Content IDs
 Use stable IDs for authored content. MVP0 only needs a few, but the pattern should hold:
 
-- POIs: `poi_a`, `poi_b`, `poi_c`, `poi_d`
+- POIs: `poi_a`, `poi_b`, `poi_c`, `poi_d`, `poi_e`, `poi_f`
 - spawn lanes: `north`, `east`, `west`
-- enemy archetypes: `zombie_basic`, `zombie_brute`
+- enemy archetypes: `zombie_basic`, `zombie_brute`, `zombie_runner`, `zombie_spitter`
 - socket IDs: the 4 fixed socket IDs listed above
 
 Future systems should refer to these IDs, not scene paths or display names.
@@ -190,13 +212,23 @@ Future systems should refer to these IDs, not scene paths or display names.
 - `POI_D`
   - lower-right
   - favors `Parts`
-  - includes one medicine node
+  - firearm cache with bullets and weapon rewards
+- `POI_E`
+  - upper-mid
+  - favors `Food`
+  - supports prep recovery
+- `POI_F`
+  - lower-mid
+  - higher-risk combat POI
+  - supports elite encounters and stronger mixed rewards
 
 ### Node Rules
 - `POI_A` has `4` searchable nodes.
 - `POI_B` has `4` searchable nodes.
 - `POI_C` has `4` searchable nodes.
 - `POI_D` has `4` searchable nodes.
+- `POI_E` has `4` searchable nodes.
+- `POI_F` has `4` searchable nodes.
 - Search time: `0.9s`
 - Search energy cost: `15`
 - A searched node becomes depleted for the rest of the run.
@@ -220,7 +252,7 @@ Use authored baseline rewards per node.
 - node 1: `1 Parts`
 - node 2: `1 Salvage + 1 Parts`
 - node 3: `1 Parts`
-- node 4: `2 Parts`
+- node 4: `2 Parts + Baseball Bat`
 
 `POI_C` baseline nodes
 - node 1: `3 Salvage`
@@ -229,10 +261,22 @@ Use authored baseline rewards per node.
 - node 4: `2 Salvage + 1 Parts`
 
 `POI_D` baseline nodes
-- node 1: `1 Parts`
-- node 2: `1 Salvage + 2 Parts`
-- node 3: `1 Parts + 1 Medicine`
-- node 4: `2 Parts`
+- node 1: `1 Parts + 4 Bullets + Shotgun`
+- node 2: `1 Salvage + 2 Parts + 4 Bullets`
+- node 3: `1 Parts + 1 Medicine + 2 Bullets`
+- node 4: `2 Parts + 6 Bullets + Pistol`
+
+`POI_E` baseline nodes
+- node 1: `2 Food + 1 Salvage`
+- node 2: `2 Food + 1 Parts`
+- node 3: `1 Food + 1 Medicine`
+- node 4: `3 Food + 1 Parts`
+
+`POI_F` baseline nodes
+- node 1: `2 Parts + 2 Bullets`
+- node 2: `2 Salvage + 1 Parts + 1 Food`
+- node 3: `1 Medicine + 1 Food`
+- node 4: `2 Parts + 4 Bullets`
 
 Optional bonus roll after baseline reward:
 
@@ -259,7 +303,7 @@ Intent:
 ### Tier Model
 Each socket has:
 - `socket_type`: `wall` or `door`
-- `tier`: `damaged` or `reinforced`
+- `tier`: `damaged`, `reinforced`, or `fortified`
 - `current_hp`
 
 `Broken` means `current_hp == 0`. It is not a separate upgrade tier.
@@ -271,8 +315,10 @@ Implementation note:
 ### Max HP By Type And Tier
 - Wall damaged HP: `120`
 - Wall reinforced HP: `240`
+- Wall fortified HP: `380`
 - Door damaged HP: `90`
 - Door reinforced HP: `170`
+- Door fortified HP: `250`
 
 ### Starting Setup
 All 4 sockets begin in the `damaged` tier.
@@ -291,32 +337,45 @@ Expose one context-sensitive interaction at each socket.
 - If the socket tier is `damaged` and missing HP, show `Repair`.
 - If the socket tier is `damaged` and at full damaged HP, show `Strengthen`.
 - If the socket tier is `reinforced` and missing HP, show `Repair`.
-- If the socket tier is `reinforced` and at full HP, show no action prompt.
+- If the socket tier is `reinforced` and at full HP, show `Fortify`.
+- If the socket tier is `fortified` and missing HP, show `Repair`.
+- If the socket tier is `fortified` and at full HP, show no action prompt.
 
 ### Costs
 `Strengthen`
 - wall: `6 Salvage + 2 Parts`
 - door: `4 Salvage + 1 Parts`
 
+`Fortify`
+- wall: `9 Salvage + 4 Parts`
+- door: `6 Salvage + 3 Parts`
+
 `Repair`
 - damaged wall: `2 Salvage`
 - damaged door: `1 Salvage`
-- wall: `3 Salvage`
-- door: `2 Salvage`
+- reinforced wall: `4 Salvage`
+- reinforced door: `2 Salvage`
+- fortified wall: `6 Salvage + 1 Parts`
+- fortified door: `4 Salvage + 1 Parts`
 
 ### Results
 - `Repair` on a damaged socket restores it to full damaged HP.
 - `Strengthen` sets the socket to `reinforced` and restores it to full reinforced HP.
+- `Fortify` sets the socket to `fortified` and restores it to full fortified HP.
 - `Repair` restores a reinforced socket to full reinforced HP.
+- `Repair` restores a fortified socket to full fortified HP.
 - A broken damaged socket can still be strengthened.
 - A broken damaged socket can also be repaired back to full damaged HP.
 - A broken reinforced socket can still be repaired.
+- A broken reinforced socket can still be fortified.
+- A broken fortified socket can still be repaired.
 
 ### Behavior
 - Doors are weaker but cheaper to improve.
+- Fortified structures are a late-run investment, not an invulnerability state.
 - Zombies can damage sockets until HP reaches `0`.
 - A socket at `0` HP is breached and no longer blocks zombies.
-- Socket visuals should clearly communicate damaged, reinforced, and breached conditions even though the only upgrade tiers are `damaged` and `reinforced`.
+- Socket visuals should clearly communicate damaged, reinforced, fortified, and breached conditions.
 
 Future-facing rule:
 - Additional socket types such as windows, barricades, or traps should be addable through socket data and visuals, without rewriting the wave or player interaction loop.
@@ -343,14 +402,14 @@ Stats:
 - Attack interval: `1.0s`
 
 Future-facing rule:
-- Enemy stats and targeting preferences should come from an enemy definition resource or config object, even if MVP0 only ships one enemy archetype.
+- Enemy stats and targeting preferences should come from an enemy definition resource or config object so new archetypes can be added without rewriting core AI flow.
 
 ### Enemy Contexts
 The same zombie archetype may appear in two different contexts:
 
 - `exploration`
-  - can appear during `PRE_WAVE`, but only after wave `1`
-  - stays near POIs or authored exploration zones
+  - can appear during `PRE_WAVE` from the start of the run
+  - includes both authored POI guards and rerolled roaming prep spawns
   - pressures the player during scavenging
   - does not target sockets or path toward the base
 - `wave`
@@ -373,9 +432,10 @@ The same zombie archetype may appear in two different contexts:
 - Keep retargeting simple. Do not build complex threat systems for MVP0.
 
 ### Drops
-- On death, a zombie drops a salvage pickup worth `1 Salvage`.
-- `20%` of kills drop `2 Salvage` instead.
-- Zombies never drop `Parts` or `Medicine`.
+- Basic enemies still primarily drop salvage.
+- Some enemy definitions can also drop `Parts`, `Bullets`, or `Food`.
+- Elite enemy definitions can also roll weapon drops at low odds.
+- Weapon-drop pickups must render differently from normal resource pickups.
 
 ## Waves
 ### Lane Setup
@@ -392,23 +452,13 @@ Implementation note:
 - Each lane entry should support at least: `lane_id`, `enemy_id`, `count`, and `spawn_interval`.
 
 ### Wave Data
-Wave `1`
-- total zombies: `4`
-- active lanes: `north`
-- spawn split: `4`
-- spawn interval: `0.8s`
+The current authored wave set contains `8` waves and mixes:
+- `zombie_basic`
+- `zombie_brute`
+- `zombie_runner`
+- `zombie_spitter`
 
-Wave `2`
-- total zombies: `7`
-- active lanes: `east`, `west`
-- spawn split: `4`, `3`
-- spawn interval: `0.7s`
-
-Wave `3`
-- total zombies: `10`
-- active lanes: `north`, `east`, `west`
-- spawn split: `4`, `3`, `3`
-- spawn interval: `0.6s`
+Late waves increase pressure mainly through composition and lane variety rather than only higher counts.
 
 ### Flow
 - Sleeping in `PRE_WAVE` increments the wave number and starts that wave immediately.
@@ -420,8 +470,8 @@ Wave `3`
   - player keeps current health
   - player keeps current energy
   - sleep becomes available again
-- After wave `1`, later `PRE_WAVE` exploration may spawn ambient enemies near POIs.
-- Clearing wave `3` ends the run in `WIN`.
+- Every `PRE_WAVE` phase can also reroll roaming exploration enemies in POI-biased outer zones.
+- Clearing wave `8` ends the run in `WIN`.
 
 ## UI
 ### HUD

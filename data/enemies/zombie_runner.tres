@@ -1,0 +1,45 @@
+[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_definition.gd" id="1_enemy_definition"]
+
+[resource]
+script = ExtResource("1_enemy_definition")
+enemy_id = &"zombie_runner"
+body_color = Color(0.72, 0.82, 0.34, 1)
+max_health = 34
+move_speed = 64.0
+player_damage = 7
+player_knockback_force = 70.0
+structure_damage = 3
+structure_damage_type = &"impact"
+attack_interval = 1.1
+attack_prep_time = 0.34
+wave_target_mode = 1
+exploration_target_mode = 3
+chase_player_when_nearby = true
+chase_overrides_target_mode = true
+idle_until_player_detected = true
+ally_alert_radius = 110.0
+player_detection_radius = 108.0
+player_chase_break_radius = 154.0
+fallback_to_player_when_no_sockets = true
+attack_player_when_obstructing = true
+attack_player_on_contact = true
+obstruction_width = 16.0
+separation_radius = 30.0
+separation_weight = 1.3
+sidestep_weight = 1.15
+detection_facing_dot_threshold = -0.1
+attack_facing_dot_threshold = 0.15
+attack_tell_color = Color(0.92, 0.96, 0.42, 0.72)
+attack_tell_start_scale = Vector2(0.68, 0.68)
+attack_tell_ready_scale = Vector2(0.98, 0.98)
+attack_tell_lead_time = 0.14
+attack_tell_start_alpha = 0.12
+attack_tell_ready_alpha = 0.58
+attack_strike_color = Color(0.98, 1, 0.84, 0.98)
+attack_flash_start_scale = Vector2(0.8, 0.8)
+attack_flash_peak_scale = Vector2(1.08, 1.08)
+attack_flash_duration = 0.06
+drop_salvage = 1
+drop_food = 1

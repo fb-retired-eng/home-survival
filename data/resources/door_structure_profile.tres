@@ -1,33 +1,36 @@
-[gd_resource type="Resource" script_class="StructureProfile" load_steps=5 format=3]
+[gd_resource type="Resource" script_class="StructureProfile" format=3 uid="uid://7xtinyhes7qh"]
 
-[ext_resource type="Script" path="res://scripts/data/structure_profile.gd" id="1_profile"]
-[ext_resource type="Script" path="res://scripts/data/damage_type_modifier.gd" id="2_modifier"]
+[ext_resource type="Script" uid="uid://qnsammnnp4bh" path="res://scripts/data/structure_profile.gd" id="1_profile"]
+[ext_resource type="Script" uid="uid://civk810rrycpw" path="res://scripts/data/damage_type_modifier.gd" id="2_modifier"]
 
 [sub_resource type="Resource" id="1"]
 script = ExtResource("2_modifier")
-damage_type = &"impact"
 flat_reduction = 2
-multiplier = 1.0
 
 [sub_resource type="Resource" id="2"]
 script = ExtResource("2_modifier")
 damage_type = &"crush"
-flat_reduction = 0
 multiplier = 1.2
 
 [resource]
 script = ExtResource("1_profile")
 profile_id = &"door"
-damaged_max_hp = 90
 reinforced_max_hp = 170
+fortified_max_hp = 250
 damaged_repair_salvage_cost = 1
 reinforced_repair_salvage_cost = 2
+fortified_repair_salvage_cost = 4
+fortified_repair_parts_cost = 1
 strengthen_salvage_cost = 4
 strengthen_parts_cost = 1
+fortify_salvage_cost = 6
+fortify_parts_cost = 3
 default_flat_reduction = 1
-default_multiplier = 1.0
-damage_modifiers = Array[ExtResource("2_modifier")]([SubResource("1"), SubResource("2")])
-interaction_priority = 10
+reinforced_flat_reduction_bonus = 1
+fortified_flat_reduction_bonus = 2
+reinforced_tier_multiplier = 0.95
+fortified_tier_multiplier = 0.88
+damage_modifiers = Array[Resource]([SubResource("1"), SubResource("2")])
 damaged_color = Color(0.74, 0.49, 0.26, 1)
 reinforced_color = Color(0.82, 0.66, 0.28, 1)
-breached_color = Color(0.24, 0.18, 0.18, 1)
+fortified_color = Color(0.94, 0.82, 0.4, 1)

@@ -862,3 +862,188 @@ Validation:
 Validation:
 - Headless Godot project load succeeded after the weapon-POI and held-weapon visual pass.
 - Headless runtime probe confirmed the player-held weapon visual changes at runtime from knife to bat, including distinct color and offset values.
+
+### Docs Sync And Equipped-Weapon HUD Pass
+- Brought the README and MVP0 spec back in line with the live game: opening POIs can already be hostile, the current run target is five waves, the player can switch obtained weapons, sleep restores a small amount of HP, and `poi_b_4` is now a baseball-bat reward node.
+- Added an always-visible equipped-weapon readout to the HUD so weapon switching is no longer only message-driven.
+- Added a small headless HUD probe to verify the HUD weapon label updates at runtime when the player equips the baseball bat.
+
+Validation:
+- Headless Godot project load succeeded after the docs-sync and equipped-weapon HUD pass.
+- Headless runtime probe confirmed the HUD weapon label changes from `Weapon: Kitchen Knife` to `Weapon: Baseball Bat` when the bat is obtained and equipped.
+
+### Pistol Weapon Pass
+- Extended weapon config with a lightweight `attack_mode` split so the current system can support both melee and hitscan weapons without a larger projectile refactor.
+- Added a new `Pistol` weapon resource with faster low-windup ranged attacks, modest per-shot energy cost, lighter knockback than the bat, and a compact held-weapon silhouette.
+- Hooked the pistol into `poi_d_4` as a second weapon reward node and gave `POI_D` a distinct cooler color treatment so it reads differently from the bat POI.
+- Switched player attack target collection from `Area2D.get_overlapping_bodies()` to a direct physics shape query, then layered pistol hitscan selection on top of that so ranged attacks use forward-target filtering plus an unobstructed ray to the enemy.
+
+Validation:
+- Headless Godot project load succeeded after the pistol pass.
+- Headless pistol probe confirmed the pistol equips successfully, acquires a ranged target, and reduces a zombie from `50` HP to `16` HP at distance.
+
+### Firearm Rules, Impact Feedback, And Weapon Balance Pass
+- Extended `WeaponDefinition` with magazine/reload settings plus dedicated hitscan impact-feedback settings so firearm behavior and shot feel remain data-driven.
+- Updated the player combat loop so magazine weapons fire committed shots, auto-reload when emptied, expose reload state in the HUD weapon label, and let weapon switching cancel an in-progress reload.
+- Added a shot-impact flash at the tracer endpoint and tuned the pistol to show distinct enemy-hit and structure/world impact colors.
+- Rebalanced the current weapon trio around clearer roles: faster knife, heavier slower bat with stronger knockback, and pistol as safe ranged pressure gated by a 6-round magazine and reload downtime.
+- Added headless runtime probes for pistol reload, impact feedback, and reload-cancel-by-switch behavior.
+
+Validation:
+- Headless Godot project load succeeded after the firearm-rules and balance pass.
+- Headless pistol probe confirmed the retuned pistol still acquires a ranged target and reduces a zombie from `50` HP to `24` HP at distance.
+- Headless pistol reload probe confirmed:
+  - `pistol_reload_probe_initial_status=Weapon: Pistol 1/6`
+  - `pistol_reload_probe_after_shot_status=Weapon: Pistol 0/6 ↻`
+  - `pistol_reload_probe_after_reload_complete=Weapon: Pistol 6/6`
+- Headless pistol impact probe confirmed:
+  - `pistol_impact_probe_enemy_visible=true`
+  - `pistol_impact_probe_enemy_color=(1.0, 0.72, 0.42, 0.96)`
+  - `pistol_impact_probe_structure_visible=true`
+  - `pistol_impact_probe_structure_color=(0.96, 0.94, 0.88, 0.86)`
+- Headless pistol reload-switch probe confirmed:
+  - `pistol_reload_switch_probe_during_reload=Weapon: Pistol 0/6 ↻`
+  - `pistol_reload_switch_probe_after_switch=Weapon: Baseball Bat`
+
+### Test-Mode Weapon Loadout Pass
+- Added a game-level `enable_test_mode` toggle plus authored `test_mode_weapons` so the player can start runs with the full weapon set unlocked for faster weapon testing.
+- Applied the test-mode loadout both on initial scene startup and on full run reset so restart keeps the same debug loadout instead of dropping back to knife-only.
+- Added a headless test-mode probe to verify the startup and reset loadouts.
+
+Validation:
+- Headless Godot project load succeeded after the test-mode pass.
+- Headless test-mode probe confirmed:
+  - `test_mode_probe_initial_weapon=Pistol`
+  - `test_mode_probe_initial_loadout=kitchen_knife,baseball_bat,pistol`
+  - `test_mode_probe_after_reset_weapon=Pistol`
+  - `test_mode_probe_after_reset_loadout=kitchen_knife,baseball_bat,pistol`
+
+### Pistol Energy Cost Tuning
+- Restored a nonzero energy cost to the pistol so ranged pressure still participates in the player energy economy instead of bypassing it entirely.
+- Kept the cost modest because the pistol already pays for safety with a 6-round magazine and reload downtime.
+
+Validation:
+- Headless pistol energy probe confirmed:
+  - `pistol_energy_probe_before=100`
+  - `pistol_energy_probe_after=99`
+  - `pistol_energy_probe_cost=1`
+
+### Weapon Data Rebalance Pass
+- Retuned the current three-weapon set around cleaner roles instead of near-overlapping stats.
+- `Kitchen Knife` is now slightly lighter and faster, so it stays the best close-range baseline and cleanup option.
+- `Baseball Bat` is now slower, heavier, longer, and stronger on knockback so it reads as the deliberate crowd-control weapon.
+- `Pistol` is now slightly less bursty and slightly shorter-ranged, with a bit more reload commitment, so it keeps its safety niche without dominating melee pickups.
+
+### Bullet Resource And Pistol Ammo Pass
+- Added `bullets` as a normal collectible run resource and surfaced it in the HUD resource strip.
+- Updated pistol reload to consume bullet reserve ammo instead of assuming infinite reserve, and block empty-mag attacks when both magazine and reserve are empty.
+- Extended scavenge nodes with `reward_bullets` and authored `POI_D` to grant bullet pickups alongside the pistol path.
+- Added test and runtime probes for bullet-fed reload and empty-ammo behavior.
+
+Validation:
+- Headless Godot project load succeeded after the bullet-ammo pass.
+- Headless reload-from-reserve probe confirmed:
+  - `pistol_reload_probe_initial_status=Weapon: Pistol 1/6 | ◉5`
+  - `pistol_reload_probe_after_shot_status=Weapon: Pistol 0/6 | ◉5 ↻`
+  - `pistol_reload_probe_after_reload_complete=Weapon: Pistol 5/6 | ◉0`
+- Headless empty-ammo probe confirmed:
+  - `pistol_no_bullets_probe_status=Weapon: Pistol 0/6 | ◉0`
+  - `pistol_no_bullets_probe_energy_before=100`
+  - `pistol_no_bullets_probe_energy_after=100`
+  - `pistol_no_bullets_probe_tracer_visible=false`
+
+### Shotgun Weapon Pass
+- Added a new `Shotgun` weapon as a spread-hitscan firearm with short range, wider cone coverage, heavier knockback than the pistol, and a small 2-shot magazine.
+- Hooked the shotgun into `poi_d_1` so `POI_D` now serves as the firearm-cache POI, with bullet pickups supporting both the shotgun and pistol path.
+- Extended test mode to include the shotgun in the authored startup loadout.
+- Tuned the shotgun spread after the first runtime pass so it actually demonstrates multi-target value instead of behaving like a narrower pistol.
+
+Validation:
+- Headless shotgun probe confirmed:
+  - `shotgun_probe_target_count=2`
+  - `shotgun_probe_health_b_after=14`
+  - `shotgun_probe_health_c_after=14`
+  - `shotgun_probe_status=Weapon: Shotgun 1/2 | ◉4`
+- Headless test-mode probe confirmed:
+  - `test_mode_probe_initial_weapon=Shotgun`
+  - `test_mode_probe_initial_loadout=kitchen_knife,baseball_bat,pistol,shotgun`
+  - `test_mode_probe_after_reset_weapon=Shotgun`
+  - `test_mode_probe_after_reset_loadout=kitchen_knife,baseball_bat,pistol,shotgun`
+
+### Map Expansion Pass
+- Expanded the authored playfield from `1920x1080` to `2560x1440`.
+- Recentered the base, player spawn, perimeter resource, sleep point, wave lanes, map bounds, spawn markers, and all four POIs around the larger world footprint.
+- Pushed exploration guards outward with the POIs so the larger map creates more traversal space instead of only adding empty margins.
+- Added a headless layout probe to verify the recentered base and pushed-out POI/spawn coordinates.
+
+Validation:
+- Headless Godot project load succeeded after the map-expansion pass.
+- Headless map layout probe confirmed:
+  - `map_layout_probe_player=(1280.0, 720.0)`
+  - `map_layout_probe_sleep=(1280.0, 720.0)`
+  - `map_layout_probe_poi_a=(420.0, 320.0)`
+  - `map_layout_probe_poi_d=(2140.0, 1120.0)`
+  - `map_layout_probe_north_spawn=(1280.0, 110.0)`
+  - `map_layout_probe_east_spawn=(2470.0, 720.0)`
+
+### Expansion Systems Pass
+- Added `food` as a first-class resource in the player inventory, HUD, scavenging rewards, bonus tables, and pickups.
+- Added a new `FoodTablePoint` interaction and split the old sleep flow into:
+  - table = consume exact food needed to refill energy to full
+  - bed = restore some HP and start the next wave
+- Tightened the bed gate so waves cannot start until the player has restored energy to full through the table flow.
+- Extended structure profiles and sockets with a new `fortified` tier for both walls and doors, including stronger HP, stronger economy costs, and distinct visuals.
+
+Validation:
+- Headless Godot project load succeeded after the food/table/fortified pass.
+- Headless food-table probe confirmed:
+  - `food_table_probe_before_energy=55`
+  - `food_table_probe_before_food=3`
+  - `food_table_probe_after_energy=100`
+  - `food_table_probe_after_food=0`
+- Headless bed-gate probe confirmed:
+  - `bed_gate_probe_can_sleep_before=false`
+  - `bed_gate_probe_can_sleep_after=true`
+- Headless fortified-socket probe confirmed:
+  - `fortified_socket_probe_initial_tier=damaged`
+  - `fortified_socket_probe_after_strengthen_tier=reinforced`
+  - `fortified_socket_probe_after_fortify_tier=fortified`
+
+### Expansion Content Pass
+- Expanded authored content from `4` to `6` POIs by adding `POI_E` and `POI_F`, with `POI_E` biased toward food-heavy prep recovery and `POI_F` biased toward higher-risk combat rewards.
+- Expanded authored wave content from `5` to `8` waves and introduced `zombie_runner` and `zombie_spitter` into the live wave data.
+- Added POI-biased roaming exploration spawn zones that reroll each `PRE_WAVE` phase and stay outside a safe radius around the base.
+- Added elite weapon-drop support through enemy data and weapon-drop pickups with a distinct gold visual treatment.
+- Split the elite drop path out from the base spitter definition into a separate `zombie_elite_spitter` resource so not every spitter became a weapon-drop enemy.
+
+Validation:
+- Headless Godot project load succeeded after the expansion content pass.
+- Headless roaming-spawn probe confirmed:
+  - `roaming_spawn_probe_final_wave=8`
+  - `roaming_spawn_probe_initial_roaming=2`
+  - `roaming_spawn_probe_mid_roaming=4`
+  - `roaming_spawn_probe_late_roaming=5`
+
+### Expansion Fix Pass
+- Added a separate `structure_attack_range_override` so ranged player-pressure enemies like spitters do not automatically inherit ranged siege behavior against walls and doors.
+- Fixed restart-state HUD drift so resetting from `WIN` or `LOSS` explicitly restores the `Pre-Wave` phase label.
+- Hardened elite weapon-drop enforcement so non-elite definitions cannot silently become weapon-dropping enemies by data accident.
+- Added north/south roaming spawn zones so prep-stage roaming pressure now covers the new top/bottom POIs instead of only the original corner routes.
+- Added fortified-tier damage mitigation on top of fortified HP so the top structure tier is not just a larger health pool.
+
+Validation:
+- Headless Godot project load succeeded after the fix pass.
+- Headless reset-phase probe confirmed:
+  - `reset_phase_probe_wave_label=Wave 0 / 8   |   Pre-Wave`
+- Headless elite weapon-drop probe confirmed:
+  - `elite_weapon_drop_probe_weapon_pickups=0`
+- Headless roaming-zone probe confirmed:
+  - `roaming_zone_probe_count=6`
+  - `roaming_zone_probe_ids=roam_nw,roam_ne,roam_n,roam_sw,roam_se,roam_s`
+- Headless spitter structure-range probe confirmed:
+  - `spitter_structure_range_probe_far=false`
+  - `spitter_structure_range_probe_near=true`
+- Headless fortified-mitigation probe confirmed:
+  - `fortified_mitigation_probe_damaged=16`
+  - `fortified_mitigation_probe_reinforced=14`
+  - `fortified_mitigation_probe_fortified=12`

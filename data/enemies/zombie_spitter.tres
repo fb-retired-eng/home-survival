@@ -1,0 +1,49 @@
+[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_definition.gd" id="1_enemy_definition"]
+[ext_resource type="Resource" path="res://data/weapons/pistol.tres" id="2_pistol"]
+
+[resource]
+script = ExtResource("1_enemy_definition")
+enemy_id = &"zombie_spitter"
+body_color = Color(0.64, 0.82, 0.58, 1)
+max_health = 58
+move_speed = 28.0
+player_damage = 11
+player_knockback_force = 100.0
+structure_damage = 2
+structure_damage_type = &"acid"
+attack_range_override = 126.0
+structure_attack_range_override = 22.0
+attack_interval = 1.5
+attack_prep_time = 0.68
+wave_target_mode = 1
+exploration_target_mode = 3
+chase_player_when_nearby = true
+chase_overrides_target_mode = true
+idle_until_player_detected = true
+ally_alert_radius = 92.0
+player_detection_radius = 116.0
+player_chase_break_radius = 154.0
+fallback_to_player_when_no_sockets = true
+attack_player_when_obstructing = true
+attack_player_on_contact = true
+obstruction_width = 20.0
+separation_radius = 36.0
+separation_weight = 1.05
+sidestep_weight = 1.0
+detection_facing_dot_threshold = -0.2
+attack_facing_dot_threshold = -0.1
+attack_tell_color = Color(0.62, 0.96, 0.58, 0.76)
+attack_tell_start_scale = Vector2(0.74, 0.74)
+attack_tell_ready_scale = Vector2(1.02, 1.02)
+attack_tell_lead_time = 0.24
+attack_tell_start_alpha = 0.16
+attack_tell_ready_alpha = 0.66
+attack_strike_color = Color(0.86, 1, 0.84, 0.98)
+attack_flash_start_scale = Vector2(0.88, 0.88)
+attack_flash_peak_scale = Vector2(1.14, 1.14)
+attack_flash_duration = 0.08
+drop_salvage = 1
+drop_parts = 1
+drop_bullets = 2

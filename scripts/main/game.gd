@@ -5,20 +5,32 @@ const BASE_PERIMETER_DEFINITION_SCRIPT := preload("res://scripts/data/base_perim
 const PERIMETER_SEGMENT_DEFINITION_SCRIPT := preload("res://scripts/data/perimeter_segment_definition.gd")
 const STRUCTURE_PROFILE_SCRIPT := preload("res://scripts/data/structure_profile.gd")
 const EXPLORATION_SPAWN_POINT_SCRIPT := preload("res://scripts/world/exploration_spawn_point.gd")
+const ENEMY_DEFINITION_SCRIPT := preload("res://scripts/data/enemy_definition.gd")
+const ROAMING_SPAWN_ZONE_SCRIPT := preload("res://scripts/world/roaming_spawn_zone.gd")
 
 @export var defense_socket_scene: PackedScene
 @export var exploration_enemy_scene: PackedScene
 @export var perimeter_definition: Resource
 @export var sleep_heal_amount: int = 25
+@export_range(1, 100, 1) var food_energy_per_unit: int = 20
+@export var enable_test_mode: bool = false
+@export var test_mode_weapons: Array[Resource] = []
+@export var test_mode_bullets: int = 18
+@export var test_mode_food: int = 4
+@export var roaming_early_enemies: Array[Resource] = []
+@export var roaming_mid_enemies: Array[Resource] = []
+@export var roaming_late_enemies: Array[Resource] = []
 
 @onready var game_manager = $GameManager
 @onready var player = $Player
 @onready var hud = $HUD
 @onready var wave_manager = $WaveManager
+@onready var food_table: Area2D = $World/FoodTable
 @onready var sleep_point: Area2D = $World/SleepPoint
 @onready var spawn_markers_root: Node2D = $World/SpawnMarkers
 @onready var defense_sockets: Node2D = $World/DefenseSockets
 @onready var exploration_spawn_points_root: Node2D = $World/ExplorationSpawnPoints
+@onready var roaming_spawn_zones_root: Node2D = $World/RoamingSpawnZones
 @onready var exploration_enemy_layer: Node2D = $World/ExplorationEnemies
 @onready var wave_enemy_layer: Node2D = $World/WaveEnemies
 
@@ -32,15 +44,19 @@ func _ready() -> void:
 	randomize()
 	_build_defense_sockets()
 	_validate_exploration_spawn_points()
+	_validate_roaming_spawn_zones()
 	player.set_interaction_gate(Callable(self, "_can_player_interact_with"))
+	food_table.configure(Callable(self, "_can_player_eat"), Callable(self, "_get_food_table_label"))
 	sleep_point.configure(Callable(self, "_can_player_sleep"), Callable(self, "_get_sleep_label"))
 	hud.bind_player(player)
+	_apply_test_mode_loadout()
 	wave_manager.configure(_collect_spawn_markers(), wave_enemy_layer, player, defense_sockets)
 	_sync_final_wave_with_definitions()
 	game_manager.wave_changed.connect(_on_wave_changed)
 	game_manager.run_reset.connect(_on_run_reset)
 	wave_manager.wave_started.connect(_on_wave_started)
 	wave_manager.wave_cleared.connect(_on_wave_cleared)
+	food_table.table_requested.connect(_on_food_table_requested)
 	sleep_point.sleep_requested.connect(_on_sleep_requested)
 	_connect_defense_socket_signals()
 	hud.set_interaction_prompt("")
@@ -168,6 +184,7 @@ func _on_run_state_changed(new_state: int) -> void:
 	hud.hide_end_overlay()
 
 	if new_state == game_manager.RunState.ACTIVE_WAVE:
+		_clear_roaming_exploration_enemies()
 		_set_exploration_enemies_suspended(true)
 		hud.set_phase("Phase: Active Wave")
 		hud.set_status("Wave %d in progress. Defend the base." % game_manager.current_wave)
@@ -178,6 +195,7 @@ func _on_run_state_changed(new_state: int) -> void:
 		if _is_resetting_run:
 			return
 		_sync_exploration_enemies()
+		_spawn_roaming_exploration_enemies()
 		hud.set_phase("Phase: Pre-Wave")
 		player.refresh_interaction_prompt()
 		_refresh_phase_status()
@@ -194,19 +212,38 @@ func _refresh_phase_status() -> void:
 		return
 	
 	if game_manager.current_wave <= 0:
-		hud.set_status("Scavenge carefully. POIs may already have enemies. Strengthen, then sleep.")
+		hud.set_status("Scavenge carefully. POIs may already have enemies. Eat at the table, then sleep to start wave 1.")
 	elif game_manager.current_wave < game_manager.final_wave:
-		hud.set_status("Wave %d cleared. Repair, strengthen, scavenge, then sleep for wave %d." % [game_manager.current_wave, game_manager.current_wave + 1])
+		hud.set_status("Wave %d cleared. Repair, fortify, scavenge, eat, then sleep for wave %d." % [game_manager.current_wave, game_manager.current_wave + 1])
 	else:
-		hud.set_status("Wave %d cleared. Final preparations before wave %d." % [game_manager.current_wave, game_manager.current_wave + 1])
+		hud.set_status("Wave %d cleared. Final repairs, food, and prep before wave %d." % [game_manager.current_wave, game_manager.current_wave + 1])
 
 
 func _can_player_interact_with(_interactable) -> bool:
 	return game_manager.run_state == game_manager.RunState.PRE_WAVE
 
 
+func _can_player_eat(_player) -> bool:
+	return game_manager.run_state == game_manager.RunState.PRE_WAVE and _get_missing_food_units_for_full_energy() > 0
+
+
+func _get_food_table_label(_player) -> String:
+	if game_manager.run_state != game_manager.RunState.PRE_WAVE:
+		return ""
+
+	var food_needed := _get_missing_food_units_for_full_energy()
+	if food_needed <= 0:
+		return "Energy already full"
+
+	var current_food := int(player.resources.get("food", 0))
+	if current_food < food_needed:
+		return "Need %d food to eat" % food_needed
+
+	return "Eat %d food to fill energy" % food_needed
+
+
 func _can_player_sleep(_player) -> bool:
-	return game_manager.can_start_next_wave() and not _has_sleep_blocking_exploration_threat()
+	return game_manager.can_start_next_wave() and not _has_sleep_blocking_exploration_threat() and _is_ready_for_bed_transition()
 
 
 func _get_sleep_label(_player) -> String:
@@ -216,17 +253,56 @@ func _get_sleep_label(_player) -> String:
 	if _has_sleep_blocking_exploration_threat():
 		return "Enemies too close to sleep"
 
+	if not _is_ready_for_bed_transition():
+		var food_needed := _get_missing_food_units_for_full_energy()
+		if food_needed > 0:
+			if int(player.resources.get("food", 0)) >= food_needed:
+				return "Eat at table before bed"
+			return "Need %d food before bed" % food_needed
+		return "Eat before bed"
+
 	var next_wave: int = game_manager.current_wave + 1
 	if not wave_manager.can_start_wave(next_wave):
 		return "Wave %d not configured" % next_wave
 
-	return "Sleep and start wave %d" % (game_manager.current_wave + 1)
+	return "Sleep on bed for wave %d" % (game_manager.current_wave + 1)
+
+
+func _on_food_table_requested(_player) -> void:
+	var food_needed := _get_missing_food_units_for_full_energy()
+	if food_needed <= 0:
+		hud.set_status("Energy already full")
+		player.refresh_interaction_prompt()
+		return
+
+	if int(player.resources.get("food", 0)) < food_needed:
+		hud.set_status("Need %d food to fill energy" % food_needed)
+		player.refresh_interaction_prompt()
+		return
+
+	if not player.spend_resource("food", food_needed):
+		hud.set_status("Not enough food")
+		player.refresh_interaction_prompt()
+		return
+
+	player.restore_full_energy()
+	hud.set_status("Ate %d food and restored energy" % food_needed)
+	player.refresh_interaction_prompt()
 
 
 func _on_sleep_requested(_player) -> void:
 	var next_wave: int = game_manager.current_wave + 1
 	if _has_sleep_blocking_exploration_threat():
 		hud.set_status("Enemies too close to sleep")
+		player.refresh_interaction_prompt()
+		return
+
+	if not _is_ready_for_bed_transition():
+		var food_needed := _get_missing_food_units_for_full_energy()
+		if food_needed > 0:
+			hud.set_status("Eat %d food at the table before bed" % food_needed)
+		else:
+			hud.set_status("Energy must be full before bed")
 		player.refresh_interaction_prompt()
 		return
 
@@ -243,7 +319,6 @@ func _on_sleep_requested(_player) -> void:
 		hud.set_status("Wave %d failed to start" % next_wave)
 		return
 
-	player.restore_full_energy()
 	player.heal(sleep_heal_amount)
 	game_manager.set_wave(next_wave)
 	game_manager.set_run_state(game_manager.RunState.ACTIVE_WAVE)
@@ -267,17 +342,32 @@ func _on_run_reset() -> void:
 	for pickup in get_tree().get_nodes_in_group("pickups"):
 		pickup.queue_free()
 	player.reset_for_new_run()
+	_apply_test_mode_loadout()
 	for socket in get_tree().get_nodes_in_group("defense_sockets"):
 		if socket.has_method("reset_for_new_run"):
 			socket.reset_for_new_run()
 	for node in get_tree().get_nodes_in_group("scavenge_nodes"):
 		if node.has_method("reset_for_new_run"):
 			node.reset_for_new_run()
+	hud.set_phase("Phase: Pre-Wave")
 	_sync_exploration_enemies()
+	_spawn_roaming_exploration_enemies()
 	_refresh_base_status()
 	_refresh_phase_status()
 	player.refresh_interaction_prompt()
 	_is_resetting_run = false
+
+
+func _apply_test_mode_loadout() -> void:
+	if not enable_test_mode:
+		return
+
+	for weapon in test_mode_weapons:
+		player.obtain_weapon(weapon, true, false)
+	if test_mode_bullets > 0:
+		player.add_resource("bullets", test_mode_bullets, false)
+	if test_mode_food > 0:
+		player.add_resource("food", test_mode_food, false)
 
 
 func _sync_exploration_enemies() -> void:
@@ -352,11 +442,64 @@ func _sync_exploration_enemies() -> void:
 				enemy.died.connect(_on_exploration_enemy_died.bind(spawn_id))
 
 
+func _spawn_roaming_exploration_enemies() -> void:
+	if game_manager.run_state != game_manager.RunState.PRE_WAVE:
+		return
+
+	_clear_roaming_exploration_enemies()
+	if roaming_spawn_zones_root == null or exploration_enemy_scene == null or exploration_enemy_layer == null:
+		return
+
+	var enemy_pool := _get_roaming_enemy_pool()
+	if enemy_pool.is_empty():
+		return
+
+	var zones: Array = []
+	for child in roaming_spawn_zones_root.get_children():
+		if child == null or child.get_script() != ROAMING_SPAWN_ZONE_SCRIPT:
+			continue
+		if child.has_method("is_valid_spawn_zone") and not child.is_valid_spawn_zone():
+			continue
+		zones.append(child)
+
+	if zones.is_empty():
+		return
+
+	var spawn_budget := _get_roaming_spawn_budget()
+	for spawn_index in range(spawn_budget):
+		var zone = _choose_weighted_roaming_zone(zones)
+		if zone == null:
+			continue
+		var enemy_definition: Resource = enemy_pool[randi() % enemy_pool.size()]
+		if enemy_definition == null:
+			continue
+		var enemy = exploration_enemy_scene.instantiate()
+		enemy.definition = enemy_definition
+		exploration_enemy_layer.add_child(enemy)
+		enemy.global_position = _get_roaming_spawn_position(zone)
+		enemy.set_meta("spawn_kind", "roaming")
+		var initial_facing := Vector2.RIGHT.rotated(randf() * TAU)
+		if enemy.has_method("configure_exploration_context"):
+			enemy.configure_exploration_context(player, initial_facing, true, zone.global_position, true)
+
+
 func _clear_exploration_enemies() -> void:
 	if exploration_enemy_layer == null:
 		return
 
 	for child in exploration_enemy_layer.get_children():
+		child.queue_free()
+
+
+func _clear_roaming_exploration_enemies() -> void:
+	if exploration_enemy_layer == null:
+		return
+
+	for child in exploration_enemy_layer.get_children():
+		if not is_instance_valid(child):
+			continue
+		if String(child.get_meta("spawn_kind", "")) != "roaming":
+			continue
 		child.queue_free()
 
 
@@ -380,6 +523,17 @@ func _has_sleep_blocking_exploration_threat() -> bool:
 			return true
 
 	return false
+
+
+func _get_missing_food_units_for_full_energy() -> int:
+	var missing_energy: int = maxi(int(player.max_energy) - int(player.current_energy), 0)
+	if missing_energy <= 0:
+		return 0
+	return int(ceili(float(missing_energy) / float(max(food_energy_per_unit, 1))))
+
+
+func _is_ready_for_bed_transition() -> bool:
+	return player.current_energy >= player.max_energy
 
 
 func _on_exploration_enemy_died(_enemy, spawn_id: String) -> void:
@@ -443,6 +597,98 @@ func _validate_exploration_spawn_points() -> void:
 			continue
 
 		seen_spawn_ids[spawn_id] = true
+
+
+func _validate_roaming_spawn_zones() -> void:
+	if roaming_spawn_zones_root == null:
+		return
+
+	var seen_zone_ids := {}
+	for child in roaming_spawn_zones_root.get_children():
+		if child == null or child.get_script() != ROAMING_SPAWN_ZONE_SCRIPT:
+			continue
+		if child.has_method("is_valid_spawn_zone") and not child.is_valid_spawn_zone():
+			push_warning("Invalid roaming spawn zone: %s" % child.name)
+			continue
+		var zone_id := String(child.zone_id)
+		if seen_zone_ids.has(zone_id):
+			push_warning("Duplicate roaming spawn zone_id in scene: %s" % zone_id)
+			continue
+		seen_zone_ids[zone_id] = true
+
+
+func _get_roaming_enemy_pool() -> Array[Resource]:
+	var pool: Array[Resource] = []
+	if game_manager.current_wave <= 1:
+		pool = roaming_early_enemies
+	elif game_manager.current_wave <= 4:
+		pool = roaming_mid_enemies
+	else:
+		pool = roaming_late_enemies
+
+	var valid_pool: Array[Resource] = []
+	for enemy_definition in pool:
+		if enemy_definition == null or enemy_definition.get_script() != ENEMY_DEFINITION_SCRIPT:
+			continue
+		if not enemy_definition.is_valid_definition():
+			continue
+		valid_pool.append(enemy_definition)
+	return valid_pool
+
+
+func _get_roaming_spawn_budget() -> int:
+	if game_manager.current_wave <= 0:
+		return 2
+	if game_manager.current_wave <= 3:
+		return 3
+	if game_manager.current_wave <= 5:
+		return 4
+	return 5
+
+
+func _choose_weighted_roaming_zone(zones: Array):
+	if zones.is_empty():
+		return null
+	var total_weight := 0.0
+	for zone in zones:
+		total_weight += float(zone.spawn_weight)
+	if total_weight <= 0.0:
+		return zones[randi() % zones.size()]
+
+	var roll := randf() * total_weight
+	for zone in zones:
+		roll -= float(zone.spawn_weight)
+		if roll <= 0.0:
+			return zone
+	return zones.back()
+
+
+func _get_roaming_spawn_position(zone) -> Vector2:
+	var base_position: Vector2 = zone.global_position
+	var scatter_radius: float = float(zone.scatter_radius)
+	if scatter_radius <= 0.0:
+		return base_position
+
+	var base_safe_radius := 260.0
+	var best_position := base_position
+	var best_score := -INF
+	for _attempt in range(10):
+		var angle := randf() * TAU
+		var distance := randf() * scatter_radius
+		var candidate := base_position + Vector2.RIGHT.rotated(angle) * distance
+		var distance_from_base := candidate.distance_to(sleep_point.global_position)
+		if distance_from_base < base_safe_radius:
+			continue
+		var nearest_distance := scatter_radius
+		for child in exploration_enemy_layer.get_children():
+			if not is_instance_valid(child):
+				continue
+			nearest_distance = min(nearest_distance, candidate.distance_to(child.global_position))
+		if nearest_distance > best_score:
+			best_score = nearest_distance
+			best_position = candidate
+
+	return best_position
 
 
 func _collect_spawn_markers() -> Dictionary:

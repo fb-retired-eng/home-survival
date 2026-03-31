@@ -3,7 +3,7 @@ class_name PerimeterSegmentDefinition
 
 @export var socket_id: StringName
 @export_enum("wall", "door") var socket_type: String = "wall"
-@export_enum("damaged", "reinforced") var tier: String = "damaged"
+@export_enum("damaged", "reinforced", "fortified") var tier: String = "damaged"
 @export var position: Vector2 = Vector2.ZERO
 @export var current_hp: int = 90
 @export var structure_profile: Resource

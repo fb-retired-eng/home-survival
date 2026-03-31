@@ -10,6 +10,8 @@ const WEAPON_DEFINITION_SCRIPT := preload("res://scripts/data/weapon_definition.
 @export var reward_salvage: int = 0
 @export var reward_parts: int = 0
 @export var reward_medicine: int = 0
+@export var reward_bullets: int = 0
+@export var reward_food: int = 0
 @export var weapon_reward: Resource
 @export var bonus_table: Resource
 
@@ -75,6 +77,8 @@ func _complete_search(player) -> void:
 		"salvage": reward_salvage,
 		"parts": reward_parts,
 		"medicine": reward_medicine,
+		"bullets": reward_bullets,
+		"food": reward_food,
 	}
 	_apply_bonus_reward(rewards)
 	_grant_rewards(player, rewards)
@@ -89,13 +93,13 @@ func _apply_bonus_reward(rewards: Dictionary) -> void:
 		return
 
 	var rolled_rewards: Dictionary = bonus_table.roll_bonus()
-	for resource_id in ["salvage", "parts", "medicine"]:
+	for resource_id in ["salvage", "parts", "medicine", "bullets", "food"]:
 		rewards[resource_id] = int(rewards.get(resource_id, 0)) + int(rolled_rewards.get(resource_id, 0))
 
 
 func _grant_rewards(player, rewards: Dictionary) -> void:
 	var reward_summary: Array[String] = []
-	for resource_id in ["salvage", "parts", "medicine"]:
+	for resource_id in ["salvage", "parts", "medicine", "bullets", "food"]:
 		var amount := int(rewards.get(resource_id, 0))
 		if amount <= 0:
 			continue

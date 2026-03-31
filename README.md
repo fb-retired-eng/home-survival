@@ -4,26 +4,29 @@
 
 The current MVP0 goal is to prove this loop:
 
-`scavenge -> return -> strengthen base -> sleep -> defend -> repeat`
+`scavenge -> eat -> sleep -> defend -> repeat`
 
 ## MVP0 Summary
 - Desktop-first Godot 4 project
 - One larger authored map
 - Central abstract base
-- Four scavenging POIs
-- Sleep-triggered zombie waves
-- Five-wave authored run target
+- Six scavenging POIs
+- Table + bed prep loop
+- Eight-wave authored run target
 - Small, readable systems intended to be extended later
 
-The intended run starts safe before the first wave. Later daytime exploration phases may include ambient enemies near POIs, while wave enemies are reserved for base-defense phases.
+The current run can start with hostile POIs already active, while wave enemies remain reserved for sleep-triggered base-defense phases.
 
 ## Current Project State
 The repo currently includes:
 - project scaffold and main scene setup
-- player movement, health, energy, melee attack, medicine use, and inventory tracking
-- multiple melee weapons, including a POI-obtained baseball bat upgrade, weapon switching, and simple on-player weapon illustrations
-- HUD for core status display
-- placeholder world scenes for sockets, scavenging nodes, sleep point, pickups, and zombie enemy
+- player movement, health, energy, melee/ranged attack, medicine use, and inventory tracking
+- multiple weapons, including POI-obtained baseball bat, pistol, and shotgun upgrades, bullet pickups, weapon switching, reloadable firearm behavior, and simple on-player weapon illustrations
+- food as a prep resource, a table interaction that converts food into full energy, and bed-based wave start with partial HP restore
+- six authored POIs, eight authored waves, roaming prep-stage exploration spawns, and four enemy definitions in the live data set
+- fortified wall/door upgrades beyond the original reinforced tier
+- HUD for core status display, including the currently equipped weapon
+- placeholder world scenes for sockets, scavenging nodes, bed/table interactions, pickups, and zombie enemy
 - consolidated MVP0 design/spec documentation
 
 This is still an early prototype scaffold, not a feature-complete vertical slice.
@@ -53,6 +56,8 @@ godot --headless --path . --quit
 - Interact: `E`
 - Use medicine: `F` or `Q`
 - Switch weapon: `X`
+- Reload firearm: `C`
+- Eat at table / sleep on bed: `E` when in range
 - Restart after win/loss: `R`
 
 ## Important Docs
@@ -78,8 +83,8 @@ godot --headless --path . --quit
 - [`data/`](data): future data-driven content definitions
 
 ## Next Development Steps
-- implement authored scavenging nodes and loot payout
-- implement defense sockets and strengthening/repair actions
-- add wave spawning and base-targeting enemy behavior
-- add phase-based exploration enemies after wave 1
-- complete win/loss and restart flow
+- tune food scarcity versus prep energy demands
+- balance roaming prep spawns and the full 8-wave run
+- tune elite weapon-drop odds and duplicate-conversion economy
+- decide whether the next content step is enemy patrols, reserve-ammo scarcity, or the fifth weapon pickup
+- continue UI and readability polish from playtest feedback

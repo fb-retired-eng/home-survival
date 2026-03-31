@@ -1,17 +1,24 @@
 extends CharacterBody2D
 class_name Player
 
-const RESOURCE_IDS := ["salvage", "parts", "medicine"]
+const RESOURCE_IDS := ["salvage", "parts", "medicine", "bullets", "food"]
 const DEFAULT_ATTACK_FLASH_COLOR := Color(1.0, 0.83, 0.42, 0.75)
 const DEFAULT_ATTACK_FLASH_START_SCALE := Vector2(0.8, 0.8)
 const DEFAULT_ATTACK_FLASH_PEAK_SCALE := Vector2(1.1, 1.1)
 const DEFAULT_ATTACK_FLASH_DURATION := 0.08
+const DEFAULT_MUZZLE_FLASH_COLOR := Color(1.0, 0.87, 0.55, 0.95)
+const DEFAULT_MUZZLE_FLASH_SCALE := Vector2(1.0, 1.0)
+const DEFAULT_MUZZLE_FLASH_DURATION := 0.05
+const DEFAULT_TRACER_COLOR := Color(1.0, 0.95, 0.78, 0.9)
+const DEFAULT_TRACER_WIDTH := 2.0
+const DEFAULT_TRACER_DURATION := 0.05
 const DEFAULT_ATTACK_INDICATOR_WINDUP_COLOR := Color(1.0, 0.9, 0.62, 0.22)
 const DEFAULT_ATTACK_INDICATOR_STRIKE_COLOR := Color(1.0, 0.98, 0.88, 0.9)
 const DEFAULT_ATTACK_INDICATOR_WINDUP_START_SCALE := Vector2(0.82, 0.82)
 const DEFAULT_ATTACK_INDICATOR_STRIKE_PEAK_SCALE := Vector2(1.05, 1.05)
 const DEFAULT_HELD_WEAPON_OFFSET := Vector2(10.0, -10.0)
 const DEFAULT_HELD_WEAPON_COLOR := Color(0.86, 0.86, 0.9, 1.0)
+const DEFAULT_SPREAD_HITSCAN_CONE_DEGREES := 30.0
 const WEAPON_DEFINITION_SCRIPT := preload("res://scripts/data/weapon_definition.gd")
 const DEFAULT_WEAPON_RESOURCE := preload("res://data/weapons/kitchen_knife.tres")
 
@@ -21,6 +28,8 @@ signal resources_changed(resources: Dictionary)
 signal message_requested(text: String)
 signal player_died()
 signal interaction_prompt_changed(text: String)
+signal weapon_changed(display_name: String, weapon_id: StringName)
+signal weapon_status_changed(text: String)
 
 @export var max_health: int = 100
 @export var max_energy: int = 100
@@ -43,6 +52,8 @@ var resources: Dictionary = {
 	"salvage": 0,
 	"parts": 0,
 	"medicine": 0,
+	"bullets": 0,
+	"food": 0,
 }
 
 var is_dead: bool = false
@@ -61,6 +72,12 @@ var _attack_flash_color: Color = DEFAULT_ATTACK_FLASH_COLOR
 var _attack_flash_start_scale: Vector2 = DEFAULT_ATTACK_FLASH_START_SCALE
 var _attack_flash_peak_scale: Vector2 = DEFAULT_ATTACK_FLASH_PEAK_SCALE
 var _attack_flash_duration: float = DEFAULT_ATTACK_FLASH_DURATION
+var _muzzle_flash_color: Color = DEFAULT_MUZZLE_FLASH_COLOR
+var _muzzle_flash_scale: Vector2 = DEFAULT_MUZZLE_FLASH_SCALE
+var _muzzle_flash_duration: float = DEFAULT_MUZZLE_FLASH_DURATION
+var _tracer_color: Color = DEFAULT_TRACER_COLOR
+var _tracer_width: float = DEFAULT_TRACER_WIDTH
+var _tracer_duration: float = DEFAULT_TRACER_DURATION
 var _attack_indicator_windup_color: Color = DEFAULT_ATTACK_INDICATOR_WINDUP_COLOR
 var _attack_indicator_strike_color: Color = DEFAULT_ATTACK_INDICATOR_STRIKE_COLOR
 var _attack_indicator_windup_start_scale: Vector2 = DEFAULT_ATTACK_INDICATOR_WINDUP_START_SCALE
@@ -70,12 +87,20 @@ var _attack_indicator_windup_start_alpha: float = 0.45
 var _attack_indicator_windup_end_alpha: float = 1.0
 var _attack_indicator_strike_alpha: float = 0.95
 var _attack_indicator_strike_fade_duration: float = 0.10
+var _impact_hit_color: Color = Color(1.0, 0.84, 0.54, 0.95)
+var _impact_block_color: Color = Color(0.95, 0.94, 0.88, 0.88)
+var _impact_flash_scale: float = 1.0
+var _impact_flash_duration: float = 0.07
 var _attack_indicator_tween: Tween
 var _invalid_weapon_warning_emitted: bool = false
 var _damage_feedback_tween: Tween
 var _starting_weapon: Resource
 var _knockback_velocity: Vector2 = Vector2.ZERO
 var _obtained_weapons: Array[Resource] = []
+var _magazine_ammo_by_weapon_id: Dictionary = {}
+var _reload_time_remaining: float = 0.0
+var _reload_weapon_id: StringName = StringName()
+var _shot_impact_tween: Tween
 
 @onready var body_visual: Polygon2D = $Body
 @onready var facing_marker: Polygon2D = $FacingMarker
@@ -85,6 +110,9 @@ var _obtained_weapons: Array[Resource] = []
 @onready var attack_area_shape: CollisionShape2D = $AttackPivot/AttackArea/CollisionShape2D
 @onready var attack_indicator: Polygon2D = $AttackPivot/AttackIndicator
 @onready var attack_flash: Polygon2D = $AttackPivot/AttackFlash
+@onready var muzzle_flash: Polygon2D = $AttackPivot/MuzzleFlash
+@onready var shot_tracer: Line2D = $ShotTracer
+@onready var shot_impact: Polygon2D = $ShotImpact
 @onready var pickup_detector: Area2D = $PickupDetector
 @onready var interaction_detector: Area2D = $InteractionDetector
 @onready var action_timer: Timer = $ActionTimer
@@ -134,6 +162,7 @@ func _physics_process(delta: float) -> void:
 		return
 
 	attack_cooldown_remaining = max(attack_cooldown_remaining - delta, 0.0)
+	_update_reload(delta)
 	_handle_movement()
 	velocity += _knockback_velocity
 	move_and_slide()
@@ -150,6 +179,9 @@ func _physics_process(delta: float) -> void:
 
 	if Input.is_action_just_pressed("switch_weapon"):
 		_attempt_switch_weapon()
+
+	if Input.is_action_just_pressed("reload_weapon"):
+		_attempt_reload(false)
 
 
 func add_resource(resource_id: String, amount: int, show_message: bool = true) -> bool:
@@ -311,6 +343,7 @@ func equip_weapon(weapon: Resource, show_message: bool = true) -> bool:
 
 	if not _has_obtained_weapon_id(resolved_weapon.weapon_id):
 		_obtained_weapons.append(resolved_weapon)
+	_ensure_weapon_runtime_state(resolved_weapon)
 
 	var current_weapon := _get_equipped_weapon()
 	if current_weapon != null and current_weapon.weapon_id == resolved_weapon.weapon_id:
@@ -334,6 +367,7 @@ func obtain_weapon(weapon: Resource, auto_equip: bool = true, show_message: bool
 	var already_owned := _has_obtained_weapon_id(resolved_weapon.weapon_id)
 	if not already_owned:
 		_obtained_weapons.append(resolved_weapon)
+	_ensure_weapon_runtime_state(resolved_weapon)
 
 	if auto_equip:
 		var equipped := equip_weapon(resolved_weapon, false)
@@ -363,14 +397,32 @@ func _handle_movement() -> void:
 
 
 func _attempt_attack() -> void:
-	if attack_cooldown_remaining > 0.0 or _attack_windup_pending:
+	if attack_cooldown_remaining > 0.0 or _attack_windup_pending or _is_reloading_weapon():
 		return
 
 	var weapon: Resource = _get_equipped_weapon()
 	if weapon == null:
 		return
 
-	var hit_targets := _get_attack_targets()
+	if _uses_weapon_magazine(weapon):
+		if _get_weapon_magazine_ammo(weapon) <= 0:
+			if _get_bullet_reserve_amount() <= 0:
+				message_requested.emit("Out of bullets")
+			else:
+				_attempt_reload(true)
+			return
+
+		if current_energy < weapon.energy_cost:
+			message_requested.emit("Too tired")
+			return
+
+		if not spend_energy(weapon.energy_cost):
+			message_requested.emit("Too tired")
+			return
+		_start_attack_sequence(weapon, false)
+		return
+
+	var hit_targets := _get_attack_targets_for_weapon(weapon)
 
 	if hit_targets.is_empty():
 		_start_attack_sequence(weapon, true)
@@ -401,6 +453,70 @@ func _play_attack_flash() -> void:
 	_show_attack_indicator_strike()
 
 
+func _play_hitscan_effect(end_point: Vector2, impact_kind: String) -> void:
+	_show_attack_indicator_strike()
+	_play_muzzle_flash()
+	_play_shot_tracer(end_point)
+	_play_shot_impact(end_point, impact_kind)
+
+
+func _play_muzzle_flash() -> void:
+	muzzle_flash.visible = true
+	muzzle_flash.position = _get_muzzle_local_position()
+	muzzle_flash.scale = _muzzle_flash_scale * 0.72
+	muzzle_flash.modulate = Color(_muzzle_flash_color.r, _muzzle_flash_color.g, _muzzle_flash_color.b, 1.0)
+	var tween := create_tween()
+	tween.parallel().tween_property(muzzle_flash, "scale", _muzzle_flash_scale, _muzzle_flash_duration)
+	tween.parallel().tween_property(muzzle_flash, "modulate:a", 0.0, _muzzle_flash_duration)
+	tween.finished.connect(func() -> void:
+		muzzle_flash.visible = false
+		muzzle_flash.scale = Vector2.ONE
+		muzzle_flash.modulate = Color(_muzzle_flash_color.r, _muzzle_flash_color.g, _muzzle_flash_color.b, 1.0)
+	)
+
+
+func _play_shot_tracer(end_point: Vector2) -> void:
+	var muzzle_global := attack_pivot.to_global(_get_muzzle_local_position())
+	shot_tracer.visible = true
+	shot_tracer.width = _tracer_width
+	shot_tracer.default_color = _tracer_color
+	shot_tracer.points = PackedVector2Array([
+		to_local(muzzle_global),
+		to_local(end_point),
+	])
+	shot_tracer.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	var tween := create_tween()
+	tween.tween_property(shot_tracer, "modulate:a", 0.0, _tracer_duration)
+	tween.finished.connect(func() -> void:
+		shot_tracer.visible = false
+		shot_tracer.points = PackedVector2Array()
+		shot_tracer.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	)
+
+
+func _play_shot_impact(end_point: Vector2, impact_kind: String) -> void:
+	if shot_impact == null:
+		return
+	if _shot_impact_tween != null and is_instance_valid(_shot_impact_tween):
+		_shot_impact_tween.kill()
+
+	var impact_color := _impact_hit_color if impact_kind == "enemy" else _impact_block_color
+	shot_impact.position = to_local(end_point)
+	shot_impact.visible = true
+	shot_impact.scale = Vector2.ONE * (_impact_flash_scale * 0.7)
+	shot_impact.color = impact_color
+	shot_impact.modulate = Color(impact_color.r, impact_color.g, impact_color.b, 1.0)
+
+	_shot_impact_tween = create_tween()
+	_shot_impact_tween.parallel().tween_property(shot_impact, "scale", Vector2.ONE * _impact_flash_scale, _impact_flash_duration)
+	_shot_impact_tween.parallel().tween_property(shot_impact, "modulate:a", 0.0, _impact_flash_duration)
+	_shot_impact_tween.finished.connect(func() -> void:
+		shot_impact.visible = false
+		shot_impact.scale = Vector2.ONE
+		shot_impact.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	)
+
+
 func _attempt_use_medicine() -> void:
 	var medicine_count: int = int(resources.get("medicine", 0))
 	if medicine_count <= 0:
@@ -420,15 +536,23 @@ func _attempt_use_medicine() -> void:
 	_update_interaction_prompt()
 
 
+func _attempt_reload(auto_triggered: bool) -> void:
+	var weapon: Resource = _get_equipped_weapon()
+	_begin_reload(weapon, auto_triggered)
+
+
 func _attempt_switch_weapon() -> void:
 	if is_dead or is_busy or _attack_windup_pending:
 		return
+	var was_reloading := _is_reloading_weapon()
+	if _is_reloading_weapon():
+		_cancel_reload()
 
 	var current_weapon := _get_equipped_weapon()
 	if current_weapon == null:
 		return
 
-	if attack_cooldown_remaining > 0.0:
+	if attack_cooldown_remaining > 0.0 and not was_reloading:
 		return
 
 	if _obtained_weapons.size() <= 1:
@@ -471,15 +595,21 @@ func reset_for_new_run() -> void:
 		"salvage": 0,
 		"parts": 0,
 		"medicine": 0,
+		"bullets": 0,
+		"food": 0,
 	}
 	_cancel_attack_windup()
 	attack_cooldown_remaining = 0.0
+	_reload_time_remaining = 0.0
+	_reload_weapon_id = StringName()
 	_knockback_velocity = Vector2.ZERO
 	velocity = Vector2.ZERO
 	_nearby_interactables.clear()
 	_obtained_weapons.clear()
+	_magazine_ammo_by_weapon_id.clear()
 	if _starting_weapon != null:
 		_obtained_weapons.append(_starting_weapon)
+		_ensure_weapon_runtime_state(_starting_weapon)
 		equipped_weapon = _starting_weapon
 	global_position = _spawn_position
 	_emit_full_state()
@@ -491,6 +621,7 @@ func _emit_full_state() -> void:
 	health_changed.emit(current_health, max_health)
 	energy_changed.emit(current_energy, max_energy)
 	resources_changed.emit(resources.duplicate(true))
+	_emit_weapon_state()
 
 
 func _flash_body(flash_color: Color) -> void:
@@ -604,9 +735,10 @@ func _on_attack_windup_timer_timeout() -> void:
 	_attack_windup_pending = false
 	if _attack_windup_visual_only:
 		var windup_weapon := _attack_windup_weapon
+		var attack_result := _get_visual_only_attack_result_for_weapon(windup_weapon)
 		_attack_windup_weapon = null
 		_attack_windup_visual_only = false
-		_play_attack_flash()
+		_play_attack_effect(windup_weapon, attack_result)
 		_flash_body(Color(1.0, 0.82, 0.54, 1.0))
 		_apply_miss_recovery(windup_weapon)
 		return
@@ -687,6 +819,22 @@ func _update_facing_visuals() -> void:
 	facing_marker.rotation = attack_pivot.rotation
 
 
+func get_equipped_weapon_display_name() -> String:
+	var weapon: Resource = _get_equipped_weapon()
+	if weapon == null:
+		return ""
+	return weapon.display_name
+
+
+func get_obtained_weapon_ids() -> PackedStringArray:
+	var weapon_ids := PackedStringArray()
+	for weapon in _obtained_weapons:
+		if weapon == null:
+			continue
+		weapon_ids.append(String(weapon.weapon_id))
+	return weapon_ids
+
+
 func _get_equipped_weapon() -> Resource:
 	if _is_valid_weapon_resource(equipped_weapon):
 		_invalid_weapon_warning_emitted = false
@@ -729,20 +877,32 @@ func _apply_equipped_weapon() -> void:
 	var weapon: Resource = _get_equipped_weapon()
 	if weapon == null:
 		return
+	_ensure_weapon_runtime_state(weapon)
+
+	var applied_attack_area_position: Vector2 = weapon.attack_area_offset
+	var applied_attack_area_size: Vector2 = weapon.attack_area_size
+	if weapon.attack_mode == "hitscan":
+		applied_attack_area_position = Vector2(weapon.attack_area_offset.x, -weapon.attack_range * 0.5)
+		applied_attack_area_size = Vector2(weapon.attack_area_size.x, weapon.attack_range)
+	elif weapon.attack_mode == "spread_hitscan":
+		var half_angle_radians := deg_to_rad(maxf(weapon.attack_cone_degrees, DEFAULT_SPREAD_HITSCAN_CONE_DEGREES) * 0.5)
+		var derived_width := maxf(tan(half_angle_radians) * weapon.attack_range * 2.0, weapon.attack_area_size.x)
+		applied_attack_area_position = Vector2(weapon.attack_area_offset.x, -weapon.attack_range * 0.5)
+		applied_attack_area_size = Vector2(derived_width, weapon.attack_range)
 
 	weapon_visual.position = weapon.held_visual_offset if weapon.held_visual_polygon.size() >= 3 else DEFAULT_HELD_WEAPON_OFFSET
 	weapon_visual.polygon = weapon.held_visual_polygon if weapon.held_visual_polygon.size() >= 3 else _get_default_held_weapon_polygon()
 	weapon_visual.color = weapon.held_visual_color if weapon.held_visual_polygon.size() >= 3 else DEFAULT_HELD_WEAPON_COLOR
-	attack_area.position = weapon.attack_area_offset
-	attack_indicator.position = weapon.attack_area_offset
+	attack_area.position = applied_attack_area_position
+	attack_indicator.position = applied_attack_area_position
 	if attack_area_shape.shape is RectangleShape2D:
 		var shape := attack_area_shape.shape as RectangleShape2D
-		shape.size = weapon.attack_area_size
+		shape.size = applied_attack_area_size
 		attack_indicator.polygon = PackedVector2Array([
-			Vector2(-weapon.attack_area_size.x * 0.5, -weapon.attack_area_size.y * 0.5),
-			Vector2(weapon.attack_area_size.x * 0.5, -weapon.attack_area_size.y * 0.5),
-			Vector2(weapon.attack_area_size.x * 0.5, weapon.attack_area_size.y * 0.5),
-			Vector2(-weapon.attack_area_size.x * 0.5, weapon.attack_area_size.y * 0.5)
+			Vector2(-applied_attack_area_size.x * 0.5, -applied_attack_area_size.y * 0.5),
+			Vector2(applied_attack_area_size.x * 0.5, -applied_attack_area_size.y * 0.5),
+			Vector2(applied_attack_area_size.x * 0.5, applied_attack_area_size.y * 0.5),
+			Vector2(-applied_attack_area_size.x * 0.5, applied_attack_area_size.y * 0.5)
 		])
 	_attack_flash_color = weapon.attack_flash_color
 	_attack_flash_start_scale = weapon.attack_flash_start_scale
@@ -762,12 +922,87 @@ func _apply_equipped_weapon() -> void:
 	attack_flash.modulate = Color(weapon.attack_flash_color.r, weapon.attack_flash_color.g, weapon.attack_flash_color.b, 1.0)
 	_attack_flash_peak_scale = weapon.attack_flash_peak_scale
 	_attack_flash_duration = weapon.attack_flash_duration
+	_muzzle_flash_color = weapon.muzzle_flash_color
+	_muzzle_flash_scale = weapon.muzzle_flash_scale
+	_muzzle_flash_duration = weapon.muzzle_flash_duration
+	_tracer_color = weapon.tracer_color
+	_tracer_width = weapon.tracer_width
+	_tracer_duration = weapon.tracer_duration
+	_impact_hit_color = weapon.impact_hit_color
+	_impact_block_color = weapon.impact_block_color
+	_impact_flash_scale = weapon.impact_flash_scale
+	_impact_flash_duration = weapon.impact_flash_duration
+	muzzle_flash.color = weapon.muzzle_flash_color
+	muzzle_flash.modulate = Color(weapon.muzzle_flash_color.r, weapon.muzzle_flash_color.g, weapon.muzzle_flash_color.b, 1.0)
+	shot_tracer.default_color = weapon.tracer_color
+	shot_tracer.width = weapon.tracer_width
+	_emit_weapon_state()
 
 
-func _get_attack_targets() -> Array:
+func _get_attack_result_for_weapon(weapon: Resource) -> Dictionary:
+	if weapon == null:
+		return {
+			"targets": [],
+			"end_point": global_position,
+			"impact_kind": "none",
+		}
+
+	if weapon.attack_mode == "hitscan":
+		return _get_hitscan_attack_result(weapon)
+	if weapon.attack_mode == "spread_hitscan":
+		return _get_spread_hitscan_attack_result(weapon)
+	return {
+		"targets": _get_melee_attack_targets(),
+		"end_point": attack_pivot.to_global(weapon.attack_area_offset),
+		"impact_kind": "enemy",
+	}
+
+
+func _get_visual_only_attack_result_for_weapon(weapon: Resource) -> Dictionary:
+	if weapon == null:
+		return {
+			"targets": [],
+			"end_point": global_position,
+			"impact_kind": "none",
+		}
+
+	if weapon.attack_mode == "hitscan" or weapon.attack_mode == "spread_hitscan":
+		var ray_start := attack_pivot.to_global(_get_muzzle_local_position())
+		return {
+			"targets": [],
+			"end_point": ray_start + facing_direction * float(weapon.attack_range),
+			"impact_kind": "miss",
+		}
+
+	return {
+		"targets": [],
+		"end_point": attack_pivot.to_global(weapon.attack_area_offset),
+		"impact_kind": "miss",
+	}
+
+
+func _get_attack_targets_for_weapon(weapon: Resource) -> Array:
+	return Array(_get_attack_result_for_weapon(weapon).get("targets", []))
+
+
+func _get_melee_attack_targets() -> Array:
+	return _get_enemy_targets_in_attack_shape()
+
+
+func _get_enemy_targets_in_attack_shape() -> Array:
 	var hit_targets: Array = []
-	for body in attack_area.get_overlapping_bodies():
-		if body == self:
+	if attack_area_shape == null or attack_area_shape.shape == null:
+		return hit_targets
+
+	var shape_query := PhysicsShapeQueryParameters2D.new()
+	shape_query.shape = attack_area_shape.shape
+	shape_query.transform = attack_area.global_transform
+	shape_query.collision_mask = attack_area.collision_mask
+	shape_query.exclude = [self]
+
+	for result in get_world_2d().direct_space_state.intersect_shape(shape_query):
+		var body = result.get("collider")
+		if body == null or body == self:
 			continue
 		if not body.is_in_group("enemies"):
 			continue
@@ -777,6 +1012,115 @@ func _get_attack_targets() -> Array:
 	return hit_targets
 
 
+func _get_hitscan_attack_result(weapon: Resource) -> Dictionary:
+	var candidates := _get_enemy_targets_in_attack_shape()
+
+	var direct_space_state := get_world_2d().direct_space_state
+	var ray_start := attack_pivot.to_global(_get_muzzle_local_position())
+	var max_end := ray_start + facing_direction * float(weapon.attack_range)
+	var miss_query := PhysicsRayQueryParameters2D.create(ray_start, max_end)
+	miss_query.exclude = [self]
+	var miss_hit := direct_space_state.intersect_ray(miss_query)
+	var end_point: Vector2 = max_end
+	var impact_kind := "miss"
+	if not miss_hit.is_empty():
+		end_point = miss_hit.get("position", max_end)
+		var miss_collider = miss_hit.get("collider")
+		if miss_collider != null and miss_collider.is_in_group("defense_sockets"):
+			impact_kind = "structure"
+
+	if candidates.is_empty():
+		return {
+			"targets": [],
+			"end_point": end_point,
+			"impact_kind": impact_kind,
+		}
+
+	candidates.sort_custom(func(a, b):
+		return ray_start.distance_squared_to(a.global_position) < ray_start.distance_squared_to(b.global_position)
+	)
+
+	for candidate in candidates:
+		if ray_start.distance_to(candidate.global_position) > float(weapon.attack_range):
+			continue
+		var ray_query := PhysicsRayQueryParameters2D.create(ray_start, candidate.global_position)
+		ray_query.exclude = [self]
+		var hit := direct_space_state.intersect_ray(ray_query)
+		if hit.is_empty():
+			continue
+		if hit.get("collider") == candidate:
+			return {
+				"targets": [candidate],
+				"end_point": hit.get("position", candidate.global_position),
+				"impact_kind": "enemy",
+			}
+
+	return {
+		"targets": [],
+		"end_point": end_point,
+		"impact_kind": impact_kind,
+	}
+
+
+func _get_spread_hitscan_attack_result(weapon: Resource) -> Dictionary:
+	var candidates := _get_enemy_targets_in_attack_shape()
+
+	var direct_space_state := get_world_2d().direct_space_state
+	var ray_start := attack_pivot.to_global(_get_muzzle_local_position())
+	var max_end := ray_start + facing_direction * float(weapon.attack_range)
+	var miss_query := PhysicsRayQueryParameters2D.create(ray_start, max_end)
+	miss_query.exclude = [self]
+	var miss_hit := direct_space_state.intersect_ray(miss_query)
+	var end_point: Vector2 = max_end
+	var impact_kind := "miss"
+	if not miss_hit.is_empty():
+		end_point = miss_hit.get("position", max_end)
+		var miss_collider = miss_hit.get("collider")
+		if miss_collider != null and miss_collider.is_in_group("defense_sockets"):
+			impact_kind = "structure"
+
+	if candidates.is_empty():
+		return {
+			"targets": [],
+			"end_point": end_point,
+			"impact_kind": impact_kind,
+		}
+
+	var max_angle_degrees := maxf(weapon.attack_cone_degrees, DEFAULT_SPREAD_HITSCAN_CONE_DEGREES) * 0.5
+	var valid_targets: Array = []
+	candidates.sort_custom(func(a, b):
+		return ray_start.distance_squared_to(a.global_position) < ray_start.distance_squared_to(b.global_position)
+	)
+
+	for candidate in candidates:
+		var to_candidate: Vector2 = candidate.global_position - ray_start
+		if to_candidate.is_zero_approx():
+			continue
+		if to_candidate.length() > float(weapon.attack_range):
+			continue
+		var angle_to_candidate: float = rad_to_deg(absf(facing_direction.angle_to(to_candidate.normalized())))
+		if angle_to_candidate > max_angle_degrees:
+			continue
+
+		var ray_query := PhysicsRayQueryParameters2D.create(ray_start, candidate.global_position)
+		ray_query.exclude = [self]
+		var hit := direct_space_state.intersect_ray(ray_query)
+		if hit.is_empty():
+			continue
+		if hit.get("collider") != candidate:
+			continue
+		valid_targets.append(candidate)
+		if valid_targets.size() == 1:
+			end_point = hit.get("position", candidate.global_position)
+			impact_kind = "enemy"
+
+	return {
+		"targets": valid_targets,
+		"end_point": end_point,
+		"impact_kind": impact_kind,
+	}
+
+
 func _commit_attack(weapon_override: Resource = null) -> void:
 	var weapon: Resource = weapon_override
 	if weapon == null:
@@ -784,20 +1128,26 @@ func _commit_attack(weapon_override: Resource = null) -> void:
 	if weapon == null:
 		return
 
-	var hit_targets := _get_attack_targets()
+	var attack_result := _get_attack_result_for_weapon(weapon)
+	var hit_targets: Array = Array(attack_result.get("targets", []))
+	var consumes_ammo := _uses_weapon_magazine(weapon)
+	if consumes_ammo:
+		_consume_weapon_magazine_round(weapon)
 	if hit_targets.is_empty():
-		_play_attack_flash()
+		_play_attack_effect(weapon, attack_result)
 		_flash_body(Color(1.0, 0.82, 0.54, 1.0))
-		if _attack_windup_weapon != null:
+		if consumes_ammo:
+			attack_cooldown_remaining = weapon.attack_cooldown
+		elif _attack_windup_weapon != null:
 			restore_energy(int(weapon.energy_cost))
-		_apply_miss_recovery(weapon)
+			_apply_miss_recovery(weapon)
 		attack_windup_timer.stop()
 		_attack_windup_pending = false
 		_attack_windup_weapon = null
 		_attack_windup_visual_only = false
 		return
 
-	_play_attack_flash()
+	_play_attack_effect(weapon, attack_result)
 	attack_cooldown_remaining = weapon.attack_cooldown
 	_flash_body(Color(1.0, 0.82, 0.54, 1.0))
 
@@ -893,16 +1243,153 @@ func _get_default_held_weapon_polygon() -> PackedVector2Array:
 	])
 
 
+func _get_muzzle_local_position() -> Vector2:
+	return weapon_visual.position + Vector2(0.0, -10.0)
+
+
+func _emit_weapon_state() -> void:
+	var weapon: Resource = _get_equipped_weapon()
+	if weapon == null:
+		weapon_changed.emit("", StringName())
+		weapon_status_changed.emit("Weapon: None")
+		return
+	weapon_changed.emit(weapon.display_name, weapon.weapon_id)
+	weapon_status_changed.emit(get_weapon_status_text())
+
+
 func _apply_miss_recovery(weapon: Resource) -> void:
 	if weapon == null:
 		return
 	attack_cooldown_remaining = max(attack_cooldown_remaining, float(weapon.miss_recovery_time))
 
 
+func get_weapon_status_text() -> String:
+	var weapon: Resource = _get_equipped_weapon()
+	if weapon == null:
+		return "Weapon: None"
+	if not _uses_weapon_magazine(weapon):
+		return "Weapon: %s" % weapon.display_name
+
+	var ammo_in_mag := _get_weapon_magazine_ammo(weapon)
+	var status := "Weapon: %s %d/%d | ◉%d" % [weapon.display_name, ammo_in_mag, int(weapon.magazine_size), _get_bullet_reserve_amount()]
+	if _is_reloading_weapon() and _reload_weapon_id == weapon.weapon_id:
+		status += " ↻"
+	return status
+
+
+func _uses_weapon_magazine(weapon: Resource) -> bool:
+	return weapon != null and bool(weapon.uses_magazine)
+
+
+func _begin_reload(weapon: Resource, auto_triggered: bool) -> void:
+	if weapon == null or not _uses_weapon_magazine(weapon):
+		return
+	if is_dead or is_busy or _attack_windup_pending or _is_reloading_weapon():
+		return
+
+	var current_ammo := _get_weapon_magazine_ammo(weapon)
+	if current_ammo >= int(weapon.magazine_size):
+		if not auto_triggered:
+			message_requested.emit("Magazine full")
+		return
+	if _get_bullet_reserve_amount() <= 0:
+		message_requested.emit("Out of bullets")
+		return
+
+	_reload_weapon_id = weapon.weapon_id
+	_reload_time_remaining = float(weapon.reload_time)
+	_emit_weapon_state()
+	if auto_triggered:
+		message_requested.emit("%s empty. Reloading..." % weapon.display_name)
+	else:
+		message_requested.emit("Reloading %s" % weapon.display_name)
+
+
+func _ensure_weapon_runtime_state(weapon: Resource) -> void:
+	if weapon == null or not _uses_weapon_magazine(weapon):
+		return
+	if not _magazine_ammo_by_weapon_id.has(weapon.weapon_id):
+		_magazine_ammo_by_weapon_id[weapon.weapon_id] = int(weapon.magazine_size)
+
+
+func _get_weapon_magazine_ammo(weapon: Resource) -> int:
+	if weapon == null or not _uses_weapon_magazine(weapon):
+		return 0
+	_ensure_weapon_runtime_state(weapon)
+	return int(_magazine_ammo_by_weapon_id.get(weapon.weapon_id, int(weapon.magazine_size)))
+
+
+func _set_weapon_magazine_ammo(weapon: Resource, amount: int) -> void:
+	if weapon == null or not _uses_weapon_magazine(weapon):
+		return
+	_magazine_ammo_by_weapon_id[weapon.weapon_id] = clampi(amount, 0, int(weapon.magazine_size))
+	_emit_weapon_state()
+
+
+func _consume_weapon_magazine_round(weapon: Resource) -> void:
+	if weapon == null or not _uses_weapon_magazine(weapon):
+		return
+	var remaining_ammo: int = maxi(_get_weapon_magazine_ammo(weapon) - 1, 0)
+	_set_weapon_magazine_ammo(weapon, remaining_ammo)
+	if remaining_ammo == 0:
+		_begin_reload(weapon, true)
+
+
+func _is_reloading_weapon() -> bool:
+	return _reload_time_remaining > 0.0 and _reload_weapon_id != StringName()
+
+
+func _cancel_reload() -> void:
+	if not _is_reloading_weapon():
+		return
+	_reload_time_remaining = 0.0
+	_reload_weapon_id = StringName()
+	_emit_weapon_state()
+
+
+func _update_reload(delta: float) -> void:
+	if not _is_reloading_weapon():
+		return
+	_reload_time_remaining = max(_reload_time_remaining - delta, 0.0)
+	if _reload_time_remaining > 0.0:
+		return
+	_complete_reload()
+
+
+func _complete_reload() -> void:
+	var reloaded_weapon := _find_obtained_weapon_by_id(_reload_weapon_id)
+	_reload_time_remaining = 0.0
+	_reload_weapon_id = StringName()
+	if reloaded_weapon == null:
+		_emit_weapon_state()
+		return
+	var current_ammo := _get_weapon_magazine_ammo(reloaded_weapon)
+	var bullets_needed := maxi(int(reloaded_weapon.magazine_size) - current_ammo, 0)
+	var bullets_to_load := mini(bullets_needed, _get_bullet_reserve_amount())
+	if bullets_to_load <= 0:
+		message_requested.emit("Out of bullets")
+		_emit_weapon_state()
+		return
+	spend_resource("bullets", bullets_to_load)
+	_set_weapon_magazine_ammo(reloaded_weapon, current_ammo + bullets_to_load)
+	message_requested.emit("%s reloaded" % reloaded_weapon.display_name)
+
+
+func _find_obtained_weapon_by_id(weapon_id: StringName) -> Resource:
+	for weapon in _obtained_weapons:
+		if weapon != null and weapon.weapon_id == weapon_id:
+			return weapon
+	return null
+
+
+func _get_bullet_reserve_amount() -> int:
+	return int(resources.get("bullets", 0))
+
+
 func _start_attack_sequence(weapon: Resource, visual_only: bool) -> void:
 	if weapon.attack_windup <= 0.0:
 		if visual_only:
-			_play_attack_flash()
+			_play_attack_effect(weapon, _get_visual_only_attack_result_for_weapon(weapon))
 			_flash_body(Color(1.0, 0.82, 0.54, 1.0))
 			_apply_miss_recovery(weapon)
 			return
@@ -914,3 +1401,13 @@ func _start_attack_sequence(weapon: Resource, visual_only: bool) -> void:
 	_attack_windup_visual_only = visual_only
 	_show_attack_indicator_windup(weapon.attack_windup)
 	attack_windup_timer.start(weapon.attack_windup)
+
+
+func _play_attack_effect(weapon: Resource, attack_result: Dictionary) -> void:
+	if weapon != null and weapon.attack_mode == "hitscan":
+		_play_hitscan_effect(
+			attack_result.get("end_point", attack_pivot.global_position),
+			String(attack_result.get("impact_kind", "miss"))
+		)
+		return
+	_play_attack_flash()

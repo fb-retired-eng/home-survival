@@ -16,6 +16,8 @@ signal died(zombie: Zombie)
 @export_range(0.0, 1200.0, 10.0) var player_knockback_force: float = 90.0
 @export var structure_damage: int = 10
 @export var structure_damage_type: StringName = &"impact"
+@export_range(0.0, 240.0, 1.0) var attack_range_override: float = 0.0
+@export_range(0.0, 240.0, 1.0) var structure_attack_range_override: float = 0.0
 @export_range(0.0, 2.0, 0.05) var knockback_multiplier: float = 1.0
 @export_range(0.0, 4000.0, 10.0) var knockback_decay: float = 900.0
 @export var attack_cooldown: float = 1.0
@@ -332,7 +334,10 @@ func _is_target_in_damage_range(target) -> bool:
 		return false
 
 	if target.is_in_group("defense_sockets"):
-		return global_position.distance_to(_get_target_point(target)) <= _get_damage_range_estimate()
+		return global_position.distance_to(_get_target_point(target)) <= _get_structure_damage_range_estimate()
+
+	if attack_range_override > 0.0:
+		return global_position.distance_to(_get_target_point(target)) <= attack_range_override
 
 	if target is PhysicsBody2D:
 		return damage_area.overlaps_body(target)
@@ -451,6 +456,8 @@ func _apply_definition() -> void:
 	player_knockback_force = definition.player_knockback_force
 	structure_damage = definition.structure_damage
 	structure_damage_type = definition.structure_damage_type
+	attack_range_override = definition.attack_range_override
+	structure_attack_range_override = definition.structure_attack_range_override
 	knockback_multiplier = definition.knockback_multiplier
 	knockback_decay = definition.knockback_decay
 	attack_cooldown = definition.attack_interval
@@ -1030,16 +1037,22 @@ func _has_clear_structure_attack_path(target) -> bool:
 
 func _get_damage_range_estimate() -> float:
 	if damage_area == null:
-		return 18.0
+		return attack_range_override if attack_range_override > 0.0 else 18.0
 
 	var area_shape: CollisionShape2D = damage_area.get_node_or_null("CollisionShape2D")
 	if area_shape == null or area_shape.shape == null:
-		return 18.0
+		return attack_range_override if attack_range_override > 0.0 else 18.0
 
 	if area_shape.shape is CircleShape2D:
-		return area_shape.shape.radius
+		return max(area_shape.shape.radius, attack_range_override)
 
-	return 18.0
+	return attack_range_override if attack_range_override > 0.0 else 18.0
+
+
+func _get_structure_damage_range_estimate() -> float:
+	if structure_attack_range_override > 0.0:
+		return structure_attack_range_override
+	return _get_damage_range_estimate()
 
 
 func _alert_to_player(player_ref, propagate: bool = true) -> void:
@@ -1080,7 +1093,7 @@ func receive_ally_alert(player_ref) -> void:
 
 
 func _spawn_death_drop() -> void:
-	if definition == null or definition.drop_salvage <= 0:
+	if definition == null:
 		return
 
 	var drop_parent: Node = get_parent()
@@ -1091,15 +1104,32 @@ func _spawn_death_drop() -> void:
 	if drop_parent == null:
 		return
 
-	var pickup = ResourcePickupScene.instantiate()
-	var salvage_amount := definition.drop_salvage
-	if definition.bonus_salvage > 0 and randf() < definition.bonus_salvage_chance:
-		salvage_amount += definition.bonus_salvage
+	var drop_entries: Array[Dictionary] = []
+	var salvage_amount: int = maxi(int(definition.drop_salvage), 0)
+	if salvage_amount > 0:
+		if definition.bonus_salvage > 0 and randf() < definition.bonus_salvage_chance:
+			salvage_amount += definition.bonus_salvage
+		drop_entries.append({"resource_id": "salvage", "amount": salvage_amount})
+	if definition.drop_parts > 0:
+		drop_entries.append({"resource_id": "parts", "amount": definition.drop_parts})
+	if definition.drop_bullets > 0:
+		drop_entries.append({"resource_id": "bullets", "amount": definition.drop_bullets})
+	if definition.drop_food > 0:
+		drop_entries.append({"resource_id": "food", "amount": definition.drop_food})
 
-	pickup.resource_id = "salvage"
-	pickup.amount = salvage_amount
-	drop_parent.add_child(pickup)
-	pickup.global_position = global_position
+	for drop_entry in drop_entries:
+		var pickup = ResourcePickupScene.instantiate()
+		pickup.resource_id = String(drop_entry.get("resource_id", "salvage"))
+		pickup.amount = int(drop_entry.get("amount", 1))
+		drop_parent.add_child(pickup)
+		pickup.global_position = global_position + Vector2(randf_range(-10.0, 10.0), randf_range(-8.0, 8.0))
+
+	if definition.is_elite and definition.weapon_drop != null and definition.weapon_drop_chance > 0.0 and randf() <= definition.weapon_drop_chance:
+		var weapon_pickup = ResourcePickupScene.instantiate()
+		weapon_pickup.is_weapon_drop = true
+		weapon_pickup.weapon_reward = definition.weapon_drop
+		drop_parent.add_child(weapon_pickup)
+		weapon_pickup.global_position = global_position + Vector2(0.0, -14.0)
 
 
 func _flash_body(flash_color: Color) -> void:

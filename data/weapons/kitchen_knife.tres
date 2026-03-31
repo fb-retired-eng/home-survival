@@ -6,12 +6,12 @@
 script = ExtResource("1_weapon")
 weapon_id = &"kitchen_knife"
 display_name = "Kitchen Knife"
-damage = 25
+damage = 22
 damage_type = &"melee"
 energy_cost = 1
-attack_cooldown = 0.45
+attack_cooldown = 0.34
 miss_recovery_time = 0.12
-attack_windup = 0.14
+attack_windup = 0.1
 attack_area_size = Vector2(28, 18)
 attack_area_offset = Vector2(0, -24)
 held_visual_offset = Vector2(9, -10)

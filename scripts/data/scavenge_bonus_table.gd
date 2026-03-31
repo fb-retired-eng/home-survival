@@ -5,10 +5,12 @@ class_name ScavengeBonusTable
 @export var salvage_weight: float = 0.0
 @export var parts_weight: float = 0.0
 @export var medicine_weight: float = 0.0
+@export var food_weight: float = 0.0
 
 @export var salvage_amount: int = 1
 @export var parts_amount: int = 1
 @export var medicine_amount: int = 1
+@export var food_amount: int = 1
 
 
 func roll_bonus() -> Dictionary:
@@ -16,8 +18,9 @@ func roll_bonus() -> Dictionary:
 		"salvage": 0,
 		"parts": 0,
 		"medicine": 0,
+		"food": 0,
 	}
-	var total_weight: float = max(empty_weight, 0.0) + max(salvage_weight, 0.0) + max(parts_weight, 0.0) + max(medicine_weight, 0.0)
+	var total_weight: float = max(empty_weight, 0.0) + max(salvage_weight, 0.0) + max(parts_weight, 0.0) + max(medicine_weight, 0.0) + max(food_weight, 0.0)
 	if total_weight <= 0.0:
 		return rewards
 
@@ -36,5 +39,10 @@ func roll_bonus() -> Dictionary:
 		rewards["parts"] = max(parts_amount, 0)
 		return rewards
 
-	rewards["medicine"] = max(medicine_amount, 0)
+	roll -= max(medicine_weight, 0.0)
+	if roll < 0.0:
+		rewards["medicine"] = max(medicine_amount, 0)
+		return rewards
+
+	rewards["food"] = max(food_amount, 0)
 	return rewards

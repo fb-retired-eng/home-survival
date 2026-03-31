@@ -1,0 +1,49 @@
+[gd_resource type="Resource" script_class="WeaponDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/weapon_definition.gd" id="1_weapon"]
+
+[resource]
+script = ExtResource("1_weapon")
+weapon_id = &"shotgun"
+display_name = "Shotgun"
+damage = 36
+damage_type = &"ballistic"
+attack_mode = "spread_hitscan"
+energy_cost = 2
+attack_cooldown = 0.9
+uses_magazine = true
+magazine_size = 2
+reload_time = 1.45
+miss_recovery_time = 0.24
+attack_windup = 0.24
+attack_range = 140.0
+attack_cone_degrees = 52.0
+attack_area_size = Vector2(108, 128)
+attack_area_offset = Vector2(0, -78)
+held_visual_offset = Vector2(12, -14)
+held_visual_polygon = PackedVector2Array(-4, -20, 4, -20, 5, -10, 9, -10, 10, 6, 2, 8, 2, 16, -2, 16, -2, 8, -8, 8, -9, -2, -6, -10, -4, -10)
+held_visual_color = Color(0.48, 0.32, 0.18, 1)
+knockback_force = 180.0
+attack_flash_color = Color(1, 0.86, 0.58, 0.84)
+attack_flash_start_scale = Vector2(0.9, 0.78)
+attack_flash_peak_scale = Vector2(1.4, 1.1)
+attack_flash_duration = 0.06
+muzzle_flash_color = Color(1, 0.86, 0.58, 0.98)
+muzzle_flash_scale = Vector2(1.5, 1.2)
+muzzle_flash_duration = 0.06
+tracer_color = Color(1, 0.9, 0.68, 0.82)
+tracer_width = 3.5
+tracer_duration = 0.05
+impact_hit_color = Color(1, 0.72, 0.38, 0.98)
+impact_block_color = Color(0.94, 0.9, 0.78, 0.88)
+impact_flash_scale = 1.15
+impact_flash_duration = 0.07
+attack_indicator_windup_color = Color(1, 0.86, 0.58, 0.18)
+attack_indicator_strike_color = Color(1, 0.92, 0.8, 0.94)
+attack_indicator_windup_start_scale = Vector2(0.92, 0.82)
+attack_indicator_strike_peak_scale = Vector2(1.1, 1)
+attack_indicator_lead_time = 0.1
+attack_indicator_windup_start_alpha = 0.16
+attack_indicator_windup_end_alpha = 0.76
+attack_indicator_strike_alpha = 0.98
+attack_indicator_strike_fade_duration = 0.06

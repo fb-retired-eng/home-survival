@@ -16,6 +16,7 @@ var _phase_text: String = "Pre-Wave"
 @onready var energy_bar: ProgressBar = %EnergyBar
 @onready var wave_label: Label = %WaveLabel
 @onready var base_label: Label = %BaseLabel
+@onready var weapon_label: Label = %WeaponLabel
 @onready var resources_label: Label = %ResourcesLabel
 @onready var status_label: Label = %StatusLabel
 @onready var interaction_panel: PanelContainer = %InteractionLabel.get_parent()
@@ -31,9 +32,13 @@ func bind_player(target) -> void:
 	player.energy_changed.connect(_on_energy_changed)
 	player.resources_changed.connect(_on_resources_changed)
 	player.interaction_prompt_changed.connect(set_interaction_prompt)
+	player.weapon_changed.connect(_on_weapon_changed)
+	player.weapon_status_changed.connect(_on_weapon_status_changed)
 	_on_health_changed(player.current_health, player.max_health)
 	_on_energy_changed(player.current_energy, player.max_energy)
 	_on_resources_changed(player.resources.duplicate(true))
+	_on_weapon_changed(player.get_equipped_weapon_display_name(), StringName())
+	_on_weapon_status_changed(player.get_weapon_status_text())
 	set_interaction_prompt("")
 
 
@@ -72,6 +77,17 @@ func set_base_status(intact_count: int, breached_count: int, hp_percent: int) ->
 	base_label.text = "Base %d intact  |  %d breached  |  %d%% integrity" % [intact_count, breached_count, hp_percent]
 
 
+func _on_weapon_changed(display_name: String, _weapon_id: StringName) -> void:
+	if display_name.is_empty():
+		weapon_label.text = "Weapon: None"
+		return
+	weapon_label.text = "Weapon: %s" % display_name
+
+
+func _on_weapon_status_changed(text: String) -> void:
+	weapon_label.text = text
+
+
 func _on_health_changed(current: int, maximum: int) -> void:
 	_health_current = current
 	_health_maximum = maximum
@@ -85,11 +101,13 @@ func _on_energy_changed(current: int, maximum: int) -> void:
 
 
 func _on_resources_changed(resources: Dictionary) -> void:
-	resources_label.text = "🔩%d  ⚙️%d  🩹%d" % [
+	resources_label.text = "🔩%d  ⚙️%d  🩹%d  ◉%d" % [
 		int(resources.get("salvage", 0)),
 		int(resources.get("parts", 0)),
 		int(resources.get("medicine", 0)),
+		int(resources.get("bullets", 0)),
 	]
+	resources_label.text += "  🍗%d" % int(resources.get("food", 0))
 
 
 func _refresh_vitals() -> void:

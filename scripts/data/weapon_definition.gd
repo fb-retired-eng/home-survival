@@ -5,10 +5,16 @@ class_name WeaponDefinition
 @export var display_name: String = "Weapon"
 @export var damage: int = 25
 @export var damage_type: StringName = &"melee"
+@export_enum("melee", "hitscan", "spread_hitscan") var attack_mode: String = "melee"
 @export var energy_cost: int = 1
 @export var attack_cooldown: float = 0.45
+@export var uses_magazine: bool = false
+@export_range(1, 24, 1) var magazine_size: int = 6
+@export_range(0.0, 3.0, 0.05) var reload_time: float = 1.0
 @export_range(0.0, 1.0, 0.01) var miss_recovery_time: float = 0.12
 @export_range(0.0, 2.0, 0.05) var attack_windup: float = 0.0
+@export_range(0.0, 600.0, 5.0) var attack_range: float = 0.0
+@export_range(0.0, 180.0, 1.0) var attack_cone_degrees: float = 0.0
 @export var attack_area_size: Vector2 = Vector2(28, 18)
 @export var attack_area_offset: Vector2 = Vector2(0, -24)
 @export var held_visual_offset: Vector2 = Vector2(10, -10)
@@ -24,6 +30,16 @@ class_name WeaponDefinition
 @export var attack_flash_start_scale: Vector2 = Vector2(0.8, 0.8)
 @export var attack_flash_peak_scale: Vector2 = Vector2(1.1, 1.1)
 @export_range(0.01, 1.0, 0.01) var attack_flash_duration: float = 0.08
+@export var muzzle_flash_color: Color = Color(1.0, 0.87, 0.55, 0.95)
+@export var muzzle_flash_scale: Vector2 = Vector2(1.0, 1.0)
+@export_range(0.01, 1.0, 0.01) var muzzle_flash_duration: float = 0.05
+@export var tracer_color: Color = Color(1.0, 0.95, 0.78, 0.9)
+@export_range(1.0, 16.0, 0.5) var tracer_width: float = 2.0
+@export_range(0.01, 1.0, 0.01) var tracer_duration: float = 0.05
+@export var impact_hit_color: Color = Color(1.0, 0.84, 0.54, 0.95)
+@export var impact_block_color: Color = Color(0.95, 0.94, 0.88, 0.88)
+@export_range(0.2, 3.0, 0.05) var impact_flash_scale: float = 1.0
+@export_range(0.01, 1.0, 0.01) var impact_flash_duration: float = 0.07
 @export var attack_indicator_windup_color: Color = Color(1.0, 0.9, 0.62, 0.22)
 @export var attack_indicator_strike_color: Color = Color(1.0, 0.98, 0.88, 0.9)
 @export var attack_indicator_windup_start_scale: Vector2 = Vector2(0.82, 0.82)
@@ -42,13 +58,23 @@ func is_valid_definition() -> bool:
 		return false
 	if damage < 0:
 		return false
+	if attack_mode != "melee" and attack_mode != "hitscan" and attack_mode != "spread_hitscan":
+		return false
 	if energy_cost < 0:
 		return false
 	if attack_cooldown < 0.0:
 		return false
+	if uses_magazine and magazine_size <= 0:
+		return false
+	if uses_magazine and reload_time <= 0.0:
+		return false
 	if miss_recovery_time < 0.0:
 		return false
 	if attack_windup < 0.0:
+		return false
+	if (attack_mode == "hitscan" or attack_mode == "spread_hitscan") and attack_range <= 0.0:
+		return false
+	if attack_mode == "spread_hitscan" and attack_cone_degrees <= 0.0:
 		return false
 	if attack_area_size.x <= 0.0 or attack_area_size.y <= 0.0:
 		return false
@@ -61,6 +87,18 @@ func is_valid_definition() -> bool:
 	if attack_flash_peak_scale.x <= 0.0 or attack_flash_peak_scale.y <= 0.0:
 		return false
 	if attack_flash_duration <= 0.0:
+		return false
+	if muzzle_flash_scale.x <= 0.0 or muzzle_flash_scale.y <= 0.0:
+		return false
+	if muzzle_flash_duration <= 0.0:
+		return false
+	if tracer_width <= 0.0:
+		return false
+	if tracer_duration <= 0.0:
+		return false
+	if impact_flash_scale <= 0.0:
+		return false
+	if impact_flash_duration <= 0.0:
 		return false
 	if attack_indicator_windup_start_scale.x <= 0.0 or attack_indicator_windup_start_scale.y <= 0.0:
 		return false

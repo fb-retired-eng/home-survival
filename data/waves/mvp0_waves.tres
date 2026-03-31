@@ -1,10 +1,13 @@
-[gd_resource type="Resource" script_class="WaveSetDefinition" load_steps=10 format=3]
+[gd_resource type="Resource" script_class="WaveSetDefinition" format=3 uid="uid://bvy1bxxcyjm41"]
 
-[ext_resource type="Script" path="res://scripts/data/wave_set_definition.gd" id="1_wave_set"]
-[ext_resource type="Script" path="res://scripts/data/wave_definition.gd" id="2_wave"]
-[ext_resource type="Script" path="res://scripts/data/wave_lane_definition.gd" id="3_lane"]
+[ext_resource type="Script" uid="uid://ch4acigfokss8" path="res://scripts/data/wave_set_definition.gd" id="1_wave_set"]
+[ext_resource type="Script" uid="uid://bsag6kvcjcgdx" path="res://scripts/data/wave_definition.gd" id="2_wave"]
+[ext_resource type="Script" uid="uid://blx542t7qe3po" path="res://scripts/data/wave_lane_definition.gd" id="3_lane"]
 [ext_resource type="Resource" path="res://data/enemies/zombie_basic.tres" id="4_basic_enemy"]
 [ext_resource type="Resource" path="res://data/enemies/zombie_brute.tres" id="5_brute_enemy"]
+[ext_resource type="Resource" path="res://data/enemies/zombie_runner.tres" id="6_runner_enemy"]
+[ext_resource type="Resource" path="res://data/enemies/zombie_spitter.tres" id="7_spitter_enemy"]
+[ext_resource type="Resource" path="res://data/enemies/zombie_elite_spitter.tres" id="8_elite_spitter_enemy"]
 
 [sub_resource type="Resource" id="1"]
 script = ExtResource("3_lane")
@@ -15,9 +18,8 @@ preferred_socket_ids = PackedStringArray("wall_n")
 
 [sub_resource type="Resource" id="2"]
 script = ExtResource("2_wave")
-wave_number = 1
 spawn_interval = 0.8
-lanes = Array[ExtResource("3_lane")]([SubResource("1")])
+lanes = Array[Resource]([SubResource("1")])
 
 [sub_resource type="Resource" id="3"]
 script = ExtResource("3_lane")
@@ -36,8 +38,8 @@ preferred_socket_ids = PackedStringArray("door_w")
 [sub_resource type="Resource" id="5"]
 script = ExtResource("2_wave")
 wave_number = 2
-spawn_interval = 0.7
-lanes = Array[ExtResource("3_lane")]([SubResource("3"), SubResource("4")])
+spawn_interval = 0.72
+lanes = Array[Resource]([SubResource("3"), SubResource("4")])
 
 [sub_resource type="Resource" id="6"]
 script = ExtResource("3_lane")
@@ -46,87 +48,118 @@ count = 4
 enemy_definition = ExtResource("4_basic_enemy")
 preferred_socket_ids = PackedStringArray("wall_n")
 
-[sub_resource type="Resource" id="8"]
+[sub_resource type="Resource" id="7"]
 script = ExtResource("3_lane")
 lane_id = &"east"
-count = 1
-enemy_definition = ExtResource("5_brute_enemy")
+count = 2
+enemy_definition = ExtResource("6_runner_enemy")
 preferred_socket_ids = PackedStringArray("door_e")
 
-[sub_resource type="Resource" id="9"]
-script = ExtResource("3_lane")
-lane_id = &"west"
-count = 1
-enemy_definition = ExtResource("5_brute_enemy")
-preferred_socket_ids = PackedStringArray("door_w")
-
-[sub_resource type="Resource" id="7"]
+[sub_resource type="Resource" id="8"]
 script = ExtResource("2_wave")
 wave_number = 3
-spawn_interval = 0.6
-lanes = Array[ExtResource("3_lane")]([SubResource("6"), SubResource("3"), SubResource("4"), SubResource("8"), SubResource("9")])
+spawn_interval = 0.64
+lanes = Array[Resource]([SubResource("6"), SubResource("4"), SubResource("7")])
 
-[sub_resource type="Resource" id="10"]
+[sub_resource type="Resource" id="9"]
 script = ExtResource("3_lane")
 lane_id = &"north"
 count = 5
 enemy_definition = ExtResource("4_basic_enemy")
 preferred_socket_ids = PackedStringArray("wall_n")
 
-[sub_resource type="Resource" id="11"]
+[sub_resource type="Resource" id="10"]
 script = ExtResource("3_lane")
-lane_id = &"east"
-count = 3
-enemy_definition = ExtResource("4_basic_enemy")
-preferred_socket_ids = PackedStringArray("door_e")
+lane_id = &"west"
+enemy_definition = ExtResource("5_brute_enemy")
+preferred_socket_ids = PackedStringArray("door_w")
+
+[sub_resource type="Resource" id="11"]
+script = ExtResource("2_wave")
+wave_number = 4
+spawn_interval = 0.58
+lanes = Array[Resource]([SubResource("9"), SubResource("3"), SubResource("10")])
 
 [sub_resource type="Resource" id="12"]
 script = ExtResource("3_lane")
-lane_id = &"west"
-count = 3
-enemy_definition = ExtResource("4_basic_enemy")
-preferred_socket_ids = PackedStringArray("door_w")
+lane_id = &"east"
+count = 2
+enemy_definition = ExtResource("7_spitter_enemy")
+preferred_socket_ids = PackedStringArray("door_e")
 
 [sub_resource type="Resource" id="13"]
-script = ExtResource("3_lane")
-lane_id = &"north"
-count = 1
-enemy_definition = ExtResource("5_brute_enemy")
-preferred_socket_ids = PackedStringArray("wall_n")
+script = ExtResource("2_wave")
+wave_number = 5
+spawn_interval = 0.54
+lanes = Array[Resource]([SubResource("9"), SubResource("4"), SubResource("12")])
 
 [sub_resource type="Resource" id="14"]
-script = ExtResource("2_wave")
-wave_number = 4
-spawn_interval = 0.55
-lanes = Array[ExtResource("3_lane")]([SubResource("10"), SubResource("11"), SubResource("12"), SubResource("13")])
+script = ExtResource("3_lane")
+lane_id = &"north"
+count = 3
+enemy_definition = ExtResource("6_runner_enemy")
+preferred_socket_ids = PackedStringArray("wall_n")
 
 [sub_resource type="Resource" id="15"]
 script = ExtResource("3_lane")
-lane_id = &"north"
-count = 6
-enemy_definition = ExtResource("4_basic_enemy")
-preferred_socket_ids = PackedStringArray("wall_n")
+lane_id = &"west"
+count = 2
+enemy_definition = ExtResource("5_brute_enemy")
+preferred_socket_ids = PackedStringArray("door_w")
 
 [sub_resource type="Resource" id="16"]
+script = ExtResource("2_wave")
+wave_number = 6
+spawn_interval = 0.5
+lanes = Array[Resource]([SubResource("14"), SubResource("3"), SubResource("15"), SubResource("12")])
+
+[sub_resource type="Resource" id="17"]
+script = ExtResource("3_lane")
+lane_id = &"north"
+count = 4
+enemy_definition = ExtResource("6_runner_enemy")
+preferred_socket_ids = PackedStringArray("wall_n")
+
+[sub_resource type="Resource" id="18"]
 script = ExtResource("3_lane")
 lane_id = &"east"
 count = 2
 enemy_definition = ExtResource("5_brute_enemy")
 preferred_socket_ids = PackedStringArray("door_e")
 
-[sub_resource type="Resource" id="17"]
+[sub_resource type="Resource" id="19"]
+script = ExtResource("2_wave")
+wave_number = 7
+spawn_interval = 0.46
+lanes = Array[Resource]([SubResource("17"), SubResource("18"), SubResource("15"), SubResource("12")])
+
+[sub_resource type="Resource" id="20"]
+script = ExtResource("3_lane")
+lane_id = &"north"
+count = 5
+enemy_definition = ExtResource("4_basic_enemy")
+preferred_socket_ids = PackedStringArray("wall_n")
+
+[sub_resource type="Resource" id="21"]
+script = ExtResource("3_lane")
+lane_id = &"east"
+count = 2
+enemy_definition = ExtResource("7_spitter_enemy")
+preferred_socket_ids = PackedStringArray("door_e")
+
+[sub_resource type="Resource" id="22"]
 script = ExtResource("3_lane")
 lane_id = &"west"
-count = 2
-enemy_definition = ExtResource("5_brute_enemy")
+count = 1
+enemy_definition = ExtResource("8_elite_spitter_enemy")
 preferred_socket_ids = PackedStringArray("door_w")
 
-[sub_resource type="Resource" id="18"]
+[sub_resource type="Resource" id="23"]
 script = ExtResource("2_wave")
-wave_number = 5
-spawn_interval = 0.5
-lanes = Array[ExtResource("3_lane")]([SubResource("15"), SubResource("11"), SubResource("12"), SubResource("16"), SubResource("17")])
+wave_number = 8
+spawn_interval = 0.42
+lanes = Array[Resource]([SubResource("20"), SubResource("17"), SubResource("18"), SubResource("15"), SubResource("21"), SubResource("22")])
 
 [resource]
 script = ExtResource("1_wave_set")
-waves = Array[ExtResource("2_wave")]([SubResource("2"), SubResource("5"), SubResource("7"), SubResource("14"), SubResource("18")])
+waves = Array[Resource]([SubResource("2"), SubResource("5"), SubResource("8"), SubResource("11"), SubResource("13"), SubResource("16"), SubResource("19"), SubResource("23")])
