@@ -4,6 +4,7 @@ class_name PlaceableProfile
 @export var placeable_id: StringName = &"placeable"
 @export var display_name: String = "Placeable"
 @export_enum("barrier", "trap", "utility", "turret") var category: String = "barrier"
+@export_enum("tactical", "utility", "structural") var placement_layer: String = "tactical"
 @export var footprint_cells: PackedVector2Array = PackedVector2Array([Vector2.ZERO])
 @export var build_cost: Dictionary = {}
 @export var repair_cost: Dictionary = {}
@@ -32,6 +33,8 @@ func is_valid_profile() -> bool:
 	if display_name.is_empty():
 		return false
 	if category != "barrier" and category != "trap" and category != "utility" and category != "turret":
+		return false
+	if placement_layer != "tactical" and placement_layer != "utility" and placement_layer != "structural":
 		return false
 	if max_hp <= 0:
 		return false

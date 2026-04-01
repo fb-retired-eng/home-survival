@@ -62,6 +62,7 @@ var _last_daily_refilled_pois: Array[StringName] = []
 func _ready() -> void:
 	randomize()
 	_build_defense_sockets()
+	_register_fixed_grid_footprints()
 	_validate_exploration_spawn_points()
 	_validate_roaming_spawn_zones()
 	_cache_poi_visuals()
@@ -388,9 +389,10 @@ func _on_run_reset() -> void:
 		pickup.queue_free()
 	player.reset_for_new_run()
 	_apply_test_mode_loadout()
-	for socket in get_tree().get_nodes_in_group("defense_sockets"):
+	for socket in defense_sockets.get_children():
 		if socket.has_method("reset_for_new_run"):
 			socket.reset_for_new_run()
+	_register_fixed_grid_footprints()
 	for node in get_tree().get_nodes_in_group("scavenge_nodes"):
 		if node.has_method("reset_for_new_run"):
 			node.reset_for_new_run()
@@ -413,6 +415,45 @@ func _apply_test_mode_loadout() -> void:
 		player.add_resource("bullets", test_mode_bullets, false)
 	if test_mode_food > 0:
 		player.add_resource("food", test_mode_food, false)
+
+
+func _register_fixed_grid_footprints() -> void:
+	if construction_grid == null:
+		return
+
+	construction_grid.clear_runtime_occupancy()
+	_register_fixed_grid_rect(sleep_point, _get_area_shape_size(sleep_point), &"sleep_point")
+	_register_fixed_grid_rect(food_table, _get_area_shape_size(food_table), &"food_table")
+
+	for socket in defense_sockets.get_children():
+		if socket == null or not is_instance_valid(socket):
+			continue
+		if socket.has_method("is_breached") and socket.is_breached():
+			continue
+		_register_fixed_grid_rect(socket, socket.socket_size, StringName(socket.socket_id))
+
+
+func _register_fixed_grid_rect(node: Node2D, rect_size: Vector2, occupant_id: StringName) -> void:
+	if node == null or not is_instance_valid(node):
+		return
+	if rect_size.x <= 0.0 or rect_size.y <= 0.0:
+		return
+	construction_grid.register_occupied_cells(
+		construction_grid.get_cells_for_world_rect(node.global_position, rect_size),
+		occupant_id
+	)
+
+
+func _get_area_shape_size(area: Area2D) -> Vector2:
+	if area == null or not is_instance_valid(area):
+		return Vector2.ZERO
+	var shape_node := area.get_node_or_null("CollisionShape2D") as CollisionShape2D
+	if shape_node == null:
+		return Vector2.ZERO
+	var rectangle := shape_node.shape as RectangleShape2D
+	if rectangle == null:
+		return Vector2.ZERO
+	return rectangle.size
 
 
 func _on_player_weapon_noise_emitted(source_position: Vector2, noise_radius: float, noise_alert_budget: float, _weapon_id: StringName) -> void:
@@ -1248,6 +1289,7 @@ func _connect_defense_socket_signals() -> void:
 
 
 func _on_defense_socket_state_changed(_socket) -> void:
+	_register_fixed_grid_footprints()
 	_refresh_base_status()
 
 
