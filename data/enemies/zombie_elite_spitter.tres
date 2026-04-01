@@ -24,6 +24,7 @@ chase_player_when_nearby = true
 chase_overrides_target_mode = true
 idle_until_player_detected = true
 ally_alert_radius = 100.0
+noise_alert_weight = 3.0
 player_detection_radius = 124.0
 player_chase_break_radius = 162.0
 fallback_to_player_when_no_sockets = true

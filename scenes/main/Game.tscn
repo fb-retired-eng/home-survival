@@ -26,6 +26,7 @@
 [ext_resource type="Script" uid="uid://dwa7iri2l2fef" path="res://scripts/world/roaming_spawn_zone.gd" id="25_roaming_zone"]
 [ext_resource type="Resource" path="res://data/enemies/zombie_brute.tres" id="26_brute_enemy"]
 [ext_resource type="Resource" path="res://data/enemies/zombie_elite_spitter.tres" id="27_elite_spitter_enemy"]
+[ext_resource type="Resource" path="res://data/enemies/zombie_elite_brute.tres" id="28_elite_brute_enemy"]
 
 [sub_resource type="RectangleShape2D" id="1_horizontal_wall"]
 size = Vector2(2560, 32)
@@ -38,7 +39,8 @@ script = ExtResource("8_game_script")
 defense_socket_scene = ExtResource("11_socket_scene")
 exploration_enemy_scene = ExtResource("12_zombie_scene")
 perimeter_definition = ExtResource("13_perimeter")
-enable_test_mode = true
+default_daily_elite_enemy = ExtResource("27_elite_spitter_enemy")
+enable_test_mode = false
 test_mode_weapons = Array[Resource]([ExtResource("17_baseball_bat"), ExtResource("18_pistol"), ExtResource("19_shotgun")])
 roaming_early_enemies = Array[Resource]([ExtResource("16_basic_enemy"), ExtResource("23_runner_enemy")])
 roaming_mid_enemies = Array[Resource]([ExtResource("16_basic_enemy"), ExtResource("23_runner_enemy"), ExtResource("26_brute_enemy")])
@@ -426,30 +428,35 @@ position = Vector2(520, 430)
 script = ExtResource("15_exploration_spawn")
 spawn_id = &"explore_guard_a"
 enemy_definition = ExtResource("16_basic_enemy")
+daily_elite_definition = ExtResource("27_elite_spitter_enemy")
 
 [node name="POI_B_Guard" type="Marker2D" parent="World/ExplorationSpawnPoints" unique_id=1799033528]
 position = Vector2(2028, 432)
 script = ExtResource("15_exploration_spawn")
 spawn_id = &"explore_guard_b"
 enemy_definition = ExtResource("16_basic_enemy")
+daily_elite_definition = ExtResource("28_elite_brute_enemy")
 
 [node name="POI_C_Guard" type="Marker2D" parent="World/ExplorationSpawnPoints" unique_id=1904742490]
 position = Vector2(532, 1016)
 script = ExtResource("15_exploration_spawn")
 spawn_id = &"explore_guard_c"
 enemy_definition = ExtResource("16_basic_enemy")
+daily_elite_definition = ExtResource("27_elite_spitter_enemy")
 
 [node name="POI_D_Guard" type="Marker2D" parent="World/ExplorationSpawnPoints" unique_id=525360921]
 position = Vector2(2016, 1012)
 script = ExtResource("15_exploration_spawn")
 spawn_id = &"explore_guard_d"
 enemy_definition = ExtResource("16_basic_enemy")
+daily_elite_definition = ExtResource("27_elite_spitter_enemy")
 
 [node name="POI_E_Guard" type="Marker2D" parent="World/ExplorationSpawnPoints" unique_id=3365090]
 position = Vector2(1286, 332)
 script = ExtResource("15_exploration_spawn")
 spawn_id = &"explore_guard_e"
 enemy_definition = ExtResource("23_runner_enemy")
+daily_elite_definition = ExtResource("28_elite_brute_enemy")
 
 [node name="POI_F_Guard" type="Marker2D" parent="World/ExplorationSpawnPoints" unique_id=188126142]
 position = Vector2(1284, 1100)

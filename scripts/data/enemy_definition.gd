@@ -35,6 +35,7 @@ enum WaveTargetMode {
 @export var idle_until_player_detected: bool = false
 @export var alert_nearby_enemies: bool = true
 @export var ally_alert_radius: float = 84.0
+@export_range(0.0, 12.0, 0.5) var noise_alert_weight: float = 1.0
 @export var player_detection_radius: float = 88.0
 @export var player_chase_break_radius: float = 128.0
 @export var fallback_to_player_when_no_sockets: bool = true
@@ -95,6 +96,8 @@ func is_valid_definition() -> bool:
 	if exploration_target_mode < WaveTargetMode.SOCKET_THEN_PLAYER or exploration_target_mode > WaveTargetMode.PLAYER_ONLY:
 		return false
 	if ally_alert_radius < 0.0:
+		return false
+	if noise_alert_weight < 0.0:
 		return false
 	if player_detection_radius < 0.0:
 		return false

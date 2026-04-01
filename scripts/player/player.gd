@@ -30,6 +30,8 @@ signal player_died()
 signal interaction_prompt_changed(text: String)
 signal weapon_changed(display_name: String, weapon_id: StringName)
 signal weapon_status_changed(text: String)
+signal weapon_trait_changed(text: String)
+signal weapon_noise_emitted(source_position: Vector2, noise_radius: float, noise_alert_budget: float, weapon_id: StringName)
 
 @export var max_health: int = 100
 @export var max_energy: int = 100
@@ -1133,6 +1135,7 @@ func _commit_attack(weapon_override: Resource = null) -> void:
 	var consumes_ammo := _uses_weapon_magazine(weapon)
 	if consumes_ammo:
 		_consume_weapon_magazine_round(weapon)
+	_emit_weapon_noise(weapon)
 	if hit_targets.is_empty():
 		_play_attack_effect(weapon, attack_result)
 		_flash_body(Color(1.0, 0.82, 0.54, 1.0))
@@ -1151,16 +1154,26 @@ func _commit_attack(weapon_override: Resource = null) -> void:
 	attack_cooldown_remaining = weapon.attack_cooldown
 	_flash_body(Color(1.0, 0.82, 0.54, 1.0))
 
+	var attack_damage_map := _build_attack_damage_map(weapon, hit_targets)
 	for body in hit_targets:
 		if is_instance_valid(body):
-			body.take_damage(weapon.damage, {
+			body.take_damage(int(attack_damage_map.get(body, weapon.damage)), {
 				"attacker": self,
 				"damage_type": weapon.damage_type,
 				"knockback_force": weapon.knockback_force,
 				"knockback_direction": facing_direction,
+				"interrupt_attack_prep": bool(weapon.interrupt_attack_prep),
 			})
 	_attack_windup_weapon = null
 	_attack_windup_visual_only = false
+
+
+func _emit_weapon_noise(weapon: Resource) -> void:
+	if weapon == null:
+		return
+	if float(weapon.noise_radius) <= 0.0 or float(weapon.noise_alert_budget) <= 0.0:
+		return
+	weapon_noise_emitted.emit(global_position, float(weapon.noise_radius), float(weapon.noise_alert_budget), weapon.weapon_id)
 
 
 func _cancel_attack_windup() -> void:
@@ -1252,9 +1265,30 @@ func _emit_weapon_state() -> void:
 	if weapon == null:
 		weapon_changed.emit("", StringName())
 		weapon_status_changed.emit("Weapon: None")
+		weapon_trait_changed.emit("")
 		return
 	weapon_changed.emit(weapon.display_name, weapon.weapon_id)
 	weapon_status_changed.emit(get_weapon_status_text())
+	weapon_trait_changed.emit(get_weapon_trait_text())
+
+
+func _build_attack_damage_map(weapon: Resource, hit_targets: Array) -> Dictionary:
+	var damage_map := {}
+	if weapon == null:
+		return damage_map
+
+	var target_count := hit_targets.size()
+	var apply_isolated_bonus := target_count == 1 and int(weapon.isolated_bonus_damage) > 0
+	var apply_cluster_bonus := target_count >= 2 and int(weapon.cluster_bonus_damage) > 0
+
+	for target in hit_targets:
+		var damage_amount := int(weapon.damage)
+		if apply_isolated_bonus:
+			damage_amount += int(weapon.isolated_bonus_damage)
+		if apply_cluster_bonus:
+			damage_amount += int(weapon.cluster_bonus_damage)
+		damage_map[target] = damage_amount
+	return damage_map
 
 
 func _apply_miss_recovery(weapon: Resource) -> void:
@@ -1275,6 +1309,13 @@ func get_weapon_status_text() -> String:
 	if _is_reloading_weapon() and _reload_weapon_id == weapon.weapon_id:
 		status += " ↻"
 	return status
+
+
+func get_weapon_trait_text() -> String:
+	var weapon: Resource = _get_equipped_weapon()
+	if weapon == null:
+		return ""
+	return String(weapon.hud_trait_text)
 
 
 func _uses_weapon_magazine(weapon: Resource) -> bool:

@@ -12,6 +12,22 @@ func _count_live_exploration_enemies(game) -> int:
 	return count
 
 
+func _clear_wave_by_killing_enemies(game) -> void:
+	for _step in range(240):
+		for child in game.wave_enemy_layer.get_children():
+			if not is_instance_valid(child):
+				continue
+			if child.is_queued_for_deletion():
+				continue
+			if child.has_method("take_damage"):
+				child.take_damage(9999, {"source_position": child.global_position + Vector2.LEFT})
+		if game.game_manager.run_state == game.game_manager.RunState.POST_WAVE:
+			return
+		await process_frame
+		await physics_frame
+		await process_frame
+
+
 func _init() -> void:
 	var game_scene := load("res://scenes/main/Game.tscn")
 	var game = game_scene.instantiate()
@@ -33,7 +49,7 @@ func _init() -> void:
 	await process_frame
 	await physics_frame
 	await process_frame
-	game.wave_manager.clear_wave()
+	await _clear_wave_by_killing_enemies(game)
 	await process_frame
 
 	print("bed_gate_probe_sleep_label_after=%s" % game._get_sleep_label(game.player))

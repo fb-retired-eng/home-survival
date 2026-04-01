@@ -7,10 +7,13 @@ const STRUCTURE_PROFILE_SCRIPT := preload("res://scripts/data/structure_profile.
 const EXPLORATION_SPAWN_POINT_SCRIPT := preload("res://scripts/world/exploration_spawn_point.gd")
 const ENEMY_DEFINITION_SCRIPT := preload("res://scripts/data/enemy_definition.gd")
 const ROAMING_SPAWN_ZONE_SCRIPT := preload("res://scripts/world/roaming_spawn_zone.gd")
+const POSITIVE_POI_MODIFIERS: Array[StringName] = [&"bountiful_food", &"extra_parts"]
+const NEGATIVE_POI_MODIFIERS: Array[StringName] = [&"disturbed", &"elite_present"]
 
 @export var defense_socket_scene: PackedScene
 @export var exploration_enemy_scene: PackedScene
 @export var perimeter_definition: Resource
+@export var default_daily_elite_enemy: Resource
 @export var sleep_heal_amount: int = 25
 @export_range(1, 100, 1) var food_energy_per_unit: int = 20
 @export var enable_test_mode: bool = false
@@ -37,7 +40,11 @@ const ROAMING_SPAWN_ZONE_SCRIPT := preload("res://scripts/world/roaming_spawn_zo
 var _defeated_exploration_spawn_ids: Dictionary = {}
 var _exploration_spawn_counts: Dictionary = {}
 var _defeated_exploration_enemy_counts: Dictionary = {}
+var _current_exploration_target_counts: Dictionary = {}
 var _is_resetting_run: bool = false
+var _daily_poi_modifiers: Dictionary = {}
+var _poi_visuals_by_id: Dictionary = {}
+var _debug_forced_next_daily_poi_modifiers: Dictionary = {}
 
 
 func _ready() -> void:
@@ -45,6 +52,7 @@ func _ready() -> void:
 	_build_defense_sockets()
 	_validate_exploration_spawn_points()
 	_validate_roaming_spawn_zones()
+	_cache_poi_visuals()
 	player.set_interaction_gate(Callable(self, "_can_player_interact_with"))
 	food_table.configure(Callable(self, "_can_player_eat"), Callable(self, "_get_food_table_label"))
 	sleep_point.configure(Callable(self, "_can_player_sleep"), Callable(self, "_get_sleep_label"))
@@ -62,7 +70,9 @@ func _ready() -> void:
 	hud.set_interaction_prompt("")
 	player.message_requested.connect(hud.set_status)
 	player.player_died.connect(_on_player_died)
+	player.weapon_noise_emitted.connect(_on_player_weapon_noise_emitted)
 	game_manager.run_state_changed.connect(_on_run_state_changed)
+	_configure_scavenge_nodes()
 	_on_wave_changed(game_manager.current_wave)
 	_on_run_state_changed(game_manager.run_state)
 	_refresh_base_status()
@@ -212,13 +222,20 @@ func _on_wave_changed(new_wave: int) -> void:
 func _refresh_phase_status() -> void:
 	if game_manager.run_state != game_manager.RunState.PRE_WAVE:
 		return
-	
+
+	var base_status := ""
 	if game_manager.current_wave <= 0:
-		hud.set_status("Day 1. Scavenge carefully, build up, and eat dinner at the table to start night 1.")
+		base_status = "Day 1. Scavenge carefully, build up, and eat dinner at the table to start night 1."
 	elif game_manager.current_wave < game_manager.final_wave - 1:
-		hud.set_status("Day %d. Explore, build, and eat dinner at the table to start night %d." % [game_manager.current_wave + 1, game_manager.current_wave + 1])
+		base_status = "Day %d. Explore, build, and eat dinner at the table to start night %d." % [game_manager.current_wave + 1, game_manager.current_wave + 1]
 	else:
-		hud.set_status("Final day. Make repairs, gather food, and eat dinner before the last night.")
+		base_status = "Final day. Make repairs, gather food, and eat dinner before the last night."
+
+	var modifier_summary := _get_daily_modifier_summary()
+	if modifier_summary.is_empty():
+		hud.set_status(base_status)
+		return
+	hud.set_status("%s %s" % [base_status, modifier_summary])
 
 
 func _can_player_interact_with(_interactable) -> bool:
@@ -325,6 +342,8 @@ func _on_run_reset() -> void:
 	_defeated_exploration_spawn_ids.clear()
 	_exploration_spawn_counts.clear()
 	_defeated_exploration_enemy_counts.clear()
+	_current_exploration_target_counts.clear()
+	_daily_poi_modifiers.clear()
 	for pickup in get_tree().get_nodes_in_group("pickups"):
 		pickup.queue_free()
 	player.reset_for_new_run()
@@ -352,12 +371,404 @@ func _apply_test_mode_loadout() -> void:
 		player.add_resource("food", test_mode_food, false)
 
 
+func _on_player_weapon_noise_emitted(source_position: Vector2, noise_radius: float, noise_alert_budget: float, _weapon_id: StringName) -> void:
+	if game_manager.run_state != game_manager.RunState.PRE_WAVE:
+		return
+	if exploration_enemy_layer == null or noise_radius <= 0.0 or noise_alert_budget <= 0.0:
+		return
+
+	var candidates: Array = []
+	for child in exploration_enemy_layer.get_children():
+		if not is_instance_valid(child):
+			continue
+		if child.is_queued_for_deletion():
+			continue
+		if not child.has_method("receive_noise_alert"):
+			continue
+		if not _can_enemy_hear_weapon_noise(child, source_position, noise_radius):
+			continue
+		candidates.append(child)
+
+	candidates.sort_custom(func(a, b):
+		return source_position.distance_squared_to(a.global_position) < source_position.distance_squared_to(b.global_position)
+	)
+
+	var remaining_budget := noise_alert_budget
+	for enemy in candidates:
+		var alert_weight := 1.0
+		if enemy.has_method("get_noise_alert_weight"):
+			alert_weight = float(enemy.get_noise_alert_weight())
+		if alert_weight <= 0.0:
+			continue
+		if remaining_budget < alert_weight:
+			continue
+		enemy.receive_noise_alert(player, source_position)
+		remaining_budget -= alert_weight
+
+
+func _can_enemy_hear_weapon_noise(enemy, source_position: Vector2, noise_radius: float) -> bool:
+	if enemy == null or not is_instance_valid(enemy):
+		return false
+	var distance_to_source: float = enemy.global_position.distance_to(source_position)
+	if distance_to_source > noise_radius:
+		return false
+
+	var close_hearing_radius := minf(noise_radius, 96.0)
+	if distance_to_source <= close_hearing_radius:
+		return true
+
+	var ray_query := PhysicsRayQueryParameters2D.create(source_position, enemy.global_position)
+	ray_query.exclude = [player, enemy]
+	for other_enemy in get_tree().get_nodes_in_group("enemies"):
+		if other_enemy == enemy or not is_instance_valid(other_enemy):
+			continue
+		ray_query.exclude.append(other_enemy)
+	var hit := get_world_2d().direct_space_state.intersect_ray(ray_query)
+	return hit.is_empty() or hit.get("collider") == enemy
+
+
 func _enter_day_phase() -> void:
+	_roll_daily_poi_modifiers()
+	_current_exploration_target_counts.clear()
+	_refresh_poi_modifier_visuals()
+	_clear_stale_daily_modifier_enemies()
 	_sync_exploration_enemies()
+	_sync_daily_modifier_enemies()
 	_spawn_roaming_exploration_enemies()
 	hud.set_phase("Phase: Day")
 	player.refresh_interaction_prompt()
 	_refresh_phase_status()
+
+
+func _configure_scavenge_nodes() -> void:
+	for node in get_tree().get_nodes_in_group("scavenge_nodes"):
+		if node.has_method("configure_reward_modifier"):
+			node.configure_reward_modifier(Callable(self, "_apply_daily_poi_reward_modifier"))
+
+
+func _apply_daily_poi_reward_modifier(node, rewards: Dictionary) -> Dictionary:
+	var modified_rewards: Dictionary = rewards.duplicate(true)
+	if node == null:
+		return modified_rewards
+
+	var poi_id := StringName(node.poi_id)
+	var modifier_id := _get_daily_poi_modifier(poi_id)
+	match modifier_id:
+		&"bountiful_food":
+			modified_rewards["food"] = int(modified_rewards.get("food", 0)) + 1
+		&"extra_parts":
+			modified_rewards["parts"] = int(modified_rewards.get("parts", 0)) + 1
+
+	return modified_rewards
+
+
+func _roll_daily_poi_modifiers() -> void:
+	_daily_poi_modifiers.clear()
+
+	if _poi_visuals_by_id.is_empty():
+		return
+
+	if not _debug_forced_next_daily_poi_modifiers.is_empty():
+		_daily_poi_modifiers = _debug_forced_next_daily_poi_modifiers.duplicate(true)
+		_debug_forced_next_daily_poi_modifiers.clear()
+		return
+
+	var used_pois := {}
+	_assign_random_daily_modifier(POSITIVE_POI_MODIFIERS, used_pois)
+	_assign_random_daily_modifier(NEGATIVE_POI_MODIFIERS, used_pois)
+
+
+func _assign_random_daily_modifier(candidate_modifiers: Array[StringName], used_pois: Dictionary) -> void:
+	var available_assignments: Array[Dictionary] = []
+	for modifier_id in candidate_modifiers:
+		var eligible_pois := _get_modifier_eligible_poi_ids(modifier_id, used_pois)
+		if eligible_pois.is_empty():
+			continue
+		available_assignments.append({
+			"modifier": modifier_id,
+			"pois": eligible_pois,
+		})
+
+	if available_assignments.is_empty():
+		return
+
+	var assignment: Dictionary = available_assignments[randi() % available_assignments.size()]
+	var modifier_id := StringName(assignment.get("modifier", StringName()))
+	var eligible_pois: Array[StringName] = assignment.get("pois", [])
+	if eligible_pois.is_empty():
+		return
+	var poi_id: StringName = eligible_pois[randi() % eligible_pois.size()]
+	_daily_poi_modifiers[poi_id] = modifier_id
+	used_pois[poi_id] = true
+
+
+func _get_modifier_eligible_poi_ids(modifier_id: StringName, excluded_pois: Dictionary) -> Array[StringName]:
+	var eligible: Array[StringName] = []
+	for poi_id_variant in _poi_visuals_by_id.keys():
+		var poi_id := StringName(poi_id_variant)
+		if excluded_pois.has(poi_id):
+			continue
+		if _is_poi_depleted(poi_id):
+			continue
+		if modifier_id == &"elite_present" and not _is_poi_eligible_for_elite_modifier(poi_id):
+			continue
+		eligible.append(poi_id)
+	return eligible
+
+
+func _is_poi_depleted(poi_id: StringName) -> bool:
+	var total_nodes := 0
+	var depleted_nodes := 0
+	for node in get_tree().get_nodes_in_group("scavenge_nodes"):
+		if StringName(node.poi_id) != poi_id:
+			continue
+		total_nodes += 1
+		if bool(node.is_depleted):
+			depleted_nodes += 1
+	return total_nodes > 0 and total_nodes == depleted_nodes
+
+
+func _is_poi_eligible_for_elite_modifier(poi_id: StringName) -> bool:
+	var guard_spawn = _get_poi_guard_spawn_point(poi_id)
+	if guard_spawn == null:
+		return false
+	var enemy_definition: Resource = guard_spawn.enemy_definition
+	if enemy_definition == null or enemy_definition.get_script() != ENEMY_DEFINITION_SCRIPT:
+		return false
+	return not bool(enemy_definition.is_elite)
+
+
+func _cache_poi_visuals() -> void:
+	_poi_visuals_by_id.clear()
+	var world_node := get_node_or_null("World")
+	if world_node == null:
+		return
+
+	for child in world_node.get_children():
+		var poi_id := _get_poi_id_from_name(String(child.name))
+		if poi_id == StringName():
+			continue
+		var label: Label = child.get_node_or_null("Label")
+		var marker: Polygon2D = child.get_node_or_null("Marker")
+		if label == null or marker == null:
+			continue
+		label.offset_left = -56.0
+		label.offset_right = 84.0
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_poi_visuals_by_id[poi_id] = {
+			"root": child,
+			"label": label,
+			"marker": marker,
+			"base_text": label.text,
+			"base_marker_color": marker.color,
+			"base_label_color": label.get_theme_color("font_color"),
+		}
+
+
+func _refresh_poi_modifier_visuals() -> void:
+	for poi_id_variant in _poi_visuals_by_id.keys():
+		var poi_id := StringName(poi_id_variant)
+		var visual_data: Dictionary = _poi_visuals_by_id[poi_id]
+		var label: Label = visual_data.get("label")
+		var marker: Polygon2D = visual_data.get("marker")
+		var base_text := String(visual_data.get("base_text", ""))
+		var base_marker_color: Color = visual_data.get("base_marker_color", Color.WHITE)
+		var base_label_color: Color = visual_data.get("base_label_color", Color.WHITE)
+		var modifier_id := _get_daily_poi_modifier(poi_id)
+		if modifier_id == StringName():
+			label.text = base_text
+			label.add_theme_color_override("font_color", base_label_color)
+			marker.color = base_marker_color
+			continue
+		label.text = "%s %s" % [base_text, _get_modifier_label_text(modifier_id)]
+		var modifier_tint := _get_modifier_tint(modifier_id)
+		label.add_theme_color_override("font_color", modifier_tint)
+		marker.color = base_marker_color.lerp(modifier_tint, 0.35)
+
+
+func _get_poi_id_from_name(node_name: String) -> StringName:
+	var lower_name := node_name.to_lower()
+	if not lower_name.begins_with("poi_") or lower_name.length() < 5:
+		return StringName()
+	return StringName("poi_%s" % lower_name.substr(4, 1))
+
+
+func _get_modifier_label_text(modifier_id: StringName) -> String:
+	match modifier_id:
+		&"bountiful_food":
+			return "+Food"
+		&"extra_parts":
+			return "+Parts"
+		&"disturbed":
+			return "Alert"
+		&"elite_present":
+			return "Elite"
+	return ""
+
+
+func _get_modifier_tint(modifier_id: StringName) -> Color:
+	match modifier_id:
+		&"bountiful_food":
+			return Color(0.62, 0.92, 0.48, 1.0)
+		&"extra_parts":
+			return Color(0.74, 0.9, 1.0, 1.0)
+		&"disturbed":
+			return Color(1.0, 0.7, 0.34, 1.0)
+		&"elite_present":
+			return Color(1.0, 0.82, 0.4, 1.0)
+	return Color.WHITE
+
+
+func _get_daily_modifier_summary() -> String:
+	var clauses: Array[String] = []
+	for poi_id_variant in _daily_poi_modifiers.keys():
+		var poi_id := StringName(poi_id_variant)
+		var modifier_id := StringName(_daily_poi_modifiers[poi_id])
+		var poi_name := _get_poi_display_name(poi_id)
+		match modifier_id:
+			&"bountiful_food":
+				clauses.append("%s has extra food." % poi_name)
+			&"extra_parts":
+				clauses.append("%s has extra parts." % poi_name)
+			&"disturbed":
+				clauses.append("%s is disturbed." % poi_name)
+			&"elite_present":
+				clauses.append("%s has an elite guard." % poi_name)
+	return " ".join(clauses)
+
+
+func _get_poi_display_name(poi_id: StringName) -> String:
+	if not _poi_visuals_by_id.has(poi_id):
+		return String(poi_id)
+	return String(_poi_visuals_by_id[poi_id].get("base_text", String(poi_id)))
+
+
+func _get_daily_poi_modifier(poi_id: StringName) -> StringName:
+	return StringName(_daily_poi_modifiers.get(poi_id, StringName()))
+
+
+func _get_adjusted_exploration_spawn_count(spawn_point) -> int:
+	var spawn_id := String(spawn_point.spawn_id)
+	var target_count := _get_or_roll_exploration_spawn_count(spawn_point)
+	var poi_id := _get_poi_id_for_exploration_spawn(spawn_point)
+	if poi_id == StringName():
+		_current_exploration_target_counts[spawn_id] = target_count
+		return target_count
+	if _get_daily_poi_modifier(poi_id) == &"disturbed":
+		target_count += 1
+	_current_exploration_target_counts[spawn_id] = target_count
+	return target_count
+
+
+func _get_poi_id_for_exploration_spawn(spawn_point) -> StringName:
+	if spawn_point == null:
+		return StringName()
+	return _get_poi_id_from_name(String(spawn_point.name))
+
+
+func _sync_daily_modifier_enemies() -> void:
+	if game_manager.run_state != game_manager.RunState.PRE_WAVE:
+		return
+	for poi_id_variant in _daily_poi_modifiers.keys():
+		var poi_id := StringName(poi_id_variant)
+		if _get_daily_poi_modifier(poi_id) != &"elite_present":
+			continue
+		if _has_active_daily_modifier_elite(poi_id):
+			continue
+		var guard_spawn = _get_poi_guard_spawn_point(poi_id)
+		if guard_spawn == null:
+			continue
+		_spawn_daily_modifier_elite(poi_id, guard_spawn)
+
+
+func _clear_stale_daily_modifier_enemies() -> void:
+	if exploration_enemy_layer == null:
+		return
+	for child in exploration_enemy_layer.get_children():
+		if not is_instance_valid(child):
+			continue
+		if child.is_queued_for_deletion():
+			continue
+		if String(child.get_meta("spawn_kind", "")) != "daily_modifier_elite":
+			continue
+		var poi_id := StringName(child.get_meta("daily_modifier_poi_id", StringName()))
+		if _get_daily_poi_modifier(poi_id) == &"elite_present":
+			continue
+		child.queue_free()
+
+
+func _has_active_daily_modifier_elite(poi_id: StringName) -> bool:
+	for child in exploration_enemy_layer.get_children():
+		if not is_instance_valid(child):
+			continue
+		if child.is_queued_for_deletion():
+			continue
+		if StringName(child.get_meta("daily_modifier_poi_id", StringName())) == poi_id:
+			return true
+	return false
+
+
+func _spawn_daily_modifier_elite(poi_id: StringName, guard_spawn) -> void:
+	var elite_definition := _resolve_daily_modifier_elite_definition(guard_spawn)
+	if exploration_enemy_scene == null or elite_definition == null:
+		return
+	var enemy = exploration_enemy_scene.instantiate()
+	enemy.definition = elite_definition
+	exploration_enemy_layer.add_child(enemy)
+	enemy.global_position = _get_exploration_spawn_position(guard_spawn)
+	enemy.set_meta("spawn_kind", "daily_modifier_elite")
+	enemy.set_meta("daily_modifier_poi_id", poi_id)
+	var initial_facing := Vector2.ZERO
+	if guard_spawn.has_method("get_initial_facing_vector"):
+		initial_facing = guard_spawn.get_initial_facing_vector()
+	var anchor_position: Vector2 = enemy.global_position
+	if guard_spawn.has_method("get_anchor_position"):
+		anchor_position = guard_spawn.get_anchor_position()
+	if enemy.has_method("configure_exploration_context"):
+		enemy.configure_exploration_context(player, initial_facing, true, anchor_position, true)
+
+
+func _resolve_daily_modifier_elite_definition(guard_spawn) -> Resource:
+	if guard_spawn != null and guard_spawn.daily_elite_definition != null:
+		var candidate: Resource = guard_spawn.daily_elite_definition
+		if candidate.get_script() == ENEMY_DEFINITION_SCRIPT and candidate.is_valid_definition() and bool(candidate.is_elite):
+			return candidate
+	if default_daily_elite_enemy != null:
+		if default_daily_elite_enemy.get_script() == ENEMY_DEFINITION_SCRIPT and default_daily_elite_enemy.is_valid_definition() and bool(default_daily_elite_enemy.is_elite):
+			return default_daily_elite_enemy
+	return null
+
+
+func _get_poi_guard_spawn_point(poi_id: StringName):
+	if exploration_spawn_points_root == null:
+		return null
+	for child in exploration_spawn_points_root.get_children():
+		if child == null or child.get_script() != EXPLORATION_SPAWN_POINT_SCRIPT:
+			continue
+		if _get_poi_id_for_exploration_spawn(child) == poi_id:
+			return child
+	return null
+
+
+func debug_get_daily_poi_modifiers() -> Dictionary:
+	return _daily_poi_modifiers.duplicate(true)
+
+
+func debug_set_daily_poi_modifiers(modifiers: Dictionary) -> void:
+	_daily_poi_modifiers = modifiers.duplicate(true)
+	_refresh_poi_modifier_visuals()
+
+
+func debug_queue_forced_next_daily_poi_modifiers(modifiers: Dictionary) -> void:
+	_debug_forced_next_daily_poi_modifiers = modifiers.duplicate(true)
+
+
+func debug_get_poi_label_text(poi_id: StringName) -> String:
+	if not _poi_visuals_by_id.has(poi_id):
+		return ""
+	var visual_data: Dictionary = _poi_visuals_by_id[poi_id]
+	var label: Label = visual_data.get("label")
+	return label.text if label != null else ""
 
 
 func _sync_exploration_enemies() -> void:
@@ -405,7 +816,7 @@ func _sync_exploration_enemies() -> void:
 		if _defeated_exploration_spawn_ids.has(spawn_id):
 			continue
 
-		var target_count: int = _get_or_roll_exploration_spawn_count(child)
+		var target_count: int = _get_adjusted_exploration_spawn_count(child)
 		var defeated_count := int(_defeated_exploration_enemy_counts.get(spawn_id, 0))
 		var existing_count: int = 0
 		if existing_by_spawn_id.has(spawn_id):
@@ -522,12 +933,47 @@ func _get_missing_food_units_for_full_energy() -> int:
 	return int(ceili(float(missing_energy) / float(max(food_energy_per_unit, 1))))
 
 
-func _on_exploration_enemy_died(_enemy, spawn_id: String) -> void:
+func _on_exploration_enemy_died(enemy, spawn_id: String) -> void:
 	var defeated_count := int(_defeated_exploration_enemy_counts.get(spawn_id, 0)) + 1
 	_defeated_exploration_enemy_counts[spawn_id] = defeated_count
-	var target_count := int(_exploration_spawn_counts.get(spawn_id, 1))
-	if defeated_count >= target_count:
+	var target_count := int(_current_exploration_target_counts.get(spawn_id, 0))
+	if target_count <= 0:
+		var spawn_point = _get_exploration_spawn_point_by_id(spawn_id)
+		if spawn_point != null:
+			target_count = _get_adjusted_exploration_spawn_count(spawn_point)
+		else:
+			target_count = int(_exploration_spawn_counts.get(spawn_id, 1))
+	var remaining_live_count := _count_live_exploration_enemies_for_spawn_id(spawn_id, enemy)
+	if defeated_count >= target_count and remaining_live_count <= 0:
 		_defeated_exploration_spawn_ids[spawn_id] = true
+
+
+func _get_exploration_spawn_point_by_id(spawn_id: String):
+	if exploration_spawn_points_root == null:
+		return null
+	for child in exploration_spawn_points_root.get_children():
+		if child == null or child.get_script() != EXPLORATION_SPAWN_POINT_SCRIPT:
+			continue
+		if String(child.spawn_id) == spawn_id:
+			return child
+	return null
+
+
+func _count_live_exploration_enemies_for_spawn_id(spawn_id: String, excluded_enemy = null) -> int:
+	if exploration_enemy_layer == null:
+		return 0
+	var count := 0
+	for child in exploration_enemy_layer.get_children():
+		if child == excluded_enemy:
+			continue
+		if not is_instance_valid(child):
+			continue
+		if child.is_queued_for_deletion():
+			continue
+		if String(child.get_meta("spawn_id", "")) != spawn_id:
+			continue
+		count += 1
+	return count
 
 
 func _get_or_roll_exploration_spawn_count(spawn_point) -> int:

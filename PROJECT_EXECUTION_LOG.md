@@ -1115,3 +1115,138 @@ Validation:
 - Updated bed-gate probe still confirmed:
   - `bed_gate_probe_can_sleep_before=false`
   - `bed_gate_probe_can_sleep_after=true`
+
+### Full Wave-End Probe Upgrade
+- Replaced the remaining forced wave-end shortcuts in the day-night probes with an actual “kill spawned enemies until the wave clears itself” loop.
+- This exposed and fixed a real probe/runtime bug in `Zombie._spawn_death_drop()`, which had assumed `get_tree().current_scene` always existed.
+
+Validation:
+- Headless Godot project load still succeeded.
+- End-to-end day-night cycle probe now reaches:
+  - `day_night_cycle_probe_after_wave_state=2`
+  - `day_night_cycle_probe_after_sleep_state=0`
+- End-to-end bed-gate probe now reaches:
+  - `bed_gate_probe_can_sleep_after=true`
+  - `bed_gate_probe_after_sleep_state=0`
+
+### Mechanics Plan Revision
+- Added `MECHANICS_IMPLEMENTATION_PLAN.md` to capture the revised next-step design direction:
+  - local firearm noise attraction
+  - daily POI modifiers
+  - weapon sidegrades with explicit visible traits
+- Locked implementation scope to Phase 1 only for now: firearm noise with bounded investigate behavior.
+
+### Firearm Noise Phase 1
+- Added authored weapon noise fields:
+  - `noise_radius`
+  - `noise_alert_budget`
+- Added authored enemy `noise_alert_weight`.
+- Player firearms now emit a local noise event on shot commit.
+- Exploration enemies now support a bounded `investigate` state from gunfire instead of jumping straight into full omniscient chase.
+- The game now wakes the nearest exploration enemies within noise radius until the shot’s alert budget is exhausted.
+
+Validation:
+- Headless Godot project load still succeeded.
+- New firearm noise probe confirmed:
+  - `firearm_noise_probe_pistol_investigating=2`
+  - `firearm_noise_probe_shotgun_investigating=2`
+  - `firearm_noise_probe_open_pistol_investigating=0`
+  - `firearm_noise_probe_open_shotgun_investigating=2`
+  - `firearm_noise_probe_after_timeout_investigating=0`
+
+### Daily POI Modifiers Phase 2 Slice
+- Implemented the first working daily POI modifier slice in `Game` and `ScavengeNode`.
+- Added:
+  - one positive daily POI modifier
+  - one negative daily POI modifier
+  - depletion-aware rerolls
+  - visible POI label and marker updates
+- Current modifier effects:
+  - `bountiful_food`: `+1 food` on POI searches
+  - `extra_parts`: `+1 parts` on POI searches
+  - `disturbed`: `+1` exploration guard count at that POI
+  - `elite_present`: one extra elite exploration enemy at that POI
+- Also added cleanup so daily elite enemies do not linger into a later day after the modifier moves elsewhere.
+
+Validation:
+- Headless Godot project load still succeeded.
+- New daily POI modifier probe confirmed:
+  - `daily_poi_modifier_probe_positive_count=1`
+  - `daily_poi_modifier_probe_negative_count=1`
+  - `daily_poi_modifier_probe_food_reward=3`
+  - `daily_poi_modifier_probe_disturbed_counts=6>5`
+  - `daily_poi_modifier_probe_elite_count=1`
+  - `daily_poi_modifier_probe_elite_cleared=0`
+  - `daily_poi_modifier_probe_depleted_poi_a_selected=false`
+  - `daily_poi_modifier_probe_after_reset_positive=1`
+  - `daily_poi_modifier_probe_after_reset_negative=1`
+- Re-ran broader sanity probes after the phase 2 changes:
+  - `day_night_cycle_probe_after_sleep_state=0`
+  - `day_night_cycle_probe_after_sleep_enemy_count=18`
+  - `firearm_noise_probe_after_timeout_investigating=0`
+
+### Phase 2 Review Hardening
+- Fixed `disturbed` so the modifier now raises the real POI clear threshold, not just the spawned guard count.
+- Moved daily elite selection onto the authored exploration spawn points with a scene-level fallback instead of hardcoding one elite type in `Game`.
+- Added a second authored daily elite variant: `zombie_elite_brute`.
+- Strengthened the daily POI modifier probe so it now covers:
+  - real day rerolls
+  - disturbed clear bookkeeping
+  - alternate elite selection
+  - depleted-POI skip behavior
+- Restored normal run defaults by turning `enable_test_mode` back off in `Game.tscn`.
+
+Validation:
+- Headless Godot project load still succeeded.
+- Updated daily POI modifier probe confirmed:
+  - `daily_poi_modifier_probe_live_cycle_positive=1`
+  - `daily_poi_modifier_probe_live_cycle_negative=1`
+  - `daily_poi_modifier_probe_disturbed_cleared_after_base=false`
+  - `daily_poi_modifier_probe_disturbed_cleared_after_extra=true`
+  - `daily_poi_modifier_probe_elite_enemy_id=zombie_elite_spitter`
+  - `daily_poi_modifier_probe_alt_elite_enemy_id=zombie_elite_brute`
+  - `daily_poi_modifier_probe_depleted_poi_a_selected=false`
+
+### Phase 3 Weapon Sidegrades
+- Added visible weapon trait text to the HUD and player weapon-state flow.
+- Implemented:
+  - `Kitchen Knife`: isolated-target bonus damage
+  - `Baseball Bat`: explicit attack-prep interrupt
+  - `Pistol`: precise/noisy role text
+  - `Shotgun`: clustered-target bonus damage and very-noisy role text
+- Added `weapon_sidegrade_probe.gd` and `hud_weapon_probe.gd` to verify sidegrade behavior and live HUD trait text.
+
+Validation:
+- Headless Godot project load still succeeded.
+- Initial sidegrade probes confirmed:
+  - `weapon_sidegrade_probe_knife_isolated_health=22`
+  - `weapon_sidegrade_probe_knife_group_health_a=28`
+  - `weapon_sidegrade_probe_knife_group_health_b=28`
+  - `weapon_sidegrade_probe_bat_prep_before=true`
+  - `weapon_sidegrade_probe_bat_prep_after=false`
+  - `weapon_sidegrade_probe_shotgun_health_a=6`
+  - `weapon_sidegrade_probe_shotgun_health_b=6`
+- HUD weapon probe confirmed:
+  - `initial_weapon_trait=Fast, isolated`
+  - `after_bat_weapon_trait=Interrupt`
+
+### Sidegrade Review Follow-Up
+- Removed the generic “knockback always resets attack prep” behavior from `Zombie` so the bat's `Interrupt` trait is actually unique.
+- Extended the sidegrade probe with a pistol control case:
+  - bat still cancels prep
+  - pistol now preserves armed prep
+- Hardened the sidegrade probe twice:
+  - first to use the real attack state machine instead of direct `_commit_attack(...)`
+  - then to use the actual `attack` input path instead of calling `_attempt_attack()` directly
+
+Validation:
+- Headless Godot project load still succeeded.
+- Input-driven sidegrade probe confirmed:
+  - `weapon_sidegrade_probe_bat_prep_after=false`
+  - `weapon_sidegrade_probe_pistol_prep_after=true`
+  - `weapon_sidegrade_probe_shotgun_target_count=2`
+- Regression probes still passed:
+  - `firearm_noise_probe_after_timeout_investigating=0`
+  - `daily_poi_modifier_probe_after_reset_positive=1`
+  - `daily_poi_modifier_probe_after_reset_negative=1`
+  - `day_night_cycle_probe_after_sleep_state=0`

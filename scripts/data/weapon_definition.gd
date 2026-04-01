@@ -3,9 +3,12 @@ class_name WeaponDefinition
 
 @export var weapon_id: StringName = &"weapon"
 @export var display_name: String = "Weapon"
+@export var hud_trait_text: String = ""
 @export var damage: int = 25
 @export var damage_type: StringName = &"melee"
 @export_enum("melee", "hitscan", "spread_hitscan") var attack_mode: String = "melee"
+@export_range(0.0, 600.0, 5.0) var noise_radius: float = 0.0
+@export_range(0.0, 12.0, 0.5) var noise_alert_budget: float = 0.0
 @export var energy_cost: int = 1
 @export var attack_cooldown: float = 0.45
 @export var uses_magazine: bool = false
@@ -26,6 +29,9 @@ class_name WeaponDefinition
 ])
 @export var held_visual_color: Color = Color(0.86, 0.86, 0.9, 1.0)
 @export_range(0.0, 1200.0, 10.0) var knockback_force: float = 0.0
+@export_range(0, 50, 1) var isolated_bonus_damage: int = 0
+@export var interrupt_attack_prep: bool = false
+@export_range(0, 50, 1) var cluster_bonus_damage: int = 0
 @export var attack_flash_color: Color = Color(1.0, 0.83, 0.42, 0.75)
 @export var attack_flash_start_scale: Vector2 = Vector2(0.8, 0.8)
 @export var attack_flash_peak_scale: Vector2 = Vector2(1.1, 1.1)
@@ -58,7 +64,11 @@ func is_valid_definition() -> bool:
 		return false
 	if damage < 0:
 		return false
+	if isolated_bonus_damage < 0 or cluster_bonus_damage < 0:
+		return false
 	if attack_mode != "melee" and attack_mode != "hitscan" and attack_mode != "spread_hitscan":
+		return false
+	if noise_radius < 0.0 or noise_alert_budget < 0.0:
 		return false
 	if energy_cost < 0:
 		return false

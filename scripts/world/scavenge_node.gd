@@ -17,6 +17,7 @@ const WEAPON_DEFINITION_SCRIPT := preload("res://scripts/data/weapon_definition.
 
 var is_depleted: bool = false
 var _is_searching: bool = false
+var _reward_modifier_provider: Callable = Callable()
 
 @onready var visual: Polygon2D = $Visual
 @onready var label: Label = $Label
@@ -80,6 +81,8 @@ func _complete_search(player) -> void:
 		"bullets": reward_bullets,
 		"food": reward_food,
 	}
+	if _reward_modifier_provider.is_valid():
+		rewards = _reward_modifier_provider.call(self, rewards)
 	_apply_bonus_reward(rewards)
 	_grant_rewards(player, rewards)
 	_refresh_visuals()
@@ -150,3 +153,7 @@ func reset_for_new_run() -> void:
 	is_depleted = false
 	_is_searching = false
 	_refresh_visuals()
+
+
+func configure_reward_modifier(provider: Callable) -> void:
+	_reward_modifier_provider = provider

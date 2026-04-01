@@ -6,6 +6,7 @@
 script = ExtResource("1_weapon")
 weapon_id = &"kitchen_knife"
 display_name = "Kitchen Knife"
+hud_trait_text = "Fast, isolated"
 damage = 22
 damage_type = &"melee"
 energy_cost = 1
@@ -18,6 +19,7 @@ held_visual_offset = Vector2(9, -10)
 held_visual_polygon = PackedVector2Array(0, -12, 3, -4, 2, 10, -2, 10, -3, -4)
 held_visual_color = Color(0.52, 0.6, 0.74, 1)
 knockback_force = 0.0
+isolated_bonus_damage = 6
 attack_flash_color = Color(1, 0.9, 0.62, 0.75)
 attack_flash_start_scale = Vector2(0.72, 0.72)
 attack_flash_peak_scale = Vector2(1.12, 1.12)

@@ -5,6 +5,7 @@ const ENEMY_DEFINITION_SCRIPT := preload("res://scripts/data/enemy_definition.gd
 
 @export var spawn_id: StringName
 @export var enemy_definition: Resource
+@export var daily_elite_definition: Resource
 @export_range(1, 12, 1) var min_count: int = 1
 @export_range(1, 12, 1) var max_count: int = 5
 @export_range(0.0, 256.0, 1.0) var scatter_radius: float = 36.0
@@ -17,6 +18,13 @@ func is_valid_spawn_point() -> bool:
 		return false
 	if enemy_definition == null or enemy_definition.get_script() != ENEMY_DEFINITION_SCRIPT:
 		return false
+	if daily_elite_definition != null:
+		if daily_elite_definition.get_script() != ENEMY_DEFINITION_SCRIPT:
+			return false
+		if not daily_elite_definition.is_valid_definition():
+			return false
+		if not bool(daily_elite_definition.is_elite):
+			return false
 	if min_count <= 0 or max_count < min_count:
 		return false
 	if scatter_radius < 0.0:

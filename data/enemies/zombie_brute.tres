@@ -24,6 +24,7 @@ chase_player_when_nearby = true
 chase_overrides_target_mode = false
 alert_nearby_enemies = true
 ally_alert_radius = 80.0
+noise_alert_weight = 2.0
 player_detection_radius = 72.0
 player_chase_break_radius = 112.0
 fallback_to_player_when_no_sockets = true

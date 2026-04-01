@@ -21,11 +21,11 @@ The current run can start with hostile POIs already active, while wave enemies r
 The repo currently includes:
 - project scaffold and main scene setup
 - player movement, health, energy, melee/ranged attack, medicine use, and inventory tracking
-- multiple weapons, including POI-obtained baseball bat, pistol, and shotgun upgrades, bullet pickups, weapon switching, reloadable firearm behavior, and simple on-player weapon illustrations
+- multiple weapons, including POI-obtained baseball bat, pistol, and shotgun upgrades, bullet pickups, weapon switching, reloadable firearm behavior, simple on-player weapon illustrations, and visible weapon-trait HUD text
 - food as a prep resource, a dinner-at-table transition that starts the night wave, and bed-based sleep that returns the run to the next day with partial HP restore
-- six authored POIs, eight authored waves, roaming prep-stage exploration spawns, and five live enemy definitions including an elite spitter variant
+- six authored POIs, eight authored waves, roaming prep-stage exploration spawns, and six live enemy definitions including elite spitter and elite brute variants
 - fortified wall/door upgrades beyond the original reinforced tier
-- review-driven guardrails around elite-only weapon drops, spitter structure range, and reset-state UI consistency
+- review-driven guardrails around elite-only weapon drops, spitter structure range, reset-state UI consistency, and bat-only attack interrupt behavior
 - HUD for core status display, including the currently equipped weapon
 - placeholder world scenes for sockets, scavenging nodes, bed/table interactions, pickups, and zombie enemy
 - consolidated MVP0 design/spec documentation

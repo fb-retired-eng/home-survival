@@ -192,7 +192,7 @@ Use stable IDs for authored content. MVP0 only needs a few, but the pattern shou
 - POIs: `poi_a`, `poi_b`, `poi_c`, `poi_d`, `poi_e`, `poi_f`
 - spawn lanes: `north`, `east`, `west`
 - enemy archetypes: `zombie_basic`, `zombie_brute`, `zombie_runner`, `zombie_spitter`
-- elite variant currently authored: `zombie_elite_spitter`
+- elite variants currently authored: `zombie_elite_spitter`, `zombie_elite_brute`
 - socket IDs: the 4 fixed socket IDs listed above
 
 Future systems should refer to these IDs, not scene paths or display names.

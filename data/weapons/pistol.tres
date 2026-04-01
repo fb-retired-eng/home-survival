@@ -6,9 +6,12 @@
 script = ExtResource("1_weapon")
 weapon_id = &"pistol"
 display_name = "Pistol"
+hud_trait_text = "Precise, noisy"
 damage = 24
 damage_type = &"ballistic"
 attack_mode = "hitscan"
+noise_radius = 160.0
+noise_alert_budget = 3.0
 energy_cost = 1
 attack_cooldown = 0.36
 uses_magazine = true

@@ -15,8 +15,10 @@ func _init() -> void:
 	hud.bind_player(player)
 	await process_frame
 	print("initial_weapon_label=%s" % hud.get_node("MainPanel/MarginContainer/VBoxContainer/MetaRow/WeaponLabel").text)
+	print("initial_weapon_trait=%s" % hud.get_node("MainPanel/MarginContainer/VBoxContainer/WeaponTraitLabel").text)
 
 	player.obtain_weapon(bat, true, false)
 	await process_frame
 	print("after_bat_weapon_label=%s" % hud.get_node("MainPanel/MarginContainer/VBoxContainer/MetaRow/WeaponLabel").text)
+	print("after_bat_weapon_trait=%s" % hud.get_node("MainPanel/MarginContainer/VBoxContainer/WeaponTraitLabel").text)
 	quit()

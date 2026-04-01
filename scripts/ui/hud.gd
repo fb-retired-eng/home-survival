@@ -17,6 +17,7 @@ var _phase_text: String = "Pre-Wave"
 @onready var wave_label: Label = %WaveLabel
 @onready var base_label: Label = %BaseLabel
 @onready var weapon_label: Label = %WeaponLabel
+@onready var weapon_trait_label: Label = %WeaponTraitLabel
 @onready var resources_label: Label = %ResourcesLabel
 @onready var status_label: Label = %StatusLabel
 @onready var interaction_panel: PanelContainer = %InteractionLabel.get_parent()
@@ -34,11 +35,13 @@ func bind_player(target) -> void:
 	player.interaction_prompt_changed.connect(set_interaction_prompt)
 	player.weapon_changed.connect(_on_weapon_changed)
 	player.weapon_status_changed.connect(_on_weapon_status_changed)
+	player.weapon_trait_changed.connect(_on_weapon_trait_changed)
 	_on_health_changed(player.current_health, player.max_health)
 	_on_energy_changed(player.current_energy, player.max_energy)
 	_on_resources_changed(player.resources.duplicate(true))
 	_on_weapon_changed(player.get_equipped_weapon_display_name(), StringName())
 	_on_weapon_status_changed(player.get_weapon_status_text())
+	_on_weapon_trait_changed(player.get_weapon_trait_text())
 	set_interaction_prompt("")
 
 
@@ -86,6 +89,15 @@ func _on_weapon_changed(display_name: String, _weapon_id: StringName) -> void:
 
 func _on_weapon_status_changed(text: String) -> void:
 	weapon_label.text = text
+
+
+func _on_weapon_trait_changed(text: String) -> void:
+	if text.is_empty():
+		weapon_trait_label.visible = false
+		weapon_trait_label.text = ""
+		return
+	weapon_trait_label.visible = true
+	weapon_trait_label.text = text
 
 
 func _on_health_changed(current: int, maximum: int) -> void:

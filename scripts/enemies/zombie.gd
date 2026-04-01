@@ -35,6 +35,10 @@ var _facing_direction: Vector2 = Vector2.DOWN
 var _is_chasing_player: bool = false
 var _is_exploration_suspended: bool = false
 var _is_alerted_to_player: bool = false
+var _is_investigating_noise: bool = false
+var _noise_investigation_position: Vector2 = Vector2.ZERO
+var _noise_investigation_remaining: float = 0.0
+var _noise_investigation_detect_delay_remaining: float = 0.0
 var _attack_prep_remaining: float = 0.0
 var _attack_prep_armed: bool = false
 var _attack_prep_target_id: int = 0
@@ -67,6 +71,7 @@ func configure_wave_context(player_ref, defense_sockets: Array, preferred_socket
 	_player_ref = player_ref
 	_wave_sockets = defense_sockets.duplicate()
 	_preferred_socket_ids = preferred_socket_ids
+	_clear_noise_investigation()
 	_refresh_spawn_facing()
 
 
@@ -75,6 +80,7 @@ func configure_exploration_context(player_ref, initial_facing_direction: Vector2
 	_player_ref = player_ref
 	_wave_sockets.clear()
 	_preferred_socket_ids = PackedStringArray()
+	_clear_noise_investigation()
 	if set_anchor:
 		_exploration_anchor_position = anchor_position
 		_exploration_anchor_facing = initial_facing_direction
@@ -105,6 +111,8 @@ func set_exploration_suspended(suspended: bool) -> void:
 	set_physics_process(not suspended)
 	velocity = Vector2.ZERO
 	_knockback_velocity = Vector2.ZERO
+	if suspended:
+		_clear_noise_investigation()
 	if collision_shape != null:
 		collision_shape.disabled = suspended
 	if damage_area != null:
@@ -120,16 +128,40 @@ func is_engaged_with_player() -> bool:
 	return _is_chasing_player or _is_player_body_touching(live_player)
 
 
+func get_noise_alert_weight() -> float:
+	if definition == null:
+		return 1.0
+	return max(float(definition.noise_alert_weight), 0.0)
+
+
+func is_investigating_noise() -> bool:
+	return _has_active_noise_investigation()
+
+
+func is_attack_prep_armed() -> bool:
+	return _attack_prep_armed
+
+
 func _physics_process(delta: float) -> void:
 	_damage_cooldown_remaining = max(_damage_cooldown_remaining - delta, 0.0)
 	_attack_prep_remaining = max(_attack_prep_remaining - delta, 0.0)
 	_attack_prep_lost_target_grace_remaining = max(_attack_prep_lost_target_grace_remaining - delta, 0.0)
+	_noise_investigation_remaining = max(_noise_investigation_remaining - delta, 0.0)
+	_noise_investigation_detect_delay_remaining = max(_noise_investigation_detect_delay_remaining - delta, 0.0)
 	_decay_knockback(delta)
 	_update_player_chase_state()
 	var primary_target = _get_current_target()
 	_player_obstructing_this_frame = false
 	if _knockback_velocity.length_squared() > 0.01:
 		velocity = _knockback_velocity
+	elif _has_active_noise_investigation() and not _is_chasing_player:
+		var investigate_offset := _noise_investigation_position - global_position
+		if investigate_offset.length() <= 12.0 or _noise_investigation_remaining <= 0.0:
+			_clear_noise_investigation()
+			velocity = Vector2.ZERO
+		else:
+			velocity = investigate_offset.normalized() * move_speed
+			_update_facing_direction(investigate_offset)
 	elif primary_target != null and is_instance_valid(primary_target) and not _is_target_in_damage_range(primary_target):
 		velocity = _compute_move_velocity(primary_target)
 		if not velocity.is_zero_approx():
@@ -143,8 +175,6 @@ func _physics_process(delta: float) -> void:
 	_player_obstructing_this_frame = _is_player_obstructing(primary_target)
 
 	if _is_under_knockback():
-		if _attack_prep_armed:
-			_reset_attack_prep()
 		return
 
 	var attack_target = _get_attack_target(primary_target)
@@ -215,6 +245,7 @@ func take_damage(amount: int, _source: Variant = null) -> void:
 
 	_alert_to_player_from_source(_source)
 	_apply_knockback_from_source(_source)
+	_apply_attack_interrupt_from_source(_source)
 	var damage_amount := _resolve_damage_taken(amount, _source)
 	if damage_amount <= 0:
 		return
@@ -491,6 +522,15 @@ func _apply_knockback_from_source(source: Variant) -> void:
 		return
 
 	_knockback_velocity = knockback_direction * applied_force
+
+
+func _apply_attack_interrupt_from_source(source: Variant) -> void:
+	if source == null or typeof(source) != TYPE_DICTIONARY:
+		return
+	if not bool(source.get("interrupt_attack_prep", false)):
+		return
+	if not _attack_prep_armed:
+		return
 	_reset_attack_prep()
 
 
@@ -576,9 +616,46 @@ func _update_player_chase_state() -> void:
 		_is_chasing_player = distance_to_player <= _get_player_chase_break_radius()
 		return
 
+	if _has_active_noise_investigation() and _noise_investigation_detect_delay_remaining > 0.0:
+		_is_chasing_player = false
+		return
+
 	if distance_to_player <= _get_player_detection_radius():
 		_alert_to_player(live_player)
 		_is_chasing_player = true
+
+
+func _has_active_noise_investigation() -> bool:
+	return _is_investigating_noise and _noise_investigation_remaining > 0.0
+
+
+func _clear_noise_investigation() -> void:
+	_is_investigating_noise = false
+	_noise_investigation_position = Vector2.ZERO
+	_noise_investigation_remaining = 0.0
+	_noise_investigation_detect_delay_remaining = 0.0
+
+
+func _get_noise_investigation_duration() -> float:
+	return 3.0
+
+
+func _get_noise_investigation_detect_delay() -> float:
+	return 0.45
+
+
+func receive_noise_alert(player_ref, source_position: Vector2) -> void:
+	if _behavior_context != &"exploration" or _is_exploration_suspended:
+		return
+	if _is_alerted_to_player or _is_chasing_player:
+		return
+	if player_ref != null and is_instance_valid(player_ref):
+		_player_ref = player_ref
+	_is_investigating_noise = true
+	_noise_investigation_position = source_position
+	_noise_investigation_remaining = _get_noise_investigation_duration()
+	_noise_investigation_detect_delay_remaining = _get_noise_investigation_detect_delay()
+	_update_facing_direction(source_position - global_position)
 
 
 func _process_attack_prep(attack_target) -> bool:
@@ -1060,6 +1137,7 @@ func _alert_to_player(player_ref, propagate: bool = true) -> void:
 		return
 
 	_player_ref = player_ref
+	_clear_noise_investigation()
 	var was_alerted := _is_alerted_to_player
 	_is_alerted_to_player = true
 	_is_chasing_player = true
@@ -1097,7 +1175,9 @@ func _spawn_death_drop() -> void:
 		return
 
 	var drop_parent: Node = get_parent()
-	var world_node := get_tree().current_scene.get_node_or_null("World")
+	var scene_tree := get_tree()
+	var current_scene := scene_tree.current_scene if scene_tree != null else null
+	var world_node = current_scene.get_node_or_null("World") if current_scene != null else null
 	if world_node != null:
 		drop_parent = world_node
 
