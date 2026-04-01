@@ -1,0 +1,24 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/construction_grid.gd" id="1_construction_grid"]
+
+[node name="ConstructionGrid" type="Node2D"]
+script = ExtResource("1_construction_grid")
+z_as_relative = false
+z_index = 40
+
+[node name="BuildableOverlay" type="Node2D" parent="."]
+
+[node name="ReservedOverlay" type="Node2D" parent="."]
+
+[node name="Preview" type="Polygon2D" parent="."]
+visible = false
+color = Color(0.36, 0.9, 0.48, 0.58)
+polygon = PackedVector2Array(-20, -20, 20, -20, 20, 20, -20, 20)
+
+[node name="PreviewOutline" type="Line2D" parent="."]
+visible = false
+width = 3.0
+default_color = Color(0.96, 0.98, 0.92, 0.95)
+closed = true
+points = PackedVector2Array(-20, -20, 20, -20, 20, 20, -20, 20)

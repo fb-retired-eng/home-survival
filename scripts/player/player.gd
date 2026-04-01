@@ -33,6 +33,7 @@ signal weapon_changed(display_name: String, weapon_id: StringName)
 signal weapon_status_changed(text: String)
 signal weapon_trait_changed(text: String)
 signal weapon_noise_emitted(source_position: Vector2, noise_radius: float, noise_alert_budget: float, weapon_id: StringName)
+signal build_mode_toggled(active: bool)
 
 @export var max_health: int = 100
 @export var max_energy: int = 100
@@ -104,6 +105,8 @@ var _magazine_ammo_by_weapon_id: Dictionary = {}
 var _reload_time_remaining: float = 0.0
 var _reload_weapon_id: StringName = StringName()
 var _shot_impact_tween: Tween
+var _build_mode_active: bool = false
+var _build_mode_allowed: bool = true
 
 @onready var body_visual: Polygon2D = $Body
 @onready var facing_marker: Polygon2D = $FacingMarker
@@ -170,6 +173,12 @@ func _physics_process(delta: float) -> void:
 	velocity += _knockback_velocity
 	move_and_slide()
 	_update_render_order()
+
+	if Input.is_action_just_pressed("build_mode"):
+		_attempt_toggle_build_mode()
+
+	if _build_mode_active:
+		return
 
 	if Input.is_action_just_pressed("interact"):
 		_attempt_interact()
@@ -312,6 +321,29 @@ func set_interaction_gate(callback: Callable) -> void:
 
 func refresh_interaction_prompt() -> void:
 	_update_interaction_prompt()
+
+
+func set_build_mode_allowed(allowed: bool) -> void:
+	_build_mode_allowed = allowed
+	if not allowed and _build_mode_active:
+		set_build_mode_active(false, false)
+
+
+func set_build_mode_active(active: bool, show_message: bool = true) -> void:
+	if _build_mode_active == active:
+		return
+	_build_mode_active = active
+	build_mode_toggled.emit(_build_mode_active)
+	if show_message:
+		if _build_mode_active:
+			message_requested.emit("Build mode active")
+		else:
+			message_requested.emit("Build mode closed")
+	_update_interaction_prompt()
+
+
+func is_build_mode_active() -> bool:
+	return _build_mode_active
 
 
 func take_damage(amount: int, _source: Variant = null) -> void:
@@ -544,6 +576,25 @@ func _attempt_reload(auto_triggered: bool) -> void:
 	_begin_reload(weapon, auto_triggered)
 
 
+func _attempt_toggle_build_mode() -> void:
+	if is_dead or is_busy:
+		return
+	if _build_mode_active:
+		set_build_mode_active(false)
+		return
+	if not _build_mode_allowed:
+		message_requested.emit("Can only build during the day")
+		return
+	if _has_active_combat_action():
+		message_requested.emit("Finish current action first")
+		return
+	set_build_mode_active(true)
+
+
+func _has_active_combat_action() -> bool:
+	return _attack_windup_pending or _is_reloading_weapon() or attack_cooldown_remaining > 0.0
+
+
 func _attempt_switch_weapon() -> void:
 	if is_dead or is_busy or _attack_windup_pending:
 		return
@@ -592,6 +643,7 @@ func _die() -> void:
 func reset_for_new_run() -> void:
 	is_dead = false
 	cancel_timed_action()
+	set_build_mode_active(false, false)
 	current_health = max_health
 	current_energy = max_energy
 	resources = {
@@ -784,6 +836,10 @@ func _update_interaction_prompt() -> void:
 
 	if is_busy:
 		interaction_prompt_changed.emit(_busy_label)
+		return
+
+	if _build_mode_active:
+		interaction_prompt_changed.emit("Build Mode")
 		return
 
 	var interactable := _get_active_interactable()

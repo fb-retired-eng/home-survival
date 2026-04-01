@@ -8,6 +8,30 @@ This file is the running execution log for `Home Survival`.
 - Record what changed, why it changed, and how it was validated
 - Keep entries short and operational
 
+## 2026-03-31
+
+### Construction Stage 0/1 Foundation
+- Added [`CONSTRUCTION_SYSTEM_PLAN.md`](CONSTRUCTION_SYSTEM_PLAN.md) to define the staged controlled free-grid construction roadmap, including authored-grid constraints, shared-bullet turret philosophy, and the later auto machine gun path.
+- Added generic construction scaffolding:
+  - [`scripts/world/construction_grid.gd`](scripts/world/construction_grid.gd)
+  - [`scenes/world/ConstructionGrid.tscn`](scenes/world/ConstructionGrid.tscn)
+  - [`scripts/data/placeable_profile.gd`](scripts/data/placeable_profile.gd)
+  - [`scripts/world/placeable.gd`](scripts/world/placeable.gd)
+  - [`scenes/world/Placeable.tscn`](scenes/world/Placeable.tscn)
+- Added an authored construction grid to [`scenes/main/Game.tscn`](scenes/main/Game.tscn) around the base with buildable and reserved cells.
+- Added `B` build-mode toggle plumbing through the real player/game path so the preview can be entered during the day and is disabled outside the day state.
+- Added [`scripts/debug/construction_grid_probe.gd`](scripts/debug/construction_grid_probe.gd) to validate build-mode activation and reserved-vs-valid preview behavior.
+
+Validation:
+- Headless load passed.
+- `construction_grid_probe` passed:
+  - `active=true`
+  - `preview_visible=true`
+  - `reserved_reason=Reserved`
+  - `valid_reason=` (empty, valid)
+  - `valid_cell=(1, 0)`
+  - `inactive=true`
+
 ## 2026-03-28
 
 ### Repository Setup

@@ -26,8 +26,10 @@ const ELITE_MODIFIER_POIS := {
 @export_range(0, 4, 1) var daily_poi_refill_bonus_nodes: int = 1
 @export var enable_test_mode: bool = false
 @export var test_mode_weapons: Array[Resource] = []
-@export var test_mode_bullets: int = 18
-@export var test_mode_food: int = 4
+@export var test_mode_salvage: int = 72
+@export var test_mode_parts: int = 30
+@export var test_mode_bullets: int = 36
+@export var test_mode_food: int = 10
 @export var roaming_early_enemies: Array[Resource] = []
 @export var roaming_mid_enemies: Array[Resource] = []
 @export var roaming_late_enemies: Array[Resource] = []
@@ -40,6 +42,7 @@ const ELITE_MODIFIER_POIS := {
 @onready var sleep_point: Area2D = $World/SleepPoint
 @onready var spawn_markers_root: Node2D = $World/SpawnMarkers
 @onready var defense_sockets: Node2D = $World/DefenseSockets
+@onready var construction_grid = $World/ConstructionGrid
 @onready var exploration_spawn_points_root: Node2D = $World/ExplorationSpawnPoints
 @onready var roaming_spawn_zones_root: Node2D = $World/RoamingSpawnZones
 @onready var exploration_enemy_layer: Node2D = $World/ExplorationEnemies
@@ -80,11 +83,23 @@ func _ready() -> void:
 	player.message_requested.connect(hud.set_status)
 	player.player_died.connect(_on_player_died)
 	player.weapon_noise_emitted.connect(_on_player_weapon_noise_emitted)
+	player.build_mode_toggled.connect(_on_player_build_mode_toggled)
 	game_manager.run_state_changed.connect(_on_run_state_changed)
 	_configure_scavenge_nodes()
+	player.set_build_mode_allowed(game_manager.run_state == game_manager.RunState.PRE_WAVE)
 	_on_wave_changed(game_manager.current_wave)
 	_on_run_state_changed(game_manager.run_state)
 	_refresh_base_status()
+
+
+func _physics_process(_delta: float) -> void:
+	if construction_grid == null:
+		return
+	if not construction_grid.is_build_mode_active():
+		return
+	if player == null or not is_instance_valid(player):
+		return
+	construction_grid.set_preview_world_position(player.global_position)
 
 
 func _build_defense_sockets() -> void:
@@ -181,9 +196,11 @@ func _on_player_died() -> void:
 
 
 func _on_run_state_changed(new_state: int) -> void:
+	player.set_build_mode_allowed(new_state == game_manager.RunState.PRE_WAVE)
 	if new_state == game_manager.RunState.LOSS:
 		wave_manager.reset()
 		_clear_exploration_enemies()
+		player.set_build_mode_active(false, false)
 		player.cancel_timed_action()
 		hud.show_end_overlay("Run Failed", "You died.\nPress R to restart.", Color(0.94, 0.42, 0.38, 1.0))
 		hud.set_phase("Phase: Loss")
@@ -194,6 +211,7 @@ func _on_run_state_changed(new_state: int) -> void:
 	if new_state == game_manager.RunState.WIN:
 		wave_manager.reset()
 		_clear_exploration_enemies()
+		player.set_build_mode_active(false, false)
 		hud.show_end_overlay("Victory", "You survived all %d waves.\nPress R to restart." % game_manager.final_wave, Color(0.96, 0.84, 0.42, 1.0))
 		hud.set_phase("Phase: Victory")
 		hud.set_status("You survived all %d waves" % game_manager.final_wave)
@@ -203,6 +221,7 @@ func _on_run_state_changed(new_state: int) -> void:
 	hud.hide_end_overlay()
 
 	if new_state == game_manager.RunState.ACTIVE_WAVE:
+		player.set_build_mode_active(false, false)
 		_clear_roaming_exploration_enemies()
 		_set_exploration_enemies_suspended(true)
 		hud.set_phase("Phase: Night")
@@ -211,6 +230,7 @@ func _on_run_state_changed(new_state: int) -> void:
 		return
 
 	if new_state == game_manager.RunState.POST_WAVE:
+		player.set_build_mode_active(false, false)
 		hud.set_phase("Phase: Post-Wave")
 		hud.set_status("Night %d cleared. Sleep on the bed to start the next day." % game_manager.current_wave)
 		player.refresh_interaction_prompt()
@@ -220,6 +240,17 @@ func _on_run_state_changed(new_state: int) -> void:
 		if _is_resetting_run:
 			return
 		_enter_day_phase()
+
+
+func _on_player_build_mode_toggled(active: bool) -> void:
+	if construction_grid == null:
+		return
+	construction_grid.set_build_mode_active(active)
+	if active:
+		construction_grid.set_preview_world_position(player.global_position)
+		hud.set_status("Build mode active. Move to a marked cell.")
+		return
+	_refresh_phase_status()
 
 
 func _on_wave_changed(new_wave: int) -> void:
@@ -374,6 +405,10 @@ func _apply_test_mode_loadout() -> void:
 
 	for weapon in test_mode_weapons:
 		player.obtain_weapon(weapon, true, false)
+	if test_mode_salvage > 0:
+		player.add_resource("salvage", test_mode_salvage, false)
+	if test_mode_parts > 0:
+		player.add_resource("parts", test_mode_parts, false)
 	if test_mode_bullets > 0:
 		player.add_resource("bullets", test_mode_bullets, false)
 	if test_mode_food > 0:

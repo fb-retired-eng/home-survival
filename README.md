@@ -27,6 +27,7 @@ The repo currently includes:
 - fortified wall/door upgrades beyond the original reinforced tier
 - review-driven guardrails around elite-only weapon drops, spitter structure range, reset-state UI consistency, and bat-only attack interrupt behavior
 - HUD for core status display, including the currently equipped weapon
+- construction-system foundation for an authored free-build grid, including build-mode preview scaffolding and generic placeable/profile classes
 - placeholder world scenes for sockets, scavenging nodes, bed/table interactions, pickups, and zombie enemy
 - consolidated MVP0 design/spec documentation
 
@@ -58,6 +59,7 @@ godot --headless --path . --quit
 - Use medicine: `F` or `Q`
 - Switch weapon: `X`
 - Reload firearm: `C`
+- Toggle build mode preview: `B`
 - Eat dinner at table / sleep on bed: `E` when in range
 - Restart after win/loss: `R`
 
@@ -67,6 +69,7 @@ godot --headless --path . --quit
 - [`TASK_BREAKDOWN.md`](TASK_BREAKDOWN.md): milestone plan
 - [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md): coding and review workflow, including the picky post-change review rule
 - [`PROJECT_EXECUTION_LOG.md`](PROJECT_EXECUTION_LOG.md): append-only project execution log
+- [`CONSTRUCTION_SYSTEM_PLAN.md`](CONSTRUCTION_SYSTEM_PLAN.md): staged plan for controlled free-grid construction and future turrets
 - [`MVP0_DESIGN.md`](MVP0_DESIGN.md): archive pointer for the old design doc path
 
 ## Change Checklist
