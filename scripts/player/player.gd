@@ -19,6 +19,7 @@ const DEFAULT_ATTACK_INDICATOR_STRIKE_PEAK_SCALE := Vector2(1.05, 1.05)
 const DEFAULT_HELD_WEAPON_OFFSET := Vector2(10.0, -10.0)
 const DEFAULT_HELD_WEAPON_COLOR := Color(0.86, 0.86, 0.9, 1.0)
 const DEFAULT_SPREAD_HITSCAN_CONE_DEGREES := 30.0
+const STRUCTURE_ATTACK_BLOCKER_MASK := 2 | 4
 const WEAPON_DEFINITION_SCRIPT := preload("res://scripts/data/weapon_definition.gd")
 const DEFAULT_WEAPON_RESOURCE := preload("res://data/weapons/kitchen_knife.tres")
 
@@ -1010,8 +1011,20 @@ func _get_enemy_targets_in_attack_shape() -> Array:
 			continue
 		if not body.has_method("take_damage"):
 			continue
+		if _is_enemy_blocked_by_structure(body):
+			continue
 		hit_targets.append(body)
 	return hit_targets
+
+
+func _is_enemy_blocked_by_structure(enemy) -> bool:
+	if enemy == null or not is_instance_valid(enemy):
+		return false
+	var ray_query := PhysicsRayQueryParameters2D.create(attack_pivot.global_position, enemy.global_position)
+	ray_query.exclude = [self]
+	ray_query.collision_mask = STRUCTURE_ATTACK_BLOCKER_MASK
+	var hit := get_world_2d().direct_space_state.intersect_ray(ray_query)
+	return not hit.is_empty()
 
 
 func _get_hitscan_attack_result(weapon: Resource) -> Dictionary:
@@ -1101,7 +1114,8 @@ func _get_spread_hitscan_attack_result(weapon: Resource) -> Dictionary:
 		if to_candidate.length() > float(weapon.attack_range):
 			continue
 		var angle_to_candidate: float = rad_to_deg(absf(facing_direction.angle_to(to_candidate.normalized())))
-		if angle_to_candidate > max_angle_degrees:
+		var angle_padding_degrees := rad_to_deg(atan2(12.0, maxf(to_candidate.length(), 1.0)))
+		if angle_to_candidate > max_angle_degrees + angle_padding_degrees:
 			continue
 
 		var ray_query := PhysicsRayQueryParameters2D.create(ray_start, candidate.global_position)
@@ -1280,6 +1294,8 @@ func _build_attack_damage_map(weapon: Resource, hit_targets: Array) -> Dictionar
 	var target_count := hit_targets.size()
 	var apply_isolated_bonus := target_count == 1 and int(weapon.isolated_bonus_damage) > 0
 	var apply_cluster_bonus := target_count >= 2 and int(weapon.cluster_bonus_damage) > 0
+	var muzzle_position := attack_pivot.to_global(_get_muzzle_local_position())
+	var apply_close_range_bonus := int(weapon.close_range_bonus_damage) > 0 and float(weapon.close_range_bonus_distance) > 0.0
 
 	for target in hit_targets:
 		var damage_amount := int(weapon.damage)
@@ -1287,6 +1303,9 @@ func _build_attack_damage_map(weapon: Resource, hit_targets: Array) -> Dictionar
 			damage_amount += int(weapon.isolated_bonus_damage)
 		if apply_cluster_bonus:
 			damage_amount += int(weapon.cluster_bonus_damage)
+		if apply_close_range_bonus and target != null and is_instance_valid(target):
+			if muzzle_position.distance_to(target.global_position) <= float(weapon.close_range_bonus_distance):
+				damage_amount += int(weapon.close_range_bonus_damage)
 		damage_map[target] = damage_amount
 	return damage_map
 

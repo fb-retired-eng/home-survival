@@ -9,13 +9,21 @@ const ENEMY_DEFINITION_SCRIPT := preload("res://scripts/data/enemy_definition.gd
 const ROAMING_SPAWN_ZONE_SCRIPT := preload("res://scripts/world/roaming_spawn_zone.gd")
 const POSITIVE_POI_MODIFIERS: Array[StringName] = [&"bountiful_food", &"extra_parts"]
 const NEGATIVE_POI_MODIFIERS: Array[StringName] = [&"disturbed", &"elite_present"]
+const ELITE_MODIFIER_POIS := {
+	&"poi_b": true,
+	&"poi_d": true,
+	&"poi_f": true,
+}
 
 @export var defense_socket_scene: PackedScene
 @export var exploration_enemy_scene: PackedScene
 @export var perimeter_definition: Resource
 @export var default_daily_elite_enemy: Resource
 @export var sleep_heal_amount: int = 25
-@export_range(1, 100, 1) var food_energy_per_unit: int = 20
+@export_range(1, 100, 1) var food_energy_per_unit: int = 25
+@export_range(0, 4, 1) var daily_poi_refill_base_nodes: int = 1
+@export_range(0.0, 1.0, 0.01) var daily_poi_refill_bonus_chance: float = 0.3
+@export_range(0, 4, 1) var daily_poi_refill_bonus_nodes: int = 1
 @export var enable_test_mode: bool = false
 @export var test_mode_weapons: Array[Resource] = []
 @export var test_mode_bullets: int = 18
@@ -45,6 +53,7 @@ var _is_resetting_run: bool = false
 var _daily_poi_modifiers: Dictionary = {}
 var _poi_visuals_by_id: Dictionary = {}
 var _debug_forced_next_daily_poi_modifiers: Dictionary = {}
+var _last_daily_refilled_pois: Array[StringName] = []
 
 
 func _ready() -> void:
@@ -429,6 +438,7 @@ func _can_enemy_hear_weapon_noise(enemy, source_position: Vector2, noise_radius:
 
 func _enter_day_phase() -> void:
 	_roll_daily_poi_modifiers()
+	_apply_daily_poi_refills()
 	_current_exploration_target_counts.clear()
 	_refresh_poi_modifier_visuals()
 	_clear_stale_daily_modifier_enemies()
@@ -529,6 +539,8 @@ func _is_poi_depleted(poi_id: StringName) -> bool:
 
 
 func _is_poi_eligible_for_elite_modifier(poi_id: StringName) -> bool:
+	if not ELITE_MODIFIER_POIS.has(poi_id):
+		return false
 	var guard_spawn = _get_poi_guard_spawn_point(poi_id)
 	if guard_spawn == null:
 		return false
@@ -561,6 +573,7 @@ func _cache_poi_visuals() -> void:
 			"marker": marker,
 			"base_text": label.text,
 			"base_marker_color": marker.color,
+			"base_marker_scale": marker.scale,
 			"base_label_color": label.get_theme_color("font_color"),
 		}
 
@@ -573,17 +586,20 @@ func _refresh_poi_modifier_visuals() -> void:
 		var marker: Polygon2D = visual_data.get("marker")
 		var base_text := String(visual_data.get("base_text", ""))
 		var base_marker_color: Color = visual_data.get("base_marker_color", Color.WHITE)
+		var base_marker_scale: Vector2 = visual_data.get("base_marker_scale", Vector2.ONE)
 		var base_label_color: Color = visual_data.get("base_label_color", Color.WHITE)
 		var modifier_id := _get_daily_poi_modifier(poi_id)
 		if modifier_id == StringName():
 			label.text = base_text
 			label.add_theme_color_override("font_color", base_label_color)
 			marker.color = base_marker_color
+			marker.scale = base_marker_scale
 			continue
 		label.text = "%s %s" % [base_text, _get_modifier_label_text(modifier_id)]
 		var modifier_tint := _get_modifier_tint(modifier_id)
 		label.add_theme_color_override("font_color", modifier_tint)
-		marker.color = base_marker_color.lerp(modifier_tint, 0.35)
+		marker.color = base_marker_color.lerp(modifier_tint, 0.48)
+		marker.scale = base_marker_scale * _get_modifier_marker_scale(modifier_id)
 
 
 func _get_poi_id_from_name(node_name: String) -> StringName:
@@ -596,27 +612,40 @@ func _get_poi_id_from_name(node_name: String) -> StringName:
 func _get_modifier_label_text(modifier_id: StringName) -> String:
 	match modifier_id:
 		&"bountiful_food":
-			return "+Food"
+			return "[FOOD]"
 		&"extra_parts":
-			return "+Parts"
+			return "[PARTS]"
 		&"disturbed":
-			return "Alert"
+			return "[HOT]"
 		&"elite_present":
-			return "Elite"
+			return "[ELITE]"
 	return ""
 
 
 func _get_modifier_tint(modifier_id: StringName) -> Color:
 	match modifier_id:
 		&"bountiful_food":
-			return Color(0.62, 0.92, 0.48, 1.0)
+			return Color(0.58, 0.96, 0.46, 1.0)
 		&"extra_parts":
-			return Color(0.74, 0.9, 1.0, 1.0)
+			return Color(0.66, 0.9, 1.0, 1.0)
 		&"disturbed":
-			return Color(1.0, 0.7, 0.34, 1.0)
+			return Color(1.0, 0.62, 0.24, 1.0)
 		&"elite_present":
-			return Color(1.0, 0.82, 0.4, 1.0)
+			return Color(1.0, 0.86, 0.32, 1.0)
 	return Color.WHITE
+
+
+func _get_modifier_marker_scale(modifier_id: StringName) -> Vector2:
+	match modifier_id:
+		&"bountiful_food":
+			return Vector2(1.08, 1.08)
+		&"extra_parts":
+			return Vector2(1.08, 1.08)
+		&"disturbed":
+			return Vector2(1.14, 1.14)
+		&"elite_present":
+			return Vector2(1.22, 1.22)
+	return Vector2.ONE
 
 
 func _get_daily_modifier_summary() -> String:
@@ -634,6 +663,11 @@ func _get_daily_modifier_summary() -> String:
 				clauses.append("%s is disturbed." % poi_name)
 			&"elite_present":
 				clauses.append("%s has an elite guard." % poi_name)
+	if not _last_daily_refilled_pois.is_empty():
+		var restocked_names: Array[String] = []
+		for poi_id in _last_daily_refilled_pois:
+			restocked_names.append(_get_poi_display_name(poi_id))
+		clauses.append("%s restocked." % ", ".join(restocked_names))
 	return " ".join(clauses)
 
 
@@ -645,6 +679,38 @@ func _get_poi_display_name(poi_id: StringName) -> String:
 
 func _get_daily_poi_modifier(poi_id: StringName) -> StringName:
 	return StringName(_daily_poi_modifiers.get(poi_id, StringName()))
+
+
+func _apply_daily_poi_refills() -> void:
+	_last_daily_refilled_pois.clear()
+	var refill_budget: int = max(daily_poi_refill_base_nodes, 0)
+	if daily_poi_refill_bonus_nodes > 0 and randf() <= daily_poi_refill_bonus_chance:
+		refill_budget += daily_poi_refill_bonus_nodes
+	if refill_budget <= 0:
+		return
+
+	var candidates: Array = []
+	for node in get_tree().get_nodes_in_group("scavenge_nodes"):
+		if node == null or not node.has_method("is_eligible_for_daily_refill"):
+			continue
+		if not bool(node.is_eligible_for_daily_refill()):
+			continue
+		candidates.append(node)
+
+	while refill_budget > 0 and not candidates.is_empty():
+		var index := randi() % candidates.size()
+		var node = candidates[index]
+		candidates.remove_at(index)
+		if node == null or not is_instance_valid(node):
+			continue
+		if not node.has_method("apply_daily_refill"):
+			continue
+		if not bool(node.apply_daily_refill()):
+			continue
+		refill_budget -= 1
+		var poi_id := StringName(node.poi_id)
+		if poi_id != StringName() and not _last_daily_refilled_pois.has(poi_id):
+			_last_daily_refilled_pois.append(poi_id)
 
 
 func _get_adjusted_exploration_spawn_count(spawn_point) -> int:

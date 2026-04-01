@@ -1,6 +1,12 @@
 extends SceneTree
 
 
+func _get_enemy_health_or_zero(enemy) -> int:
+	if enemy == null or not is_instance_valid(enemy):
+		return 0
+	return int(enemy.current_health)
+
+
 func _spawn_enemy(root_node: Node, definition_path: String, position: Vector2):
 	var zombie_scene = load("res://scenes/enemies/Zombie.tscn")
 	var enemy = zombie_scene.instantiate()
@@ -112,9 +118,10 @@ func _init() -> void:
 	var shotgun_enemy_a = _spawn_enemy(root, "res://data/enemies/zombie_basic.tres", Vector2(300, 190))
 	var shotgun_enemy_b = _spawn_enemy(root, "res://data/enemies/zombie_basic.tres", Vector2(308, 222))
 	await _wait_frames()
+	var shotgun_target_count_before: int = player._get_attack_targets_for_weapon(shotgun).size()
 	await _trigger_attack_input()
 	await _wait_for_attack_resolution(player)
-	print("weapon_sidegrade_probe_shotgun_health_a=%d" % int(shotgun_enemy_a.current_health))
-	print("weapon_sidegrade_probe_shotgun_health_b=%d" % int(shotgun_enemy_b.current_health))
-	print("weapon_sidegrade_probe_shotgun_target_count=%d" % player._get_attack_targets_for_weapon(shotgun).size())
+	print("weapon_sidegrade_probe_shotgun_health_a=%d" % _get_enemy_health_or_zero(shotgun_enemy_a))
+	print("weapon_sidegrade_probe_shotgun_health_b=%d" % _get_enemy_health_or_zero(shotgun_enemy_b))
+	print("weapon_sidegrade_probe_shotgun_target_count=%d" % shotgun_target_count_before)
 	quit()

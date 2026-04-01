@@ -3,6 +3,8 @@ class_name Zombie
 
 const EnemyDefinitionResource = preload("res://scripts/data/enemy_definition.gd")
 const ResourcePickupScene = preload("res://scenes/world/ResourcePickup.tscn")
+const HEALTH_BAR_FILL_HALF_WIDTH := 14.0
+const HEALTH_BAR_FILL_HALF_HEIGHT := 2.0
 
 signal died(zombie: Zombie)
 
@@ -48,9 +50,14 @@ var _exploration_anchor_position: Vector2 = Vector2.ZERO
 var _exploration_anchor_facing: Vector2 = Vector2.ZERO
 var _has_exploration_anchor: bool = false
 var _knockback_velocity: Vector2 = Vector2.ZERO
+var _base_facing_marker_color: Color
+var _base_elite_aura_color: Color
 
+@onready var elite_aura: Polygon2D = $EliteAura
 @onready var body_visual: Polygon2D = $Body
 @onready var facing_marker: Polygon2D = $FacingMarker
+@onready var health_bar_background: Polygon2D = $HealthBarBackground
+@onready var health_bar_fill: Polygon2D = $HealthBarFill
 @onready var attack_flash: Polygon2D = $AttackFlash
 @onready var damage_area: Area2D = $DamageArea
 @onready var body_touch_area: Area2D = $BodyTouchArea
@@ -59,11 +66,14 @@ var _knockback_velocity: Vector2 = Vector2.ZERO
 
 func _ready() -> void:
 	add_to_group("enemies")
+	_base_color = body_visual.color
+	_base_facing_marker_color = facing_marker.color
+	_base_elite_aura_color = elite_aura.color
 	_apply_definition()
 	current_health = max_health
-	_base_color = body_visual.color
 	_refresh_player_reference()
 	_update_facing_direction(_facing_direction)
+	_refresh_health_bar()
 
 
 func configure_wave_context(player_ref, defense_sockets: Array, preferred_socket_ids: PackedStringArray = PackedStringArray()) -> void:
@@ -251,6 +261,7 @@ func take_damage(amount: int, _source: Variant = null) -> void:
 		return
 
 	current_health = max(current_health - damage_amount, 0)
+	_refresh_health_bar()
 	_flash_body(Color(1.0, 0.55, 0.55, 1.0))
 	_play_damage_feedback(_source)
 
@@ -479,6 +490,7 @@ func _apply_definition() -> void:
 
 	enemy_id = definition.enemy_id
 	body_visual.color = definition.body_color
+	_base_color = definition.body_color
 	max_health = definition.max_health
 	defense_flat_reduction = definition.defense_flat_reduction
 	defense_multiplier = definition.defense_multiplier
@@ -493,6 +505,44 @@ func _apply_definition() -> void:
 	knockback_decay = definition.knockback_decay
 	attack_cooldown = definition.attack_interval
 	attack_prep_time = definition.attack_prep_time
+	if definition.is_elite:
+		elite_aura.visible = true
+		var aura_color := definition.body_color.lerp(Color(1.0, 0.84, 0.34, 1.0), 0.5)
+		elite_aura.color = Color(aura_color.r, aura_color.g, aura_color.b, 0.46)
+		facing_marker.color = Color(1.0, 0.9, 0.52, 1.0)
+	else:
+		elite_aura.visible = false
+		elite_aura.color = _base_elite_aura_color
+		facing_marker.color = _base_facing_marker_color
+	_refresh_health_bar()
+
+
+func _refresh_health_bar() -> void:
+	if health_bar_background == null or health_bar_fill == null:
+		return
+
+	var max_health_value: int = max(max_health, 1)
+	var health_ratio: float = clamp(float(current_health) / float(max_health_value), 0.0, 1.0)
+	health_bar_background.visible = max_health_value > 0
+	health_bar_fill.visible = health_ratio > 0.0
+	if not health_bar_fill.visible:
+		return
+
+	var fill_width: float = lerpf(0.0, HEALTH_BAR_FILL_HALF_WIDTH * 2.0, health_ratio)
+	var left_x: float = -HEALTH_BAR_FILL_HALF_WIDTH
+	var right_x: float = left_x + fill_width
+	health_bar_fill.polygon = PackedVector2Array([
+		Vector2(left_x, -HEALTH_BAR_FILL_HALF_HEIGHT),
+		Vector2(right_x, -HEALTH_BAR_FILL_HALF_HEIGHT),
+		Vector2(right_x, HEALTH_BAR_FILL_HALF_HEIGHT),
+		Vector2(left_x, HEALTH_BAR_FILL_HALF_HEIGHT),
+	])
+	health_bar_fill.color = Color(
+		lerpf(0.92, 0.3, health_ratio),
+		lerpf(0.24, 0.92, health_ratio),
+		0.28,
+		0.96
+	)
 
 
 func _apply_knockback_from_source(source: Variant) -> void:

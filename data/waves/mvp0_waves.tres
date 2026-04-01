@@ -130,20 +130,20 @@ preferred_socket_ids = PackedStringArray("door_e")
 [sub_resource type="Resource" id="19"]
 script = ExtResource("2_wave")
 wave_number = 7
-spawn_interval = 0.46
+spawn_interval = 0.5
 lanes = Array[Resource]([SubResource("17"), SubResource("18"), SubResource("15"), SubResource("12")])
 
 [sub_resource type="Resource" id="20"]
 script = ExtResource("3_lane")
 lane_id = &"north"
-count = 5
+count = 4
 enemy_definition = ExtResource("4_basic_enemy")
 preferred_socket_ids = PackedStringArray("wall_n")
 
 [sub_resource type="Resource" id="21"]
 script = ExtResource("3_lane")
 lane_id = &"east"
-count = 2
+count = 1
 enemy_definition = ExtResource("7_spitter_enemy")
 preferred_socket_ids = PackedStringArray("door_e")
 
@@ -156,7 +156,7 @@ preferred_socket_ids = PackedStringArray("door_w")
 [sub_resource type="Resource" id="23"]
 script = ExtResource("2_wave")
 wave_number = 8
-spawn_interval = 0.42
+spawn_interval = 0.46
 lanes = Array[Resource]([SubResource("20"), SubResource("17"), SubResource("18"), SubResource("15"), SubResource("21"), SubResource("22")])
 
 [resource]

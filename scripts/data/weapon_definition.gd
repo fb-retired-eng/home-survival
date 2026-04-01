@@ -32,6 +32,8 @@ class_name WeaponDefinition
 @export_range(0, 50, 1) var isolated_bonus_damage: int = 0
 @export var interrupt_attack_prep: bool = false
 @export_range(0, 50, 1) var cluster_bonus_damage: int = 0
+@export_range(0, 50, 1) var close_range_bonus_damage: int = 0
+@export_range(0.0, 600.0, 5.0) var close_range_bonus_distance: float = 0.0
 @export var attack_flash_color: Color = Color(1.0, 0.83, 0.42, 0.75)
 @export var attack_flash_start_scale: Vector2 = Vector2(0.8, 0.8)
 @export var attack_flash_peak_scale: Vector2 = Vector2(1.1, 1.1)
@@ -64,7 +66,9 @@ func is_valid_definition() -> bool:
 		return false
 	if damage < 0:
 		return false
-	if isolated_bonus_damage < 0 or cluster_bonus_damage < 0:
+	if isolated_bonus_damage < 0 or cluster_bonus_damage < 0 or close_range_bonus_damage < 0:
+		return false
+	if close_range_bonus_distance < 0.0:
 		return false
 	if attack_mode != "melee" and attack_mode != "hitscan" and attack_mode != "spread_hitscan":
 		return false

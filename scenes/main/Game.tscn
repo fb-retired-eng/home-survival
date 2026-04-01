@@ -250,7 +250,7 @@ position = Vector2(-58, -32)
 node_id = &"poi_d_1"
 poi_id = &"poi_d"
 reward_parts = 1
-reward_bullets = 4
+reward_bullets = 2
 weapon_reward = ExtResource("19_shotgun")
 bonus_table = ExtResource("10_poi_b_bonus")
 
@@ -260,7 +260,7 @@ node_id = &"poi_d_2"
 poi_id = &"poi_d"
 reward_salvage = 1
 reward_parts = 2
-reward_bullets = 4
+reward_bullets = 3
 bonus_table = ExtResource("10_poi_b_bonus")
 
 [node name="Node3" parent="World/POI_D" unique_id=1180630554 instance=ExtResource("6_scavenge_scene")]
@@ -277,7 +277,7 @@ position = Vector2(58, 70)
 node_id = &"poi_d_4"
 poi_id = &"poi_d"
 reward_parts = 2
-reward_bullets = 6
+reward_bullets = 4
 weapon_reward = ExtResource("18_pistol")
 bonus_table = ExtResource("10_poi_b_bonus")
 
@@ -301,7 +301,7 @@ position = Vector2(-58, -26)
 node_id = &"poi_e_1"
 poi_id = &"poi_e"
 reward_salvage = 1
-reward_food = 2
+reward_food = 3
 bonus_table = ExtResource("21_poi_e_bonus")
 
 [node name="Node2" parent="World/POI_E" unique_id=400129542 instance=ExtResource("6_scavenge_scene")]
@@ -317,7 +317,7 @@ position = Vector2(-18, 50)
 node_id = &"poi_e_3"
 poi_id = &"poi_e"
 reward_medicine = 1
-reward_food = 1
+reward_food = 2
 bonus_table = ExtResource("21_poi_e_bonus")
 
 [node name="Node4" parent="World/POI_E" unique_id=72312105 instance=ExtResource("6_scavenge_scene")]
@@ -348,7 +348,7 @@ position = Vector2(-62, -34)
 node_id = &"poi_f_1"
 poi_id = &"poi_f"
 reward_parts = 2
-reward_bullets = 2
+reward_bullets = 1
 bonus_table = ExtResource("22_poi_f_bonus")
 
 [node name="Node2" parent="World/POI_F" unique_id=677555504 instance=ExtResource("6_scavenge_scene")]
@@ -357,7 +357,7 @@ node_id = &"poi_f_2"
 poi_id = &"poi_f"
 reward_salvage = 2
 reward_parts = 1
-reward_food = 1
+reward_food = 2
 bonus_table = ExtResource("22_poi_f_bonus")
 
 [node name="Node3" parent="World/POI_F" unique_id=1604277553 instance=ExtResource("6_scavenge_scene")]
@@ -373,7 +373,7 @@ position = Vector2(54, 68)
 node_id = &"poi_f_4"
 poi_id = &"poi_f"
 reward_parts = 2
-reward_bullets = 4
+reward_bullets = 3
 bonus_table = ExtResource("22_poi_f_bonus")
 
 [node name="SpawnMarkers" type="Node2D" parent="World" unique_id=1366976472]

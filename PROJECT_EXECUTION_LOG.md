@@ -1250,3 +1250,47 @@ Validation:
   - `daily_poi_modifier_probe_after_reset_positive=1`
   - `daily_poi_modifier_probe_after_reset_negative=1`
   - `day_night_cycle_probe_after_sleep_state=0`
+
+### Balance And Readability Tuning Pass
+- Tuned prep economy so dinner is less punishing:
+  - increased `food_energy_per_unit` from `20` to `25`
+  - increased food baseline at the food-heavy `POI_E`
+  - slightly increased mixed-route food at `POI_F`
+- Tightened firearm economy and late-wave pressure:
+  - reduced shotgun damage from `36` to `34`
+  - reduced shotgun cluster bonus from `8` to `6`
+  - increased shotgun energy cost from `2` to `3`
+  - increased shotgun reload time from `1.45s` to `1.55s`
+  - reduced several authored bullet rewards in firearm-leaning POIs
+  - reduced spitter and elite-spitter player range / detection pressure
+  - softened waves `7` and `8` by slowing the spawn interval and reducing some late enemy counts
+- Improved POI modifier readability:
+  - stronger marker tinting
+  - marker scale changes by modifier severity
+  - clearer label tags: `[FOOD]`, `[PARTS]`, `[HOT]`, `[ELITE]`
+  - restricted `elite_present` to the riskier weapon/combat POIs instead of the safer routes
+- Added first-pass elite visual differentiation in `Zombie.tscn` / `Zombie`:
+  - elite-only aura polygon
+  - stronger elite facing-marker color
+- Added `elite_visual_probe.gd` to verify the elite visual treatment at runtime.
+
+Validation:
+- Headless Godot project load still succeeded.
+- Food-table probe now confirms the lighter dinner demand:
+  - `food_table_probe_label=Eat 2 food and start night 1`
+  - `food_table_probe_after_food=1`
+- Daily POI modifier probe still confirmed:
+  - one positive and one negative modifier
+  - disturbed clear bookkeeping still correct
+  - both elite variants still spawn through the authored daily-elite path
+- Input-driven weapon sidegrade probe still confirmed:
+  - `weapon_sidegrade_probe_bat_prep_after=false`
+  - `weapon_sidegrade_probe_pistol_prep_after=true`
+  - `weapon_sidegrade_probe_shotgun_health_a=10`
+  - `weapon_sidegrade_probe_shotgun_health_b=10`
+- New elite visual probe confirmed:
+  - `elite_visual_probe_basic_aura_visible=false`
+  - `elite_visual_probe_elite_aura_visible=true`
+- Regression probes still passed:
+  - `firearm_noise_probe_after_timeout_investigating=0`
+  - `day_night_cycle_probe_after_sleep_state=0`

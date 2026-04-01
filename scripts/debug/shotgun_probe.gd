@@ -1,6 +1,12 @@
 extends SceneTree
 
 
+func _get_enemy_health_or_zero(enemy) -> int:
+	if enemy == null or not is_instance_valid(enemy):
+		return 0
+	return int(enemy.current_health)
+
+
 func _init() -> void:
 	var player_scene := load("res://scenes/player/Player.tscn")
 	var zombie_scene := load("res://scenes/enemies/Zombie.tscn")
@@ -34,10 +40,10 @@ func _init() -> void:
 	player._attempt_attack()
 	await create_timer(0.28).timeout
 	print("shotgun_probe_health_a_before=%d" % health_a_before)
-	print("shotgun_probe_health_a_after=%d" % zombie_a.current_health)
+	print("shotgun_probe_health_a_after=%d" % _get_enemy_health_or_zero(zombie_a))
 	print("shotgun_probe_health_b_before=%d" % health_b_before)
-	print("shotgun_probe_health_b_after=%d" % zombie_b.current_health)
+	print("shotgun_probe_health_b_after=%d" % _get_enemy_health_or_zero(zombie_b))
 	print("shotgun_probe_health_c_before=%d" % health_c_before)
-	print("shotgun_probe_health_c_after=%d" % zombie_c.current_health)
+	print("shotgun_probe_health_c_after=%d" % _get_enemy_health_or_zero(zombie_c))
 	print("shotgun_probe_status=%s" % player.get_weapon_status_text())
 	quit()

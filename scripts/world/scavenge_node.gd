@@ -155,5 +155,21 @@ func reset_for_new_run() -> void:
 	_refresh_visuals()
 
 
+func is_eligible_for_daily_refill() -> bool:
+	if _is_searching or not is_depleted:
+		return false
+	if _get_valid_weapon_reward() != null:
+		return false
+	return reward_salvage > 0 or reward_parts > 0 or reward_medicine > 0 or reward_bullets > 0 or reward_food > 0
+
+
+func apply_daily_refill() -> bool:
+	if not is_eligible_for_daily_refill():
+		return false
+	is_depleted = false
+	_refresh_visuals()
+	return true
+
+
 func configure_reward_modifier(provider: Callable) -> void:
 	_reward_modifier_provider = provider

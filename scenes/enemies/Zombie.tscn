@@ -18,6 +18,11 @@ definition = ExtResource("2_definition")
 collision_layer = 8
 collision_mask = 14
 
+[node name="EliteAura" type="Polygon2D" parent="."]
+visible = false
+color = Color(1, 0.84, 0.34, 0.42)
+polygon = PackedVector2Array(-18, -18, 18, -18, 22, 4, 0, 20, -22, 4)
+
 [node name="Body" type="Polygon2D" parent="."]
 color = Color(0.39, 0.68, 0.38, 1)
 polygon = PackedVector2Array(-10, -12, 10, -12, 12, 4, 0, 12, -12, 4)
@@ -25,6 +30,16 @@ polygon = PackedVector2Array(-10, -12, 10, -12, 12, 4, 0, 12, -12, 4)
 [node name="FacingMarker" type="Polygon2D" parent="."]
 color = Color(0.96, 0.49, 0.29, 1)
 polygon = PackedVector2Array(0, -18, 6, -6, -6, -6)
+
+[node name="HealthBarBackground" type="Polygon2D" parent="."]
+position = Vector2(0, -28)
+color = Color(0.08, 0.08, 0.08, 0.88)
+polygon = PackedVector2Array(-15, -3, 15, -3, 15, 3, -15, 3)
+
+[node name="HealthBarFill" type="Polygon2D" parent="."]
+position = Vector2(0, -28)
+color = Color(0.3, 0.92, 0.38, 0.96)
+polygon = PackedVector2Array(-14, -2, 14, -2, 14, 2, -14, 2)
 
 [node name="AttackFlash" type="Polygon2D" parent="."]
 visible = false

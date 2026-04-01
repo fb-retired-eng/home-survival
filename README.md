@@ -87,6 +87,6 @@ godot --headless --path . --quit
 - tune food scarcity versus prep energy demands
 - balance roaming prep spawns and the full 8-wave run
 - tune elite weapon-drop odds and duplicate-conversion economy
-- decide whether elite variants stay data-only or get stronger visual differentiation in play
+- decide whether elite variants need even stronger silhouette differentiation beyond the new aura/marker treatment
 - decide whether the next content step is enemy patrols, reserve-ammo scarcity, or the fifth weapon pickup
 - continue UI and readability polish from playtest feedback

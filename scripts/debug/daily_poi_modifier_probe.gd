@@ -97,6 +97,15 @@ func _deplete_poi(game, poi_id: StringName) -> void:
 			node._refresh_visuals()
 
 
+func _restore_poi(game, poi_id: StringName) -> void:
+	for node in game.get_tree().get_nodes_in_group("scavenge_nodes"):
+		if StringName(node.poi_id) != poi_id:
+			continue
+		node.is_depleted = false
+		if node.has_method("_refresh_visuals"):
+			node._refresh_visuals()
+
+
 func _init() -> void:
 	var game_scene := load("res://scenes/main/Game.tscn")
 	var game = game_scene.instantiate()
@@ -202,6 +211,42 @@ func _init() -> void:
 		&"poi_e": &"extra_parts",
 	})
 	print("daily_poi_modifier_probe_elite_cleared=%d" % _count_daily_elites(game, &"poi_c"))
+
+	var elite_roll_invalid := false
+	var elite_roll_seen := false
+	for _roll in range(24):
+		game._roll_daily_poi_modifiers()
+		game._refresh_poi_modifier_visuals()
+		var rolled_modifiers: Dictionary = game.debug_get_daily_poi_modifiers()
+		for poi_id_variant in rolled_modifiers.keys():
+			var poi_id := StringName(poi_id_variant)
+			if StringName(rolled_modifiers[poi_id]) != &"elite_present":
+				continue
+			elite_roll_seen = true
+			if not [StringName(&"poi_b"), StringName(&"poi_d"), StringName(&"poi_f")].has(poi_id):
+				elite_roll_invalid = true
+				break
+		if elite_roll_invalid:
+			break
+	print("daily_poi_modifier_probe_elite_roll_seen=%s" % str(elite_roll_seen))
+	print("daily_poi_modifier_probe_elite_roll_invalid=%s" % str(elite_roll_invalid))
+
+	_deplete_poi(game, &"poi_b")
+	_deplete_poi(game, &"poi_d")
+	_deplete_poi(game, &"poi_f")
+	game._roll_daily_poi_modifiers()
+	game._refresh_poi_modifier_visuals()
+	var no_elite_when_blocked := true
+	var blocked_modifiers: Dictionary = game.debug_get_daily_poi_modifiers()
+	for poi_id_variant in blocked_modifiers.keys():
+		var poi_id := StringName(poi_id_variant)
+		if StringName(blocked_modifiers[poi_id]) == &"elite_present":
+			no_elite_when_blocked = false
+			break
+	print("daily_poi_modifier_probe_no_elite_when_blocked=%s" % str(no_elite_when_blocked))
+	_restore_poi(game, &"poi_b")
+	_restore_poi(game, &"poi_d")
+	_restore_poi(game, &"poi_f")
 
 	_deplete_poi(game, &"poi_a")
 	game._roll_daily_poi_modifiers()
