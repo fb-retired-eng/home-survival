@@ -526,7 +526,7 @@ func _refresh_build_mode_status() -> void:
 		hud.set_status("Build mode active")
 		return
 	var footprint := profile.get_rotated_footprint_dimensions(_selected_buildable_rotation)
-	hud.set_status("Build mode active. %s (%dx%d, rot %d). E place, Q prev, Tab next, R rotate, wheel next, C recycle." % [
+	hud.set_status("Build: %s (%dx%d, rot %d) | E place | Q prev | Tab next | R rotate | C recycle" % [
 		profile.display_name,
 		footprint.x,
 		footprint.y,

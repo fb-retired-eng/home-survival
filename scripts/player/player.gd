@@ -953,7 +953,7 @@ func _update_interaction_prompt() -> void:
 		return
 
 	if _build_mode_active:
-		interaction_prompt_changed.emit("Build Mode | E place | Q prev | Tab next | R rotate | Wheel next | C recycle")
+		interaction_prompt_changed.emit("Build: E place | Q prev | Tab next | R rotate | C recycle")
 		return
 
 	var interactable := _get_active_interactable()

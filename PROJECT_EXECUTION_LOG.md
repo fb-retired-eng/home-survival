@@ -1553,3 +1553,12 @@ Validation:
 - `build_selector_probe_rotated_second_cell_occupied=true`
 - `barricade_probe_placeables_after_recycle=0`
 - `barricade_probe_cell_occupied_after_recycle=false`
+
+## 2026-04-01 Build HUD Hints
+- Tightened the build-mode HUD copy so it now shows the active buildable, footprint, and the core controls in a single compact line.
+- Kept the build prompt aligned with the same compact control wording so the in-world hint and HUD status now match.
+
+Validation:
+- `barricade_probe_prompt=Build: E place | Q prev | Tab next | R rotate | C recycle`
+- `build_selector_probe_rotation=1`
+- `construction_grid_probe_active_stage_build_mode=true`
