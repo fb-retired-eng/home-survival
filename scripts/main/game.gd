@@ -18,6 +18,8 @@ const ELITE_MODIFIER_POIS := {
 	&"poi_f": true,
 }
 
+signal return_to_menu_requested
+
 @export var defense_socket_scene: PackedScene
 @export var exploration_enemy_scene: PackedScene
 @export var perimeter_definition: Resource
@@ -107,6 +109,10 @@ func _ready() -> void:
 	player.build_selection_prev_requested.connect(_on_player_build_selection_prev_requested)
 	player.build_selection_next_requested.connect(_on_player_build_selection_next_requested)
 	player.build_rotation_requested.connect(_on_player_build_rotation_requested)
+	hud.pause_toggle_requested.connect(_on_pause_toggle_requested)
+	hud.pause_resume_requested.connect(_on_pause_resume_requested)
+	hud.pause_save_requested.connect(_on_pause_save_requested)
+	hud.pause_save_quit_requested.connect(_on_pause_save_quit_requested)
 	game_manager.run_state_changed.connect(_on_run_state_changed)
 	_configure_scavenge_nodes()
 	_fog_home_world_position = player.global_position
@@ -273,12 +279,14 @@ func _on_run_state_changed(new_state: int) -> void:
 		else:
 			hud.set_status("Night %d cleared. Sleep on the bed to start the next day." % game_manager.current_wave)
 		player.refresh_interaction_prompt()
+		_flush_pending_autosave()
 		return
 
 	if new_state == game_manager.RunState.PRE_WAVE:
 		if _is_resetting_run:
 			return
 		_enter_day_phase()
+		_flush_pending_autosave()
 
 
 func _on_player_build_mode_toggled(active: bool) -> void:
@@ -302,6 +310,26 @@ func _on_player_build_selection_next_requested() -> void:
 
 func _on_player_build_rotation_requested() -> void:
 	_cycle_selected_buildable_rotation(1)
+
+
+func _on_pause_toggle_requested() -> void:
+	_set_pause_state(not get_tree().paused)
+
+
+func _on_pause_resume_requested() -> void:
+	_set_pause_state(false)
+
+
+func _on_pause_save_requested() -> void:
+	_save_active_run()
+	if hud != null and is_instance_valid(hud):
+		hud.show_pause_menu("Game saved.")
+
+
+func _on_pause_save_quit_requested() -> void:
+	_save_active_run()
+	_set_pause_state(false)
+	return_to_menu_requested.emit()
 
 
 func _on_wave_changed(new_wave: int) -> void:
@@ -461,6 +489,7 @@ func _on_run_reset() -> void:
 	_enter_day_phase()
 	_refresh_base_status()
 	_is_resetting_run = false
+	_request_autosave()
 
 
 func _apply_test_mode_loadout() -> void:
@@ -648,10 +677,12 @@ func _on_player_build_placement_requested() -> void:
 	_refresh_build_mode_preview()
 	_refresh_build_mode_status()
 	player.refresh_interaction_prompt()
+	_request_autosave()
 
 
 func _on_construction_placeable_state_changed(_placeable) -> void:
 	_register_fixed_grid_footprints()
+	_request_autosave()
 
 
 func _format_cost(cost: Dictionary) -> String:
@@ -773,12 +804,15 @@ func _enter_day_phase() -> void:
 	hud.set_phase("Phase: Day")
 	player.refresh_interaction_prompt()
 	_refresh_phase_status()
+	_request_autosave()
 
 
 func _configure_scavenge_nodes() -> void:
 	for node in get_tree().get_nodes_in_group("scavenge_nodes"):
 		if node.has_method("configure_reward_modifier"):
 			node.configure_reward_modifier(Callable(self, "_apply_daily_poi_reward_modifier"))
+		if node.has_signal("state_changed") and not node.state_changed.is_connected(_on_scavenge_node_state_changed):
+			node.state_changed.connect(_on_scavenge_node_state_changed)
 
 
 func _apply_daily_poi_reward_modifier(node, rewards: Dictionary) -> Dictionary:
@@ -1540,6 +1574,11 @@ func _connect_defense_socket_signals() -> void:
 func _on_defense_socket_state_changed(_socket) -> void:
 	_register_fixed_grid_footprints()
 	_refresh_base_status()
+	_request_autosave()
+
+
+func _on_scavenge_node_state_changed(_node) -> void:
+	_request_autosave()
 
 
 func _refresh_base_status() -> void:
@@ -1619,3 +1658,370 @@ func _is_fog_cell_in_bounds(cell: Vector2i) -> bool:
 		and cell.x < _fog_memory_cells_x
 		and cell.y < _fog_memory_cells_y
 	)
+
+
+func get_save_state() -> Dictionary:
+	var selected_profile := get_selected_buildable_profile()
+	var saved_defeated_spawns: Array[String] = []
+	for spawn_id_variant in _defeated_exploration_spawn_ids.keys():
+		saved_defeated_spawns.append(String(spawn_id_variant))
+
+	var saved_daily_modifiers := {}
+	for poi_id_variant in _daily_poi_modifiers.keys():
+		saved_daily_modifiers[String(poi_id_variant)] = String(_daily_poi_modifiers[poi_id_variant])
+
+	var saved_refilled_pois: Array[String] = []
+	for poi_id in _last_daily_refilled_pois:
+		saved_refilled_pois.append(String(poi_id))
+
+	var fog_payload := _get_fog_save_payload()
+	return {
+		"game": {
+			"wave": int(game_manager.current_wave),
+			"run_state": int(game_manager.run_state),
+			"phase": _get_run_state_label(game_manager.run_state),
+			"selected_buildable_profile_id": String(selected_profile.placeable_id) if selected_profile != null else "",
+			"selected_buildable_rotation": get_selected_buildable_rotation(),
+			"defeated_exploration_spawn_ids": saved_defeated_spawns,
+			"exploration_spawn_counts": _exploration_spawn_counts.duplicate(true),
+			"defeated_exploration_enemy_counts": _defeated_exploration_enemy_counts.duplicate(true),
+			"current_exploration_target_counts": _current_exploration_target_counts.duplicate(true),
+			"daily_poi_modifiers": saved_daily_modifiers,
+			"last_daily_refilled_pois": saved_refilled_pois,
+		},
+		"player": player.get_save_state() if player != null and is_instance_valid(player) else {},
+		"defense_sockets": _get_defense_socket_save_states(),
+		"scavenge_nodes": _get_scavenge_node_save_states(),
+		"placeables": _get_construction_placeable_save_states(),
+		"fog": fog_payload,
+	}
+
+
+func apply_save_state(save_state: Dictionary) -> void:
+	if save_state.is_empty():
+		return
+
+	_is_resetting_run = true
+	wave_manager.reset()
+	_clear_exploration_enemies()
+	_defeated_exploration_spawn_ids.clear()
+	_exploration_spawn_counts.clear()
+	_defeated_exploration_enemy_counts.clear()
+	_current_exploration_target_counts.clear()
+	_daily_poi_modifiers.clear()
+	_last_daily_refilled_pois.clear()
+	_selected_buildable_profile_index = 0
+	_selected_buildable_rotation = 0
+
+	var game_state: Dictionary = save_state.get("game", {})
+	var player_state: Dictionary = save_state.get("player", {})
+	var saved_wave := maxi(int(game_state.get("wave", 0)), 0)
+	var saved_run_state := int(game_state.get("run_state", game_manager.RunState.PRE_WAVE))
+	game_manager.set_wave(saved_wave)
+	game_manager.set_run_state(saved_run_state)
+
+	_restore_buildable_selection_from_state(game_state)
+	_restore_daily_run_state(game_state)
+
+	if player != null and is_instance_valid(player):
+		player.apply_save_state(player_state, Callable(self, "_get_weapon_definition_by_id"))
+
+	_apply_defense_socket_save_states(save_state.get("defense_sockets", []))
+	_apply_scavenge_node_save_states(save_state.get("scavenge_nodes", []))
+	_apply_construction_placeable_save_states(save_state.get("placeables", []))
+	_apply_fog_save_state(save_state.get("fog", {}))
+
+	_register_fixed_grid_footprints()
+	_configure_scavenge_nodes()
+	_refresh_poi_modifier_visuals()
+	_sync_exploration_enemies()
+	_sync_daily_modifier_enemies()
+	_refresh_base_status()
+	_refresh_phase_status()
+	if player != null and is_instance_valid(player):
+		player.refresh_interaction_prompt()
+	_refresh_build_mode_preview()
+	_refresh_build_mode_status()
+	_is_resetting_run = false
+	_request_autosave()
+
+
+func _request_autosave() -> void:
+	if _is_resetting_run:
+		return
+	var save_store: Node = _get_save_store()
+	if save_store == null:
+		return
+	save_store.call("request_autosave", self)
+
+
+func _flush_pending_autosave() -> void:
+	if _is_resetting_run:
+		return
+	var save_store: Node = _get_save_store()
+	if save_store == null:
+		return
+	save_store.call("flush_pending_autosave", self)
+
+
+func _get_save_store() -> Node:
+	return get_node_or_null("/root/SaveStore")
+
+
+func _save_active_run() -> void:
+	var save_store: Node = _get_save_store()
+	if save_store == null:
+		return
+	save_store.call("save_active_game", self)
+
+
+func _set_pause_state(paused: bool) -> void:
+	get_tree().paused = paused
+	if hud != null and is_instance_valid(hud):
+		if paused:
+			hud.show_pause_menu("Paused. Save before quitting or resume when ready.")
+		else:
+			hud.hide_pause_menu()
+	if player != null and is_instance_valid(player):
+		player.refresh_interaction_prompt()
+
+
+func _get_defense_socket_save_states() -> Array[Dictionary]:
+	var save_states: Array[Dictionary] = []
+	for socket in get_tree().get_nodes_in_group("defense_sockets"):
+		if socket == null or not is_instance_valid(socket):
+			continue
+		if not socket.has_method("get_save_state"):
+			continue
+		save_states.append(socket.get_save_state())
+	return save_states
+
+
+func _apply_defense_socket_save_states(save_states: Array) -> void:
+	var socket_by_id := _get_defense_socket_by_id()
+	for raw_state in save_states:
+		var state: Dictionary = raw_state
+		var socket_id := StringName(state.get("socket_id", ""))
+		if socket_id == StringName() or not socket_by_id.has(socket_id):
+			continue
+		var socket = socket_by_id[socket_id]
+		if socket != null and is_instance_valid(socket) and socket.has_method("apply_save_state"):
+			socket.apply_save_state(state)
+
+
+func _get_defense_socket_by_id() -> Dictionary:
+	var sockets := {}
+	for socket in get_tree().get_nodes_in_group("defense_sockets"):
+		if socket == null or not is_instance_valid(socket):
+			continue
+		sockets[StringName(socket.socket_id)] = socket
+	return sockets
+
+
+func _get_scavenge_node_save_states() -> Array[Dictionary]:
+	var save_states: Array[Dictionary] = []
+	for node in get_tree().get_nodes_in_group("scavenge_nodes"):
+		if node == null or not is_instance_valid(node):
+			continue
+		if not node.has_method("get_save_state"):
+			continue
+		save_states.append(node.get_save_state())
+	return save_states
+
+
+func _apply_scavenge_node_save_states(save_states: Array) -> void:
+	var node_by_id := _get_scavenge_node_by_id()
+	for raw_state in save_states:
+		var state: Dictionary = raw_state
+		var node_id := StringName(state.get("node_id", ""))
+		if node_id == StringName() or not node_by_id.has(node_id):
+			continue
+		var node = node_by_id[node_id]
+		if node != null and is_instance_valid(node) and node.has_method("apply_save_state"):
+			node.apply_save_state(state)
+
+
+func _get_scavenge_node_by_id() -> Dictionary:
+	var nodes := {}
+	for node in get_tree().get_nodes_in_group("scavenge_nodes"):
+		if node == null or not is_instance_valid(node):
+			continue
+		nodes[StringName(node.node_id)] = node
+	return nodes
+
+
+func _get_construction_placeable_save_states() -> Array[Dictionary]:
+	var save_states: Array[Dictionary] = []
+	for placeable in construction_placeables.get_children():
+		if placeable == null or not is_instance_valid(placeable):
+			continue
+		if not placeable.has_method("get_save_state"):
+			continue
+		save_states.append(placeable.get_save_state())
+	return save_states
+
+
+func _apply_construction_placeable_save_states(save_states: Array) -> void:
+	for child in construction_placeables.get_children():
+		if is_instance_valid(child):
+			child.free()
+
+	if construction_placeable_scene == null:
+		return
+
+	for raw_state in save_states:
+		var state: Dictionary = raw_state
+		var profile := _lookup_placeable_profile(StringName(state.get("placeable_id", "")))
+		if profile == null:
+			continue
+		var placeable = construction_placeable_scene.instantiate()
+		placeable.profile = profile
+		placeable.placement_rotation_steps = int(state.get("rotation_steps", 0))
+		var anchor_data: Dictionary = state.get("anchor_cell", {})
+		placeable.footprint_anchor_cell = Vector2i(
+			int(anchor_data.get("x", 0)),
+			int(anchor_data.get("y", 0))
+		)
+		var position_data: Dictionary = state.get("position", {})
+		if position_data.is_empty():
+			placeable.global_position = construction_grid.get_world_position_for_cell(placeable.footprint_anchor_cell)
+		else:
+			placeable.global_position = Vector2(
+				float(position_data.get("x", 0.0)),
+				float(position_data.get("y", 0.0))
+			)
+		placeable.state_changed.connect(_on_construction_placeable_state_changed)
+		construction_placeables.add_child(placeable)
+		if placeable.has_method("apply_save_state"):
+			placeable.apply_save_state(state)
+
+
+func _lookup_placeable_profile(placeable_id: StringName) -> PlaceableProfile:
+	var profiles := _get_buildable_placeable_profiles()
+	for profile in profiles:
+		if profile != null and StringName(profile.placeable_id) == placeable_id:
+			return profile
+	if barricade_placeable_profile != null:
+		var fallback_profile: PlaceableProfile = barricade_placeable_profile as PlaceableProfile
+		if fallback_profile != null and StringName(fallback_profile.placeable_id) == placeable_id:
+			return fallback_profile
+	return null
+
+
+func _restore_buildable_selection_from_state(game_state: Dictionary) -> void:
+	var saved_profile_id := StringName(game_state.get("selected_buildable_profile_id", ""))
+	var saved_rotation := int(game_state.get("selected_buildable_rotation", 0))
+	if saved_profile_id != StringName():
+		var profiles := _get_buildable_placeable_profiles()
+		for index in range(profiles.size()):
+			var profile := profiles[index]
+			if profile != null and StringName(profile.placeable_id) == saved_profile_id:
+				_selected_buildable_profile_index = index
+				break
+	_selected_buildable_rotation = posmod(saved_rotation, 4)
+
+
+func _restore_daily_run_state(game_state: Dictionary) -> void:
+	_defeated_exploration_spawn_ids.clear()
+	for raw_spawn_id in game_state.get("defeated_exploration_spawn_ids", []):
+		_defeated_exploration_spawn_ids[String(raw_spawn_id)] = true
+	_exploration_spawn_counts = _duplicate_string_dictionary(game_state.get("exploration_spawn_counts", {}))
+	_defeated_exploration_enemy_counts = _duplicate_string_dictionary(game_state.get("defeated_exploration_enemy_counts", {}))
+	_current_exploration_target_counts = _duplicate_string_dictionary(game_state.get("current_exploration_target_counts", {}))
+	_daily_poi_modifiers = _duplicate_stringname_dictionary(game_state.get("daily_poi_modifiers", {}))
+	_last_daily_refilled_pois.clear()
+	for raw_poi_id in game_state.get("last_daily_refilled_pois", []):
+		_last_daily_refilled_pois.append(StringName(raw_poi_id))
+
+
+func _apply_fog_save_state(fog_state: Dictionary) -> void:
+	if fog_state.is_empty():
+		_initialize_fog_memory()
+		return
+
+	var encoded_image := String(fog_state.get("image_base64", ""))
+	if encoded_image.is_empty():
+		_initialize_fog_memory()
+		return
+
+	var image_bytes := Marshalls.base64_to_raw(encoded_image)
+	var fog_image := Image.new()
+	var error := fog_image.load_png_from_buffer(image_bytes)
+	if error != OK:
+		_initialize_fog_memory()
+		return
+
+	_fog_memory_cells_x = fog_image.get_width()
+	_fog_memory_cells_y = fog_image.get_height()
+	_fog_memory_image = fog_image
+	_fog_memory_texture = ImageTexture.create_from_image(_fog_memory_image)
+	var last_revealed: Dictionary = fog_state.get("last_revealed_cell", {})
+	_fog_last_revealed_cell = Vector2i(
+		int(last_revealed.get("x", 2147483647)),
+		int(last_revealed.get("y", 2147483647))
+	)
+
+
+func _get_fog_save_payload() -> Dictionary:
+	if _fog_memory_image == null:
+		return {}
+	var png_bytes := _fog_memory_image.save_png_to_buffer()
+	return {
+		"image_base64": Marshalls.raw_to_base64(png_bytes),
+		"last_revealed_cell": {
+			"x": int(_fog_last_revealed_cell.x),
+			"y": int(_fog_last_revealed_cell.y),
+		},
+	}
+
+
+func _get_run_state_label(run_state: int) -> String:
+	match run_state:
+		game_manager.RunState.PRE_WAVE:
+			return "Day"
+		game_manager.RunState.ACTIVE_WAVE:
+			return "Night"
+		game_manager.RunState.POST_WAVE:
+			return "Post-Wave"
+		game_manager.RunState.WIN:
+			return "Victory"
+		game_manager.RunState.LOSS:
+			return "Loss"
+	return "Unknown"
+
+
+func _duplicate_string_dictionary(raw_dictionary: Dictionary) -> Dictionary:
+	var result := {}
+	for key in raw_dictionary.keys():
+		result[String(key)] = int(raw_dictionary[key])
+	return result
+
+
+func _duplicate_stringname_dictionary(raw_dictionary: Dictionary) -> Dictionary:
+	var result := {}
+	for key in raw_dictionary.keys():
+		result[StringName(String(key))] = StringName(raw_dictionary[key])
+	return result
+
+
+func _get_weapon_definition_by_id(weapon_id: StringName) -> Resource:
+	if weapon_id == StringName():
+		return null
+
+	var weapon_dir := DirAccess.open("res://data/weapons")
+	if weapon_dir == null:
+		return null
+
+	for file_name in weapon_dir.get_files():
+		if not file_name.ends_with(".tres") and not file_name.ends_with(".res"):
+			continue
+		var weapon_path := "res://data/weapons/%s" % file_name
+		var weapon := load(weapon_path)
+		if weapon == null or not weapon.has_method("is_valid_definition"):
+			continue
+		if not weapon.is_valid_definition():
+			continue
+		if StringName(weapon.weapon_id) == weapon_id:
+			return weapon
+
+	return null

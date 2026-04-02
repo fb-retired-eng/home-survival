@@ -169,6 +169,25 @@ func reset_for_new_run() -> void:
 	_refresh_visuals()
 
 
+func get_save_state() -> Dictionary:
+	return {
+		"socket_id": String(socket_id),
+		"socket_type": socket_type,
+		"tier": tier,
+		"current_hp": current_hp,
+	}
+
+
+func apply_save_state(save_state: Dictionary) -> void:
+	var saved_tier := String(save_state.get("tier", tier))
+	if saved_tier != "damaged" and saved_tier != "reinforced" and saved_tier != "fortified":
+		saved_tier = _initial_tier
+	tier = saved_tier
+	max_hp = _get_max_hp_for_tier(tier)
+	current_hp = clampi(int(save_state.get("current_hp", max_hp)), 0, max_hp)
+	_refresh_visuals()
+
+
 func _get_available_action() -> String:
 	if not _has_structure_profile():
 		return ""

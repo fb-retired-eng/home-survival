@@ -85,6 +85,60 @@ Validation:
   - `map_fog_probe_home_center=(1280.0, 720.0)`
   - `map_fog_probe_camera_screen_center=(1464.159, 634.3447)`
 
+### MVP0.5 Bridge Spec
+- Added `MVP0_5_SPEC.md` as the bridge milestone between MVP0 and MVP1.
+- Defined MVP0.5 as the menu, settings, save/load, and persistence layer needed to make the current prototype feel shippable without adding new combat or progression systems.
+- Split persistence into separate settings and run saves, with explicit support for construction and fog-memory restoration.
+
+### MVP0.5 Settings Shell
+- Added a boot scene and menu shell that starts the project in a main menu instead of jumping directly into the run scene.
+- Added persistent settings for master volume and fullscreen using a dedicated user-data settings file.
+- Added a headless settings probe that verifies the settings file round-trips and that the boot scene constructs the menu and settings panel.
+
+Validation:
+- `settings_manager_probe` confirmed:
+  - `settings_manager_probe_file_exists=true`
+  - `settings_manager_probe_master_volume=0.37`
+  - `settings_manager_probe_fullscreen=true`
+  - `settings_manager_probe_boot_start_button=true`
+  - `settings_manager_probe_boot_settings_button=true`
+  - `settings_manager_probe_boot_settings_panel=true`
+
+### MVP0.5 Run Save/Load Slice
+- Added a slot-based run save manager plus Boot wiring for New Game, Continue, and Load Game.
+- Persisted player state, defense sockets, scavenge nodes, placed construction, fog memory, and run metadata through a versioned JSON save payload.
+- Added autosave hooks at safe points so construction and phase transitions can refresh the active slot without mid-wave serialization.
+- Added a round-trip save probe that writes to a real slot, reloads it into a fresh game instance, and checks the boot menu can see the save summary.
+
+### MVP0.5 Pause Menu Slice
+- Added an in-game pause overlay with resume, save, and save-and-quit actions.
+- Wired Escape to toggle pause while keeping the HUD responsive during paused state.
+- Connected save-and-quit to the boot menu return flow so the current run can be persisted and dropped back to the menu cleanly.
+- Added a pause-menu probe that verifies save, resume, and quit-to-menu behavior end to end.
+
+Validation:
+- `save_system_probe` confirmed:
+  - `save_probe_slot_occupied=true`
+  - `save_probe_summary_text=Slot 3 | Day 3 | Wave 2 | Post-Wave | 2026-04-02T06:58:14`
+  - `save_probe_player_health=83`
+  - `save_probe_player_build_mode=true`
+  - `save_probe_placeable_id=spike_trap`
+  - `save_probe_placeable_rotation=1`
+  - `save_probe_socket_hp=117`
+  - `save_probe_node_depleted=true`
+  - `save_probe_daily_modifier=elite_present`
+  - `save_probe_boot_continue_disabled=false`
+  - `save_probe_boot_load_slot_3_text=Slot 3 | Day 3 | Wave 2 | Post-Wave | 2026-04-02T06:58:14`
+- `pause_menu_probe` confirmed:
+  - `pause_probe_paused=true`
+  - `pause_probe_menu_visible=true`
+  - `pause_probe_saved_health=87`
+  - `pause_probe_saved_slot_summary=Slot 2 | Day 1 | Wave 0 | Day | 2026-04-02T07:01:58`
+  - `pause_probe_resumed=true`
+  - `pause_probe_menu_hidden=true`
+  - `pause_probe_back_to_menu=true`
+  - `pause_probe_game_host_children=0`
+
 ### Expanded Grid Playtest
 - Added a dedicated probe for the outer-ring tactical build cells so the widened grid is exercised through the real barricade placement flow, not just validity checks.
 - Confirmed the new expanded cell at `(-2, 3)` accepts barricade placement, spends salvage, and occupies the expected cell.

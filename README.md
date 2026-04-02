@@ -29,6 +29,7 @@ The repo currently includes:
 - HUD for core status display, including the currently equipped weapon
 - construction-system foundation for a larger authored map with a local buildable band around the home, build-mode placement, tactical cell reservations, selectable multi-cell buildables, and the first barricade placeable with repair/recycle support; this is now an active tactical layer, not just scaffolding
 - home-anchored fog-of-war that starts beyond the local home area and keeps areas the player has already visited revealed, so the enlarged map has clearer nearby readability and persistent exploration memory
+- MVP0.5 boot shell with a main menu, continue/load slots, persistent settings, pause-menu save/quit, and versioned run saves that restore construction and fog memory
 - placeholder world scenes for sockets, scavenging nodes, bed/table interactions, pickups, and zombie enemy
 - consolidated MVP0 design/spec documentation
 
@@ -65,11 +66,13 @@ godot --headless --path . --quit
 - Rotate selected buildable while in build mode: `R`
 - Place selected buildable while in build mode: `E`
 - Recycle full-health buildable while in build mode: `C`
+- Pause / resume: `Esc`
 - Eat dinner at table / sleep on bed: `E` when in range
 - Restart after win/loss: `Shift+R`
 
 ## Important Docs
 - [`MVP0_SPEC.md`](MVP0_SPEC.md): implementation source of truth
+- [`MVP0_5_SPEC.md`](MVP0_5_SPEC.md): bridge spec for menu, settings, save/load, and persistence
 - [`MVP1_SPEC.md`](MVP1_SPEC.md): expansion spec for power, dog synergy, and heirlooms
 - [`MVP0_ONE_PAGER.md`](MVP0_ONE_PAGER.md): product framing
 - [`TASK_BREAKDOWN.md`](TASK_BREAKDOWN.md): milestone plan

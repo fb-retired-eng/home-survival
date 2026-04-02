@@ -1008,6 +1008,68 @@ func get_obtained_weapon_ids() -> PackedStringArray:
 	return weapon_ids
 
 
+func get_save_state() -> Dictionary:
+	return {
+		"position": {
+			"x": global_position.x,
+			"y": global_position.y,
+		},
+		"health": current_health,
+		"energy": current_energy,
+		"resources": resources.duplicate(true),
+		"equipped_weapon_id": String(_get_equipped_weapon().weapon_id) if _get_equipped_weapon() != null else "",
+		"obtained_weapon_ids": get_obtained_weapon_ids(),
+		"build_mode_active": _build_mode_active,
+	}
+
+
+func apply_save_state(save_state: Dictionary, weapon_lookup: Callable) -> void:
+	var position_data: Dictionary = save_state.get("position", {})
+	global_position = Vector2(
+		float(position_data.get("x", global_position.x)),
+		float(position_data.get("y", global_position.y))
+	)
+	current_health = clampi(int(save_state.get("health", max_health)), 0, max_health)
+	current_energy = clampi(int(save_state.get("energy", max_energy)), 0, max_energy)
+
+	var restored_resources := {
+		"salvage": 0,
+		"parts": 0,
+		"medicine": 0,
+		"bullets": 0,
+		"food": 0,
+	}
+	var saved_resources: Dictionary = save_state.get("resources", {})
+	for resource_id in RESOURCE_IDS:
+		restored_resources[resource_id] = int(saved_resources.get(resource_id, 0))
+	resources = restored_resources
+
+	_obtained_weapons.clear()
+	var saved_weapon_ids: Array = save_state.get("obtained_weapon_ids", [])
+	for raw_weapon_id in saved_weapon_ids:
+		var weapon := _resolve_weapon_from_lookup(weapon_lookup, StringName(raw_weapon_id))
+		if weapon != null and not _has_obtained_weapon_id(weapon.weapon_id):
+			_obtained_weapons.append(weapon)
+	if _starting_weapon != null and not _has_obtained_weapon_id(_starting_weapon.weapon_id):
+		_obtained_weapons.append(_starting_weapon)
+
+	var equipped_weapon_id := StringName(save_state.get("equipped_weapon_id", ""))
+	var equipped_weapon := _resolve_weapon_from_lookup(weapon_lookup, equipped_weapon_id)
+	if equipped_weapon == null:
+		equipped_weapon = _starting_weapon
+	if equipped_weapon != null:
+		equipped_weapon = _resolve_strict_weapon_resource(equipped_weapon)
+		if equipped_weapon != null:
+			equipped_weapon = equipped_weapon
+			_equipped_weapon = equipped_weapon
+			_apply_equipped_weapon()
+
+	set_build_mode_active(bool(save_state.get("build_mode_active", false)), false)
+	_emit_full_state()
+	_update_interaction_prompt()
+	_update_render_order()
+
+
 func _get_equipped_weapon() -> Resource:
 	if _is_valid_weapon_resource(equipped_weapon):
 		_invalid_weapon_warning_emitted = false
@@ -1610,6 +1672,15 @@ func _find_obtained_weapon_by_id(weapon_id: StringName) -> Resource:
 		if weapon != null and weapon.weapon_id == weapon_id:
 			return weapon
 	return null
+
+
+func _resolve_weapon_from_lookup(weapon_lookup: Callable, weapon_id: StringName) -> Resource:
+	if not weapon_lookup.is_valid():
+		return null
+	var weapon: Resource = weapon_lookup.call(weapon_id)
+	if weapon == null or not _is_valid_weapon_resource(weapon):
+		return null
+	return weapon
 
 
 func _get_bullet_reserve_amount() -> int:

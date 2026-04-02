@@ -71,6 +71,10 @@ func get_preview_world_position() -> Vector2:
 	return to_global(_cell_to_world(_preview_cell))
 
 
+func get_world_position_for_cell(cell: Vector2i) -> Vector2:
+	return to_global(_cell_to_world(cell))
+
+
 func get_preview_reason() -> String:
 	return _preview_reason
 

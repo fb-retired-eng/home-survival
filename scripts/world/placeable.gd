@@ -204,6 +204,45 @@ func reset_for_new_run() -> void:
 	state_changed.emit(self)
 
 
+func get_save_state() -> Dictionary:
+	var saved_profile_id := String(get_placeable_id())
+	return {
+		"placeable_id": saved_profile_id,
+		"current_hp": current_hp,
+		"placed_this_run": placed_this_run,
+		"is_dismantled": is_dismantled,
+		"anchor_cell": {
+			"x": int(footprint_anchor_cell.x),
+			"y": int(footprint_anchor_cell.y),
+		},
+		"rotation_steps": placement_rotation_steps,
+		"position": {
+			"x": global_position.x,
+			"y": global_position.y,
+		},
+	}
+
+
+func apply_save_state(save_state: Dictionary) -> void:
+	current_hp = clampi(int(save_state.get("current_hp", current_hp)), 0, int(profile.max_hp) if profile != null and profile.get_script() == PLACEABLE_PROFILE_SCRIPT else current_hp)
+	placed_this_run = bool(save_state.get("placed_this_run", placed_this_run))
+	is_dismantled = bool(save_state.get("is_dismantled", is_dismantled))
+	var anchor_data: Dictionary = save_state.get("anchor_cell", {})
+	footprint_anchor_cell = Vector2i(
+		int(anchor_data.get("x", footprint_anchor_cell.x)),
+		int(anchor_data.get("y", footprint_anchor_cell.y))
+	)
+	placement_rotation_steps = int(save_state.get("rotation_steps", placement_rotation_steps))
+	var position_data: Dictionary = save_state.get("position", {})
+	global_position = Vector2(
+		float(position_data.get("x", global_position.x)),
+		float(position_data.get("y", global_position.y))
+	)
+	_refresh_from_profile()
+	_configure_trap_nodes()
+	state_changed.emit(self)
+
+
 func begin_player_collision_grace(player: Node2D, construction_grid: Node, footprint_cells: Array[Vector2i], grace_radius_cells: int = 1) -> void:
 	if player == null or not is_instance_valid(player):
 		return

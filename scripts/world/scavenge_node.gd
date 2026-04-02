@@ -3,6 +3,8 @@ class_name ScavengeNode
 
 const WEAPON_DEFINITION_SCRIPT := preload("res://scripts/data/weapon_definition.gd")
 
+signal state_changed(node: ScavengeNode)
+
 @export var node_id: StringName
 @export var poi_id: StringName
 @export var search_duration: float = 0.9
@@ -147,10 +149,25 @@ func _refresh_visuals() -> void:
 	else:
 		visual.color = Color(0.93, 0.79, 0.35, 1.0)
 		label.text = "Search"
+	state_changed.emit(self)
 
 
 func reset_for_new_run() -> void:
 	is_depleted = false
+	_is_searching = false
+	_refresh_visuals()
+
+
+func get_save_state() -> Dictionary:
+	return {
+		"node_id": String(node_id),
+		"poi_id": String(poi_id),
+		"is_depleted": is_depleted,
+	}
+
+
+func apply_save_state(save_state: Dictionary) -> void:
+	is_depleted = bool(save_state.get("is_depleted", is_depleted))
 	_is_searching = false
 	_refresh_visuals()
 
