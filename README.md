@@ -8,7 +8,7 @@ The current MVP0 goal is to prove this loop:
 
 ## MVP0 Summary
 - Desktop-first Godot 4 project
-- One larger authored map
+- One 2x larger authored map
 - Central abstract base
 - Six scavenging POIs
 - Table + bed prep loop
@@ -27,7 +27,7 @@ The repo currently includes:
 - fortified wall/door upgrades beyond the original reinforced tier
 - review-driven guardrails around elite-only weapon drops, spitter structure range, reset-state UI consistency, and bat-only attack interrupt behavior
 - HUD for core status display, including the currently equipped weapon
-- construction-system foundation for a whole-map authored build grid, build-mode placement, tactical cell reservations, selectable multi-cell buildables, and the first barricade placeable with repair/recycle support; this is now an active tactical layer, not just scaffolding
+- construction-system foundation for a larger authored map with a local buildable band around the home, build-mode placement, tactical cell reservations, selectable multi-cell buildables, and the first barricade placeable with repair/recycle support; this is now an active tactical layer, not just scaffolding
 - placeholder world scenes for sockets, scavenging nodes, bed/table interactions, pickups, and zombie enemy
 - consolidated MVP0 design/spec documentation
 

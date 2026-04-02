@@ -160,7 +160,7 @@ Not started yet:
 - broader lane-graph validation beyond the current door-route guard
 
 Implemented:
-- whole-map construction grid
+- larger bounded construction grid with a local buildable band around the home
 - build-mode preview and placement
 - barricade placement, repair, dismantle, and occupancy refresh
 - trap-prevention guard against sealing the player in

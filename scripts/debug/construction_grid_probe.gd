@@ -74,11 +74,17 @@ func _init() -> void:
 	print("construction_grid_probe_valid_cell=%s" % str(grid.get_preview_cell()))
 	print("construction_grid_probe_valid_tactical=%s" % str(grid.is_cell_tactical(grid.get_preview_cell())))
 
+	player.global_position = grid.to_global(Vector2(10.0 * grid.cell_size.x, 8.0 * grid.cell_size.y))
+	await _wait_frames()
+	print("construction_grid_probe_center_buildable_reason=%s" % grid.get_preview_reason())
+	print("construction_grid_probe_center_buildable_cell=%s" % str(grid.get_preview_cell()))
+	print("construction_grid_probe_center_buildable_tactical=%s" % str(grid.is_cell_tactical(grid.get_preview_cell())))
+
 	player.global_position = grid.to_global(Vector2(12.0 * grid.cell_size.x, 12.0 * grid.cell_size.y))
 	await _wait_frames()
-	print("construction_grid_probe_non_buildable_reason=%s" % grid.get_preview_reason())
-	print("construction_grid_probe_non_buildable_cell=%s" % str(grid.get_preview_cell()))
-	print("construction_grid_probe_non_buildable_tactical=%s" % str(grid.is_cell_tactical(grid.get_preview_cell())))
+	print("construction_grid_probe_far_blocked_reason=%s" % grid.get_preview_reason())
+	print("construction_grid_probe_far_blocked_cell=%s" % str(grid.get_preview_cell()))
+	print("construction_grid_probe_far_blocked_tactical=%s" % str(grid.is_cell_tactical(grid.get_preview_cell())))
 
 	player.global_position = grid.to_global(Vector2(-2.0 * grid.cell_size.x, 3.0 * grid.cell_size.y))
 	await _wait_frames()
@@ -92,7 +98,12 @@ func _init() -> void:
 	print("construction_grid_probe_corner_cell=%s" % str(grid.get_preview_cell()))
 	print("construction_grid_probe_corner_reserved=%s" % str(grid.is_cell_reserved(grid.get_preview_cell())))
 	print("construction_grid_probe_corner_valid=%s" % str(grid.is_cell_valid_for_basic_placeable(grid.get_preview_cell())))
-	print("construction_grid_probe_corner_buffer=%s" % str(grid.would_trap_player_local(grid.get_preview_cell(), [Vector2i(-1, -2), Vector2i(-2, -1)], 2)))
+	player.global_position = grid.to_global(Vector2(0.0 * grid.cell_size.x, 0.0 * grid.cell_size.y))
+	await _wait_frames()
+	print("construction_grid_probe_home_corner_reason=%s" % grid.get_preview_reason())
+	print("construction_grid_probe_home_corner_cell=%s" % str(grid.get_preview_cell()))
+	print("construction_grid_probe_home_corner_reserved=%s" % str(grid.is_cell_reserved(grid.get_preview_cell())))
+	print("construction_grid_probe_home_corner_valid=%s" % str(grid.is_cell_valid_for_basic_placeable(grid.get_preview_cell())))
 
 	var wall_n = _find_defense_socket(game, &"wall_n")
 	if wall_n == null:

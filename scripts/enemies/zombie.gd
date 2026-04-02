@@ -45,6 +45,8 @@ var _attack_prep_remaining: float = 0.0
 var _attack_prep_armed: bool = false
 var _attack_prep_target_id: int = 0
 var _attack_prep_lost_target_grace_remaining: float = 0.0
+var _slow_effect_multiplier: float = 1.0
+var _slow_effect_remaining: float = 0.0
 var _damage_feedback_tween: Tween
 var _exploration_anchor_position: Vector2 = Vector2.ZERO
 var _exploration_anchor_facing: Vector2 = Vector2.ZERO
@@ -152,12 +154,19 @@ func is_attack_prep_armed() -> bool:
 	return _attack_prep_armed
 
 
+func get_slow_effect_multiplier() -> float:
+	return _slow_effect_multiplier
+
+
 func _physics_process(delta: float) -> void:
 	_damage_cooldown_remaining = max(_damage_cooldown_remaining - delta, 0.0)
 	_attack_prep_remaining = max(_attack_prep_remaining - delta, 0.0)
 	_attack_prep_lost_target_grace_remaining = max(_attack_prep_lost_target_grace_remaining - delta, 0.0)
 	_noise_investigation_remaining = max(_noise_investigation_remaining - delta, 0.0)
 	_noise_investigation_detect_delay_remaining = max(_noise_investigation_detect_delay_remaining - delta, 0.0)
+	_slow_effect_remaining = max(_slow_effect_remaining - delta, 0.0)
+	if _slow_effect_remaining <= 0.0:
+		_slow_effect_multiplier = 1.0
 	_decay_knockback(delta)
 	_update_player_chase_state()
 	var primary_target = _get_current_target()
@@ -170,7 +179,7 @@ func _physics_process(delta: float) -> void:
 			_clear_noise_investigation()
 			velocity = Vector2.ZERO
 		else:
-			velocity = investigate_offset.normalized() * move_speed
+			velocity = investigate_offset.normalized() * move_speed * _slow_effect_multiplier
 			_update_facing_direction(investigate_offset)
 	elif primary_target != null and is_instance_valid(primary_target) and not _is_target_in_damage_range(primary_target):
 		velocity = _compute_move_velocity(primary_target)
@@ -222,7 +231,7 @@ func _compute_move_velocity(primary_target) -> Vector2:
 	if move_direction.is_zero_approx():
 		return Vector2.ZERO
 
-	return move_direction.normalized() * move_speed
+	return move_direction.normalized() * move_speed * _slow_effect_multiplier
 
 
 func _update_facing_direction(direction: Vector2) -> void:
@@ -256,6 +265,7 @@ func take_damage(amount: int, _source: Variant = null) -> void:
 	_alert_to_player_from_source(_source)
 	_apply_knockback_from_source(_source)
 	_apply_attack_interrupt_from_source(_source)
+	_apply_slow_effect_from_source(_source)
 	var damage_amount := _resolve_damage_taken(amount, _source)
 	if damage_amount <= 0:
 		return
@@ -607,6 +617,20 @@ func _apply_attack_interrupt_from_source(source: Variant) -> void:
 	if not _attack_prep_armed:
 		return
 	_reset_attack_prep()
+
+
+func _apply_slow_effect_from_source(source: Variant) -> void:
+	if source == null or typeof(source) != TYPE_DICTIONARY:
+		return
+	var slow_factor := float(source.get("slow_factor", 0.0))
+	if slow_factor <= 0.0:
+		return
+	var clamped_slow_factor := clampf(slow_factor, 0.0, 1.0)
+	if clamped_slow_factor <= 0.0:
+		return
+	var duration := float(source.get("slow_duration", 1.1))
+	_slow_effect_multiplier = minf(_slow_effect_multiplier, clamped_slow_factor)
+	_slow_effect_remaining = maxf(_slow_effect_remaining, duration)
 
 
 func _is_under_knockback() -> bool:

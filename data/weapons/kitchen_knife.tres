@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="WeaponDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="WeaponDefinition" format=3 uid="uid://yctnqkltqb5x"]
 
-[ext_resource type="Script" path="res://scripts/data/weapon_definition.gd" id="1_weapon"]
+[ext_resource type="Script" uid="uid://c47vqhlljgggf" path="res://scripts/data/weapon_definition.gd" id="1_weapon"]
 
 [resource]
 script = ExtResource("1_weapon")
@@ -8,17 +8,11 @@ weapon_id = &"kitchen_knife"
 display_name = "Kitchen Knife"
 hud_trait_text = "Fast, isolated"
 damage = 22
-damage_type = &"melee"
-energy_cost = 1
 attack_cooldown = 0.34
-miss_recovery_time = 0.12
 attack_windup = 0.1
-attack_area_size = Vector2(28, 18)
-attack_area_offset = Vector2(0, -24)
 held_visual_offset = Vector2(9, -10)
 held_visual_polygon = PackedVector2Array(0, -12, 3, -4, 2, 10, -2, 10, -3, -4)
 held_visual_color = Color(0.52, 0.6, 0.74, 1)
-knockback_force = 0.0
 isolated_bonus_damage = 6
 attack_flash_color = Color(1, 0.9, 0.62, 0.75)
 attack_flash_start_scale = Vector2(0.72, 0.72)

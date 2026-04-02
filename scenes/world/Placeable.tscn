@@ -1,4 +1,4 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/placeable.gd" id="1_placeable"]
 [ext_resource type="Script" path="res://scripts/world/socket_interaction_proxy.gd" id="2_proxy"]
@@ -23,3 +23,16 @@ script = ExtResource("2_proxy")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="InteractionArea"]
 shape = SubResource("1_barricade_shape")
+
+[node name="TrapHitArea" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 8
+monitorable = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="TrapHitArea"]
+shape = SubResource("1_barricade_shape")
+
+[node name="TrapHitTimer" type="Timer" parent="."]
+wait_time = 0.35
+autostart = false
+one_shot = false

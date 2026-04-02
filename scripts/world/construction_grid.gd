@@ -9,6 +9,7 @@ const CELL_BORDER_INSET := 2.0
 @export var grid_max_cell: Vector2i = Vector2i.ZERO
 @export var tactical_cells: PackedVector2Array = PackedVector2Array()
 @export var reserved_cells: PackedVector2Array = PackedVector2Array()
+@export var buildable_margin_cells: int = 3
 
 var _build_mode_active: bool = false
 var _preview_cell: Vector2i = Vector2i.ZERO
@@ -16,8 +17,11 @@ var _preview_reason: String = ""
 var _preview_footprint_offsets: PackedVector2Array = PackedVector2Array([Vector2.ZERO])
 var _occupied_cells: Dictionary = {}
 var _extra_reserved_cells: Dictionary = {}
+var _buildable_bounds_min: Vector2i = Vector2i.ZERO
+var _buildable_bounds_max: Vector2i = Vector2i.ZERO
 
 @onready var buildable_overlay: Node2D = $BuildableOverlay
+@onready var blocked_overlay: Node2D = $BlockedOverlay
 @onready var reserved_overlay: Node2D = $ReservedOverlay
 @onready var preview_footprint: Node2D = $PreviewFootprint
 @onready var preview: Polygon2D = $Preview
@@ -25,6 +29,7 @@ var _extra_reserved_cells: Dictionary = {}
 
 
 func _ready() -> void:
+	_recalculate_buildable_bounds()
 	_rebuild_overlays()
 	set_build_mode_active(false)
 
@@ -32,6 +37,7 @@ func _ready() -> void:
 func set_build_mode_active(active: bool) -> void:
 	_build_mode_active = active
 	buildable_overlay.visible = active
+	blocked_overlay.visible = active
 	reserved_overlay.visible = active
 	preview_footprint.visible = active
 	preview.visible = active
@@ -76,9 +82,14 @@ func is_cell_buildable(cell: Vector2i) -> bool:
 func is_cell_tactical(cell: Vector2i) -> bool:
 	if not is_cell_in_bounds(cell):
 		return false
-	if tactical_cells.is_empty():
-		return true
-	return _has_cell(tactical_cells, cell)
+	if is_cell_reserved(cell):
+		return false
+	return (
+		cell.x >= _buildable_bounds_min.x
+		and cell.x <= _buildable_bounds_max.x
+		and cell.y >= _buildable_bounds_min.y
+		and cell.y <= _buildable_bounds_max.y
+	)
 
 
 func is_cell_in_bounds(cell: Vector2i) -> bool:
@@ -322,31 +333,25 @@ func _update_preview_visual() -> void:
 
 
 func _rebuild_overlays() -> void:
+	for child in blocked_overlay.get_children():
+		child.queue_free()
 	for child in buildable_overlay.get_children():
 		child.queue_free()
 	for child in reserved_overlay.get_children():
 		child.queue_free()
 
-	if tactical_cells.is_empty():
-		for x in range(grid_min_cell.x, grid_max_cell.x + 1):
-			for y in range(grid_min_cell.y, grid_max_cell.y + 1):
-				var cell := Vector2i(x, y)
-				if is_cell_reserved(cell):
-					continue
+	for x in range(grid_min_cell.x, grid_max_cell.x + 1):
+		for y in range(grid_min_cell.y, grid_max_cell.y + 1):
+			var cell := Vector2i(x, y)
+			if is_cell_reserved(cell):
+				continue
+			if is_cell_tactical(cell):
 				_add_overlay_cell(
 					buildable_overlay,
 					cell,
-					Color(0.26, 0.58, 0.36, 0.18),
-					Color(0.76, 0.96, 0.82, 0.42)
+					Color(0.26, 0.58, 0.36, 0.28),
+					Color(0.76, 0.96, 0.82, 0.62)
 				)
-	else:
-		for raw_cell in tactical_cells:
-			_add_overlay_cell(
-				buildable_overlay,
-				Vector2i(roundi(raw_cell.x), roundi(raw_cell.y)),
-				Color(0.26, 0.58, 0.36, 0.28),
-				Color(0.76, 0.96, 0.82, 0.62)
-			)
 	for raw_cell in reserved_cells:
 		_add_overlay_cell(
 			reserved_overlay,
@@ -442,3 +447,22 @@ func _is_runtime_placeable_occupant_id(occupant_id: StringName) -> bool:
 			return false
 		_:
 			return true
+
+
+func _recalculate_buildable_bounds() -> void:
+	if reserved_cells.is_empty():
+		_buildable_bounds_min = grid_min_cell
+		_buildable_bounds_max = grid_max_cell
+		return
+
+	var min_cell := Vector2i(2147483647, 2147483647)
+	var max_cell := Vector2i(-2147483648, -2147483648)
+	for raw_cell in reserved_cells:
+		var cell := Vector2i(roundi(raw_cell.x), roundi(raw_cell.y))
+		min_cell.x = min(min_cell.x, cell.x)
+		min_cell.y = min(min_cell.y, cell.y)
+		max_cell.x = max(max_cell.x, cell.x)
+		max_cell.y = max(max_cell.y, cell.y)
+
+	_buildable_bounds_min = Vector2i(max(min_cell.x - buildable_margin_cells, grid_min_cell.x), max(min_cell.y - buildable_margin_cells, grid_min_cell.y))
+	_buildable_bounds_max = Vector2i(min(max_cell.x + buildable_margin_cells, grid_max_cell.x), min(max_cell.y + buildable_margin_cells, grid_max_cell.y))

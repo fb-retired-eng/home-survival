@@ -143,7 +143,6 @@ preferred_socket_ids = PackedStringArray("wall_n")
 [sub_resource type="Resource" id="21"]
 script = ExtResource("3_lane")
 lane_id = &"east"
-count = 1
 enemy_definition = ExtResource("7_spitter_enemy")
 preferred_socket_ids = PackedStringArray("door_e")
 

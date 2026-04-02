@@ -7,6 +7,8 @@ script = ExtResource("1_construction_grid")
 z_as_relative = false
 z_index = 40
 
+[node name="BlockedOverlay" type="Node2D" parent="."]
+
 [node name="BuildableOverlay" type="Node2D" parent="."]
 
 [node name="ReservedOverlay" type="Node2D" parent="."]

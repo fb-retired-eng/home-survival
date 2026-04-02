@@ -34,6 +34,22 @@ Validation:
 
 ## 2026-04-01
 
+### Map Expansion Pass
+- Expanded the authored playfield from `2560x1440` to `5120x2880` by widening the world bounds symmetrically around the existing base layout.
+- Kept the home, POIs, and spawn markers in their current authored positions while extending the collision walls to match the larger map footprint.
+- Left the construction system as a local buildable band around the home, with the four home corners reserved and the rest of the far map still non-buildable.
+
+Validation:
+- Headless Godot project load succeeded after the map-expansion pass.
+- `map_layout_probe` confirmed the player, sleep point, POIs, and spawn markers still line up in the enlarged world.
+- `construction_grid_probe` confirmed:
+  - `construction_grid_probe_map_in_bounds=true`
+  - `construction_grid_probe_far_blocked_tactical=false`
+  - `construction_grid_probe_home_corner_reserved=true`
+  - `construction_grid_probe_home_corner_valid=false`
+  - `construction_grid_probe_active_stage_build_mode=true`
+  - `construction_grid_probe_post_stage_build_mode=true`
+
 ### Expanded Grid Playtest
 - Added a dedicated probe for the outer-ring tactical build cells so the widened grid is exercised through the real barricade placement flow, not just validity checks.
 - Confirmed the new expanded cell at `(-2, 3)` accepts barricade placement, spends salvage, and occupies the expected cell.

@@ -164,7 +164,7 @@ This avoids enum churn later if more resources are added.
 
 ## Map
 ### Structure
-- One larger authored map
+- One 2x larger authored map
 - One central abstract base
 - Six authored POIs outside the base
 - Three authored zombie spawn lanes at map edges
@@ -175,6 +175,7 @@ The base contains:
 - 1 food table near the interior center
 - 1 bed near the interior center
 - open interior circulation so the player can rotate during waves
+- a local construction band around the home for tactical barricades and traps, with the four home corners reserved
 
 ### Socket IDs
 Use fixed IDs so wave targeting and reset logic stay simple:
