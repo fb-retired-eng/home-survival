@@ -19,6 +19,8 @@ The MVP0.5 foundation is now in place:
 - construction, socket, POI, and fog-memory persistence
 - autosave hooks at safe points
 - pause-menu save, resume, and quit-to-menu flow
+- active-wave manual saves blocked by policy
+- loading or continuing a slot no longer rewrites it on entry
 
 ## Scope
 
@@ -93,12 +95,18 @@ Per slot or per run.
 - fog / exploration memory
 - run flags and save version
 
+Run persistence should be collected from the active game scene only.
+- do not serialize by walking global groups across the whole tree
+- save/load must not accidentally merge state from another live `Game` instance
+
 ## Save Rules
 - version every save file
 - reject or migrate incompatible versions
 - treat the save file as the source of truth
 - never partially apply a save
 - keep settings independent from run data
+- block manual save during `ACTIVE_WAVE`
+- loading or continuing a save must be read-only until the player causes a new state change
 
 ## Construction Persistence
 Construction is already active in MVP0, so it must persist.

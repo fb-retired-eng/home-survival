@@ -697,7 +697,7 @@ func _attempt_recycle() -> void:
 func _get_nearest_recyclable_placeable() -> Node2D:
 	var best_placeable: Node2D = null
 	var best_distance := INF
-	for placeable in get_tree().get_nodes_in_group("placeables"):
+	for placeable in _get_placeables_in_scope():
 		if placeable == null or not is_instance_valid(placeable):
 			continue
 		if not placeable.has_method("recycle"):
@@ -716,6 +716,16 @@ func _get_nearest_recyclable_placeable() -> Node2D:
 			best_distance = distance
 			best_placeable = placeable
 	return best_placeable
+
+
+func _get_placeables_in_scope() -> Array:
+	var game_root := get_parent()
+	if game_root == null or not is_instance_valid(game_root):
+		return []
+	var placeables_root := game_root.get_node_or_null("World/ConstructionPlaceables")
+	if placeables_root == null or not is_instance_valid(placeables_root):
+		return []
+	return placeables_root.get_children()
 
 
 func _can_recycle_placeable(placeable: Node2D) -> bool:

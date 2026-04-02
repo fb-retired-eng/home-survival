@@ -245,7 +245,6 @@ func _on_new_game_pressed() -> void:
 		_update_status("Save manager missing")
 		return
 	var slot_id: StringName = _save_manager.choose_new_game_slot()
-	_save_manager.set_active_slot(slot_id)
 	_update_status("Starting new game in %s" % String(slot_id))
 	_start_game_with_state(slot_id, {})
 
@@ -278,7 +277,6 @@ func _on_load_slot_pressed(slot_index: int) -> void:
 		_update_status("Slot %d is empty" % (slot_index + 1))
 		return
 	var slot_id := StringName(summary.get("slot_id", ""))
-	_save_manager.set_active_slot(slot_id)
 	_update_status("Loading %s" % String(slot_id))
 	_start_game_with_state(slot_id, _save_manager.get_run_state_payload(slot_id))
 
@@ -325,6 +323,8 @@ func _start_game() -> void:
 
 
 func _start_game_with_state(slot_id: StringName, run_state: Dictionary) -> void:
+	if _save_manager != null:
+		_save_manager.set_active_slot(StringName())
 	for child in _game_host.get_children():
 		child.queue_free()
 	var game = GAME_SCENE.instantiate()
@@ -341,7 +341,8 @@ func _start_game_with_state(slot_id: StringName, run_state: Dictionary) -> void:
 		await get_tree().process_frame
 	if _save_manager != null and slot_id != StringName():
 		_save_manager.set_active_slot(slot_id)
-		_save_manager.save_active_game(game)
+		if run_state.is_empty():
+			_save_manager.save_active_game(game)
 
 
 func _refresh_save_menu_state() -> void:

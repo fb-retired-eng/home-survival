@@ -115,6 +115,8 @@ Validation:
 - Wired Escape to toggle pause while keeping the HUD responsive during paused state.
 - Connected save-and-quit to the boot menu return flow so the current run can be persisted and dropped back to the menu cleanly.
 - Added a pause-menu probe that verifies save, resume, and quit-to-menu behavior end to end.
+- Tightened the pause save path so manual saves are blocked during active waves instead of bypassing the autosave safety rule.
+- Removed slot rewrites on `Continue` / `Load Game` entry and scoped run serialization to the active `Game` scene so multiple live game instances cannot contaminate one another's save payloads.
 
 Validation:
 - `save_system_probe` confirmed:
@@ -127,8 +129,8 @@ Validation:
   - `save_probe_socket_hp=117`
   - `save_probe_node_depleted=true`
   - `save_probe_daily_modifier=elite_present`
+  - `save_probe_continue_did_not_rewrite=true`
   - `save_probe_boot_continue_disabled=false`
-  - `save_probe_boot_load_slot_3_text=Slot 3 | Day 3 | Wave 2 | Post-Wave | 2026-04-02T06:58:14`
 - `pause_menu_probe` confirmed:
   - `pause_probe_paused=true`
   - `pause_probe_menu_visible=true`
@@ -136,6 +138,8 @@ Validation:
   - `pause_probe_saved_slot_summary=Slot 2 | Day 1 | Wave 0 | Day | 2026-04-02T07:01:58`
   - `pause_probe_resumed=true`
   - `pause_probe_menu_hidden=true`
+  - `pause_probe_active_wave_blocked=true`
+  - `pause_probe_active_wave_status=Saving is blocked during active waves.`
   - `pause_probe_back_to_menu=true`
   - `pause_probe_game_host_children=0`
 

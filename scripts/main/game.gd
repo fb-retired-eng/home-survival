@@ -321,13 +321,16 @@ func _on_pause_resume_requested() -> void:
 
 
 func _on_pause_save_requested() -> void:
-	_save_active_run()
+	var saved := _save_active_run()
 	if hud != null and is_instance_valid(hud):
-		hud.show_pause_menu("Game saved.")
+		hud.show_pause_menu("Game saved." if saved else "Saving is blocked during active waves.")
 
 
 func _on_pause_save_quit_requested() -> void:
-	_save_active_run()
+	if not _save_active_run():
+		if hud != null and is_instance_valid(hud):
+			hud.show_pause_menu("Saving is blocked during active waves.")
+		return
 	_set_pause_state(false)
 	return_to_menu_requested.emit()
 
@@ -472,7 +475,7 @@ func _on_run_reset() -> void:
 	_current_exploration_target_counts.clear()
 	_daily_poi_modifiers.clear()
 	_selected_buildable_profile_index = 0
-	for pickup in get_tree().get_nodes_in_group("pickups"):
+	for pickup in _get_local_group_members(&"pickups"):
 		pickup.queue_free()
 	player.reset_for_new_run()
 	_apply_test_mode_loadout()
@@ -483,7 +486,7 @@ func _on_run_reset() -> void:
 		if is_instance_valid(child):
 			child.queue_free()
 	_register_fixed_grid_footprints()
-	for node in get_tree().get_nodes_in_group("scavenge_nodes"):
+	for node in _get_local_scavenge_nodes():
 		if node.has_method("reset_for_new_run"):
 			node.reset_for_new_run()
 	_enter_day_phase()
@@ -808,7 +811,7 @@ func _enter_day_phase() -> void:
 
 
 func _configure_scavenge_nodes() -> void:
-	for node in get_tree().get_nodes_in_group("scavenge_nodes"):
+	for node in _get_local_scavenge_nodes():
 		if node.has_method("configure_reward_modifier"):
 			node.configure_reward_modifier(Callable(self, "_apply_daily_poi_reward_modifier"))
 		if node.has_signal("state_changed") and not node.state_changed.is_connected(_on_scavenge_node_state_changed):
@@ -888,7 +891,7 @@ func _get_modifier_eligible_poi_ids(modifier_id: StringName, excluded_pois: Dict
 func _is_poi_depleted(poi_id: StringName) -> bool:
 	var total_nodes := 0
 	var depleted_nodes := 0
-	for node in get_tree().get_nodes_in_group("scavenge_nodes"):
+	for node in _get_local_scavenge_nodes():
 		if StringName(node.poi_id) != poi_id:
 			continue
 		total_nodes += 1
@@ -1049,7 +1052,7 @@ func _apply_daily_poi_refills() -> void:
 		return
 
 	var candidates: Array = []
-	for node in get_tree().get_nodes_in_group("scavenge_nodes"):
+	for node in _get_local_scavenge_nodes():
 		if node == null or not node.has_method("is_eligible_for_daily_refill"):
 			continue
 		if not bool(node.is_eligible_for_daily_refill()):
@@ -1564,7 +1567,7 @@ func _sync_final_wave_with_definitions() -> void:
 
 
 func _connect_defense_socket_signals() -> void:
-	for socket in get_tree().get_nodes_in_group("defense_sockets"):
+	for socket in _get_local_defense_sockets():
 		if not socket.has_signal("state_changed"):
 			continue
 		if not socket.state_changed.is_connected(_on_defense_socket_state_changed):
@@ -1582,7 +1585,7 @@ func _on_scavenge_node_state_changed(_node) -> void:
 
 
 func _refresh_base_status() -> void:
-	var sockets := get_tree().get_nodes_in_group("defense_sockets")
+	var sockets := _get_local_defense_sockets()
 	if sockets.is_empty():
 		hud.set_base_status(0, 0, 0)
 		return
@@ -1743,7 +1746,6 @@ func apply_save_state(save_state: Dictionary) -> void:
 	_refresh_build_mode_preview()
 	_refresh_build_mode_status()
 	_is_resetting_run = false
-	_request_autosave()
 
 
 func _request_autosave() -> void:
@@ -1768,11 +1770,13 @@ func _get_save_store() -> Node:
 	return get_node_or_null("/root/SaveStore")
 
 
-func _save_active_run() -> void:
+func _save_active_run() -> bool:
+	if game_manager != null and game_manager.run_state == game_manager.RunState.ACTIVE_WAVE:
+		return false
 	var save_store: Node = _get_save_store()
 	if save_store == null:
-		return
-	save_store.call("save_active_game", self)
+		return false
+	return bool(save_store.call("save_active_game", self))
 
 
 func _set_pause_state(paused: bool) -> void:
@@ -1788,7 +1792,7 @@ func _set_pause_state(paused: bool) -> void:
 
 func _get_defense_socket_save_states() -> Array[Dictionary]:
 	var save_states: Array[Dictionary] = []
-	for socket in get_tree().get_nodes_in_group("defense_sockets"):
+	for socket in _get_local_defense_sockets():
 		if socket == null or not is_instance_valid(socket):
 			continue
 		if not socket.has_method("get_save_state"):
@@ -1811,7 +1815,7 @@ func _apply_defense_socket_save_states(save_states: Array) -> void:
 
 func _get_defense_socket_by_id() -> Dictionary:
 	var sockets := {}
-	for socket in get_tree().get_nodes_in_group("defense_sockets"):
+	for socket in _get_local_defense_sockets():
 		if socket == null or not is_instance_valid(socket):
 			continue
 		sockets[StringName(socket.socket_id)] = socket
@@ -1820,7 +1824,7 @@ func _get_defense_socket_by_id() -> Dictionary:
 
 func _get_scavenge_node_save_states() -> Array[Dictionary]:
 	var save_states: Array[Dictionary] = []
-	for node in get_tree().get_nodes_in_group("scavenge_nodes"):
+	for node in _get_local_scavenge_nodes():
 		if node == null or not is_instance_valid(node):
 			continue
 		if not node.has_method("get_save_state"):
@@ -1843,11 +1847,43 @@ func _apply_scavenge_node_save_states(save_states: Array) -> void:
 
 func _get_scavenge_node_by_id() -> Dictionary:
 	var nodes := {}
-	for node in get_tree().get_nodes_in_group("scavenge_nodes"):
+	for node in _get_local_scavenge_nodes():
 		if node == null or not is_instance_valid(node):
 			continue
 		nodes[StringName(node.node_id)] = node
 	return nodes
+
+
+func _get_local_defense_sockets() -> Array:
+	var sockets: Array = []
+	if defense_sockets == null or not is_instance_valid(defense_sockets):
+		return sockets
+	for socket in defense_sockets.get_children():
+		if socket == null or not is_instance_valid(socket):
+			continue
+		sockets.append(socket)
+	return sockets
+
+
+func _get_local_scavenge_nodes() -> Array:
+	return _get_local_group_members(&"scavenge_nodes")
+
+
+func _get_local_group_members(group_name: StringName) -> Array:
+	var members: Array = []
+	_collect_local_group_members(self, group_name, members)
+	return members
+
+
+func _collect_local_group_members(node: Node, group_name: StringName, members: Array) -> void:
+	if node == null or not is_instance_valid(node):
+		return
+	for child in node.get_children():
+		if child == null or not is_instance_valid(child):
+			continue
+		if child.is_in_group(String(group_name)):
+			members.append(child)
+		_collect_local_group_members(child, group_name, members)
 
 
 func _get_construction_placeable_save_states() -> Array[Dictionary]:
