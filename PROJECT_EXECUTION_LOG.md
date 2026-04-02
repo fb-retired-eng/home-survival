@@ -32,6 +32,74 @@ Validation:
   - `valid_cell=(1, 0)`
   - `inactive=true`
 
+## 2026-04-01
+
+### Expanded Grid Playtest
+- Added a dedicated probe for the outer-ring tactical build cells so the widened grid is exercised through the real barricade placement flow, not just validity checks.
+- Confirmed the new expanded cell at `(-2, 3)` accepts barricade placement, spends salvage, and occupies the expected cell.
+
+Validation:
+- `construction_expanded_grid_probe` passed:
+  - `construction_expanded_probe_build_mode=true`
+  - `construction_expanded_probe_placeables=1`
+  - `construction_expanded_probe_cell_occupied=true`
+  - `construction_expanded_probe_salvage_before=72`
+  - `construction_expanded_probe_salvage_after=62`
+  - `construction_expanded_probe_placeable_id=barricade`
+  - `construction_expanded_probe_placeable_hp=90`
+
+### Construction Tuning Pass
+- Tuned barricade economy so the larger build grid does not collapse into cheap wall spam.
+- Expanded the tactical build ring and then tightened it with corner reservations to remove dead placement cells.
+- Improved construction preview feedback so outside-grid, non-buildable, reserved, and occupied cells report different reasons.
+
+Validation:
+- `barricade_placement_probe` passed with updated build and repair costs:
+  - `barricade_probe_salvage_before=72`
+  - `barricade_probe_salvage_after=62`
+  - `barricade_probe_salvage_after_repair=58`
+  - `barricade_probe_salvage_after_dismantle=63`
+- `construction_grid_probe` passed with the new feedback states:
+  - `construction_grid_probe_map_blocked_reason=Not buildable`
+  - `construction_grid_probe_offgrid_reason=Outside grid`
+  - `construction_grid_probe_non_buildable_reason=Not buildable`
+  - `construction_grid_probe_corner_reason=Reserved`
+  - `construction_grid_probe_corner_valid=false`
+
+### MVP1 Spec Draft
+- Added [`MVP1_SPEC.md`](MVP1_SPEC.md) to define the next expansion layer after MVP0, covering power-limited automation, the Dog companion, and heirloom persistence.
+- Refined the MVP1 wording so the spec stays aligned with the current MVP0 grid/construction language and does not imply freeform walls or a zombie-derived companion.
+- Linked the new spec from [`README.md`](README.md) so the project docs point to both the MVP0 source of truth and the next expansion target.
+
+Validation:
+- Docs reviewed for terminology drift and implementation-scope consistency.
+
+### Construction Stage 2 Barricade Slice
+- Added the first tactical placeable barricade through the shared construction grid, including placement, salvage spending, repair, dismantle, and occupancy refresh.
+- Tightened the placement guard so barricades cannot trap the player in or permanently seal the base routes, while still allowing valid door-side placement.
+- Updated the construction plan, README, and spec so construction is documented as an active tactical layer instead of only a future scaffold.
+
+Validation:
+- Headless load passed.
+- `barricade_placement_probe` passed:
+  - `barricade_probe_placeables=1`
+  - `barricade_probe_cell_occupied=true`
+  - `barricade_probe_salvage_before=72`
+  - `barricade_probe_salvage_after=64`
+  - `barricade_probe_placeable_id=barricade`
+  - `barricade_probe_damaged_hp=78`
+  - `barricade_probe_repaired_hp=90`
+  - `barricade_probe_placeables_after_dismantle=0`
+  - `barricade_probe_cell_occupied_after_dismantle=false`
+- `barricade_attack_probe` passed:
+  - `barricade_attack_probe_placed=true`
+  - `barricade_attack_probe_barricade_hp=83`
+  - `barricade_attack_probe_zombie_target=barricade`
+- `construction_escape_probe` passed:
+  - `construction_escape_probe_west_only=false`
+  - `construction_escape_probe_east_only=false`
+  - `construction_escape_probe_both=true`
+
 ## 2026-03-28
 
 ### Repository Setup
@@ -1318,3 +1386,170 @@ Validation:
 - Regression probes still passed:
   - `firearm_noise_probe_after_timeout_investigating=0`
   - `day_night_cycle_probe_after_sleep_state=0`
+
+## 2026-04-01 Construction Safety Fix
+- Adjusted barricade placement safety to use a local player-buffer rule instead of a global escape-to-edge trap test.
+- Kept same-cell build placement working, while still rejecting adjacent pinch placements that can wedge the player between barricades.
+- Updated the construction probes to cover:
+  - same-cell placeable confirmation on a safe build cell
+  - synthetic pinch rejection
+  - expanded-ring outer-cell placement on a safe outer-ring candidate
+
+Validation:
+- `construction_grid_probe_active=true`
+- `construction_grid_probe_corner_buffer=true`
+- `construction_escape_probe_synth_one=true`
+- `construction_escape_probe_synth_two=true`
+- `construction_escape_probe_synth_same=false`
+- `barricade_attack_probe_placed=true`
+- `construction_expanded_probe_selected_cell=(-2, 3)`
+- `construction_expanded_probe_placeables=1`
+
+## 2026-04-01 Construction Anti-Wedge Refinement
+- Tightened the barricade placement gate so the first nearby placement still succeeds, but a second nearby barricade that would wedge the player in a tight local cluster is rejected.
+- The safety rule now looks at local player escape pressure plus existing runtime placeable occupancy, instead of a blanket player-buffer block that rejected valid first placements.
+- Added a focused pinch probe to reproduce the exact “place one, step slightly, place another” case.
+
+Validation:
+- `barricade_pinch_probe_first=true`
+- `barricade_pinch_probe_second_placed=false`
+- `barricade_pinch_probe_status=Too cramped`
+- `barricade_probe_placeables=1`
+- `barricade_probe_placeables_after_dismantle=0`
+- `construction_escape_probe_both=true`
+
+## 2026-04-01 Construction Movement Safety Review
+- Confirmed the chosen rule is to never auto-move the player when placing barricades.
+- Reworked the check around local escape validation rather than forcing an avatar reposition.
+- Added an end-to-end movement probe for the nearby barricade setup.
+
+Validation:
+- `barricade_escape_move_probe_second=false`
+- `barricade_escape_move_probe_moved_right=true`
+- `barricade_escape_move_probe_moved_left=true`
+- `barricade_escape_move_probe_moved_up=true`
+- `barricade_escape_move_probe_moved_down=true`
+
+## 2026-04-01 Construction Placement Grace Fix
+- Replaced the brittle anti-cramp placement veto with a player-only collision grace window on newly placed barricades.
+- This keeps adjacent barricade construction legal while letting the player walk out of a newly placed barricade before it starts blocking them.
+- Updated the repro scripts so the second placement keeps build mode active and exercises the real adjacent-place case.
+
+Validation:
+- `barricade_pinch_probe_first=true`
+- `barricade_pinch_probe_second_placed=true`
+- `barricade_escape_move_probe_second=true`
+- `barricade_escape_move_probe_moved_right=true`
+- `barricade_escape_move_probe_moved_left=true`
+- `barricade_escape_move_probe_moved_up=true`
+- `barricade_escape_move_probe_moved_down=true`
+
+## 2026-04-01 Construction Collision Grace Refinement
+- Tightened the barricade grace behavior to follow the player’s current grid cell instead of only using a short timer.
+- The barricade now ignores the player until they leave the new barricade’s local footprint, which avoids the teleport/jam behavior without forcing any player movement.
+- Verified the adjacent build case directly in the new pinch and movement probes.
+
+Validation:
+- `barricade_pinch_probe_first=true`
+- `barricade_pinch_probe_second_placed=true`
+- `barricade_escape_move_probe_after_first_cell=(-2, 3)`
+- `barricade_escape_move_probe_second=true`
+- `barricade_escape_move_probe_moved_right=true`
+- `barricade_escape_move_probe_moved_left=true`
+- `barricade_escape_move_probe_moved_up=true`
+- `barricade_escape_move_probe_moved_down=true`
+
+## 2026-04-01 Construction Collision Grace API Fix
+- Replaced the invalid `set_collision_mask_bit()` calls on the player with a refcounted collision-mask exemption on `Player`.
+- Barricades still block zombies, but the player can step out of a fresh placement without teleporting or getting wedged between adjacent builds.
+- Kept the grace player-only and reversible so adjacent barricades remain legal.
+
+Validation:
+- `barricade_placement_probe_placeables=1`
+- `barricade_pinch_probe_first=true`
+- `barricade_pinch_probe_second_placed=true`
+- `barricade_escape_move_probe_second=true`
+- `barricade_escape_move_probe_moved_right=true`
+- `barricade_escape_move_probe_moved_left=true`
+- `barricade_escape_move_probe_moved_up=true`
+- `barricade_escape_move_probe_moved_down=true`
+- `barricade_attack_probe_placed=true`
+- `barricade_attack_probe_barricade_hp=83`
+- `construction_grid_probe_valid_tactical=true`
+
+## 2026-04-01 Construction Recycle Function
+- Added a full-refund `recycle()` path for `Placeable` so intact buildings can return all build materials instead of the previous half-refund dismantle behavior.
+- Kept `dismantle()` as a separate helper path, but the normal full-health interact now shows and performs recycle.
+- Updated the barricade lifecycle probe to verify repair followed by full refund recycle and occupancy clearing.
+
+Validation:
+- `barricade_probe_salvage_before=72`
+- `barricade_probe_salvage_after=62`
+- `barricade_probe_salvage_after_repair=58`
+- `barricade_probe_placeables_after_recycle=0`
+- `barricade_probe_cell_occupied_after_recycle=false`
+- `barricade_probe_salvage_after_recycle=68`
+
+## 2026-04-01 Recycle Key Binding
+- Bound the full-health recycle action to `R` in the project input map.
+- Kept `E` for repair/interact on placeables so the two actions are now distinct in play.
+- Left the game-over restart path intact and restored the `R` restart binding in the input map.
+
+Validation:
+- `barricade_probe_recycle_action_exists=true`
+- `barricade_probe_placeables_after_direct_recycle=0`
+- `barricade_probe_cell_occupied_after_direct_recycle=false`
+- `barricade_probe_salvage_after_direct_recycle=68`
+
+## 2026-04-01 Build Selector and Multi-Cell Placeables
+- Added a buildable catalog for build mode so the player can cycle between multiple authored placeables.
+- Added `build_next` / `build_prev` inputs and updated build mode to show the selected buildable, its footprint, and the cycle hint in the HUD.
+- Added a second authored placeable, `Spike Trap`, with a two-cell footprint to prove multi-grid occupancy and placement.
+- Updated the construction grid preview to render the full footprint, not just the anchor cell, so multi-cell buildables are readable before placement.
+
+Validation:
+- `build_selector_probe_initial_profile=barricade`
+- `build_selector_probe_next_profile=spike_trap`
+- `build_selector_probe_next_footprint=2`
+- `build_selector_probe_placeable_id=spike_trap`
+- `build_selector_probe_second_cell_occupied=true`
+- `build_selector_probe_placeable_scale=(2.0, 1.0)`
+- `barricade_probe_placeables_after_recycle=0`
+- `barricade_probe_cell_occupied_after_outside_recycle=false`
+
+## 2026-04-01 Build Selector Keys
+- Rebound build cycling to `Q` for previous and `Tab` for next, while keeping the mouse wheel as an optional next-cycle fallback.
+- Updated the in-game build-mode prompt and HUD status text so they now describe `E` as place, `Q` as previous, and `Tab` / wheel as next.
+- Kept `E` reserved for place/interact so the build selector no longer collides with placement controls.
+
+Validation:
+- `build_selector_probe_initial_profile=barricade`
+- `build_selector_probe_next_profile=spike_trap`
+- `build_selector_probe_placeable_id=spike_trap`
+- `construction_grid_probe_active_stage_build_mode=true`
+- `barricade_probe_placeables_after_recycle=0`
+
+## 2026-04-01 Build Rotation
+- Added a `build_rotate` input so build mode can rotate the currently selected placeable in 90-degree steps.
+- Rotated footprints now drive both the preview footprint and the spawned placeable occupancy, so multi-cell buildables place in the rotated orientation instead of only changing the ghost.
+- Added rotation-aware build-mode status text and build selector probe coverage for a rotated `Spike Trap`.
+
+Validation:
+- `build_selector_probe_rotation=1`
+- `build_selector_probe_rotated_preview_footprint_cells=2`
+- `build_selector_probe_horizontal_cell_occupied=false`
+- `build_selector_probe_rotated_anchor_occupied=true`
+- `build_selector_probe_rotated_second_cell_occupied=true`
+
+## 2026-04-01 Rotate/Recycle Swap
+- Swapped the build controls so `R` rotates the selected buildable and `C` recycles a full-health buildable in build mode.
+- Removed the old direct `KEY_R` recycle fallback so recycle now uses the input map only.
+- Updated the build-mode HUD prompt and README controls so the documented bindings match the runtime controls.
+
+Validation:
+- `build_selector_probe_rotation=1`
+- `build_selector_probe_rotated_preview_footprint_cells=2`
+- `build_selector_probe_rotated_anchor_occupied=true`
+- `build_selector_probe_rotated_second_cell_occupied=true`
+- `barricade_probe_placeables_after_recycle=0`
+- `barricade_probe_cell_occupied_after_recycle=false`

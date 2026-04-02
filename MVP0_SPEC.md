@@ -380,7 +380,14 @@ Expose one context-sensitive interaction at each socket.
 - Socket visuals should clearly communicate damaged, reinforced, fortified, and breached conditions.
 
 Future-facing rule:
-- Additional socket types such as windows, barricades, or traps should be addable through socket data and visuals, without rewriting the wave or player interaction loop.
+- Additional socket types such as windows, plus tactical placeables such as barricades or traps, should be addable through authored data and visuals, without rewriting the wave or player interaction loop.
+
+## Construction
+- The game includes a controlled free-grid construction layer for tactical placeables.
+- Build mode is available during `PRE_WAVE` and is toggled with `B`.
+- The first implemented placeable is a barricade, which costs `Salvage`, occupies grid cells, can be repaired or dismantled, and blocks movement until destroyed.
+- Construction placement must not trap the player or permanently seal the base routes.
+- Future placeables such as traps, decoys, and turrets should share the same placement and interaction plumbing.
 
 ## Combat
 ### Player Attack

@@ -7,6 +7,7 @@ const STRUCTURE_PROFILE_SCRIPT := preload("res://scripts/data/structure_profile.
 const EXPLORATION_SPAWN_POINT_SCRIPT := preload("res://scripts/world/exploration_spawn_point.gd")
 const ENEMY_DEFINITION_SCRIPT := preload("res://scripts/data/enemy_definition.gd")
 const ROAMING_SPAWN_ZONE_SCRIPT := preload("res://scripts/world/roaming_spawn_zone.gd")
+const PLACEABLE_PROFILE_SCRIPT := preload("res://scripts/data/placeable_profile.gd")
 const POSITIVE_POI_MODIFIERS: Array[StringName] = [&"bountiful_food", &"extra_parts"]
 const NEGATIVE_POI_MODIFIERS: Array[StringName] = [&"disturbed", &"elite_present"]
 const ELITE_MODIFIER_POIS := {
@@ -19,6 +20,9 @@ const ELITE_MODIFIER_POIS := {
 @export var exploration_enemy_scene: PackedScene
 @export var perimeter_definition: Resource
 @export var default_daily_elite_enemy: Resource
+@export var construction_placeable_scene: PackedScene
+@export var barricade_placeable_profile: Resource
+@export var buildable_placeable_profiles: Array[Resource] = []
 @export var sleep_heal_amount: int = 25
 @export_range(1, 100, 1) var food_energy_per_unit: int = 25
 @export_range(0, 4, 1) var daily_poi_refill_base_nodes: int = 1
@@ -45,6 +49,7 @@ const ELITE_MODIFIER_POIS := {
 @onready var construction_grid = $World/ConstructionGrid
 @onready var exploration_spawn_points_root: Node2D = $World/ExplorationSpawnPoints
 @onready var roaming_spawn_zones_root: Node2D = $World/RoamingSpawnZones
+@onready var construction_placeables: Node2D = $World/ConstructionPlaceables
 @onready var exploration_enemy_layer: Node2D = $World/ExplorationEnemies
 @onready var wave_enemy_layer: Node2D = $World/WaveEnemies
 
@@ -57,6 +62,8 @@ var _daily_poi_modifiers: Dictionary = {}
 var _poi_visuals_by_id: Dictionary = {}
 var _debug_forced_next_daily_poi_modifiers: Dictionary = {}
 var _last_daily_refilled_pois: Array[StringName] = []
+var _selected_buildable_profile_index: int = 0
+var _selected_buildable_rotation: int = 0
 
 
 func _ready() -> void:
@@ -85,9 +92,13 @@ func _ready() -> void:
 	player.player_died.connect(_on_player_died)
 	player.weapon_noise_emitted.connect(_on_player_weapon_noise_emitted)
 	player.build_mode_toggled.connect(_on_player_build_mode_toggled)
+	player.build_placement_requested.connect(_on_player_build_placement_requested)
+	player.build_selection_prev_requested.connect(_on_player_build_selection_prev_requested)
+	player.build_selection_next_requested.connect(_on_player_build_selection_next_requested)
+	player.build_rotation_requested.connect(_on_player_build_rotation_requested)
 	game_manager.run_state_changed.connect(_on_run_state_changed)
 	_configure_scavenge_nodes()
-	player.set_build_mode_allowed(game_manager.run_state == game_manager.RunState.PRE_WAVE)
+	player.set_build_mode_allowed(true)
 	_on_wave_changed(game_manager.current_wave)
 	_on_run_state_changed(game_manager.run_state)
 	_refresh_base_status()
@@ -197,7 +208,7 @@ func _on_player_died() -> void:
 
 
 func _on_run_state_changed(new_state: int) -> void:
-	player.set_build_mode_allowed(new_state == game_manager.RunState.PRE_WAVE)
+	player.set_build_mode_allowed(new_state != game_manager.RunState.LOSS and new_state != game_manager.RunState.WIN)
 	if new_state == game_manager.RunState.LOSS:
 		wave_manager.reset()
 		_clear_exploration_enemies()
@@ -222,18 +233,22 @@ func _on_run_state_changed(new_state: int) -> void:
 	hud.hide_end_overlay()
 
 	if new_state == game_manager.RunState.ACTIVE_WAVE:
-		player.set_build_mode_active(false, false)
 		_clear_roaming_exploration_enemies()
 		_set_exploration_enemies_suspended(true)
 		hud.set_phase("Phase: Night")
-		hud.set_status("Night %d in progress. Hold the base." % game_manager.current_wave)
+		if player.is_build_mode_active():
+			_refresh_build_mode_status()
+		else:
+			hud.set_status("Night %d in progress. Hold the base." % game_manager.current_wave)
 		player.refresh_interaction_prompt()
 		return
 
 	if new_state == game_manager.RunState.POST_WAVE:
-		player.set_build_mode_active(false, false)
 		hud.set_phase("Phase: Post-Wave")
-		hud.set_status("Night %d cleared. Sleep on the bed to start the next day." % game_manager.current_wave)
+		if player.is_build_mode_active():
+			_refresh_build_mode_status()
+		else:
+			hud.set_status("Night %d cleared. Sleep on the bed to start the next day." % game_manager.current_wave)
 		player.refresh_interaction_prompt()
 		return
 
@@ -248,10 +263,22 @@ func _on_player_build_mode_toggled(active: bool) -> void:
 		return
 	construction_grid.set_build_mode_active(active)
 	if active:
-		construction_grid.set_preview_world_position(player.global_position)
-		hud.set_status("Build mode active. Move to a marked cell.")
+		_refresh_build_mode_preview()
+		_refresh_build_mode_status()
 		return
 	_refresh_phase_status()
+
+
+func _on_player_build_selection_prev_requested() -> void:
+	_cycle_selected_buildable_profile(-1)
+
+
+func _on_player_build_selection_next_requested() -> void:
+	_cycle_selected_buildable_profile(1)
+
+
+func _on_player_build_rotation_requested() -> void:
+	_cycle_selected_buildable_rotation(1)
 
 
 func _on_wave_changed(new_wave: int) -> void:
@@ -261,16 +288,24 @@ func _on_wave_changed(new_wave: int) -> void:
 
 
 func _refresh_phase_status() -> void:
-	if game_manager.run_state != game_manager.RunState.PRE_WAVE:
+	if player != null and is_instance_valid(player) and player.is_build_mode_active():
+		_refresh_build_mode_status()
 		return
-
 	var base_status := ""
-	if game_manager.current_wave <= 0:
-		base_status = "Day 1. Scavenge carefully, build up, and eat dinner at the table to start night 1."
-	elif game_manager.current_wave < game_manager.final_wave - 1:
-		base_status = "Day %d. Explore, build, and eat dinner at the table to start night %d." % [game_manager.current_wave + 1, game_manager.current_wave + 1]
-	else:
-		base_status = "Final day. Make repairs, gather food, and eat dinner before the last night."
+	match game_manager.run_state:
+		game_manager.RunState.PRE_WAVE:
+			if game_manager.current_wave <= 0:
+				base_status = "Day 1. Scavenge carefully, build up, and eat dinner at the table to start night 1."
+			elif game_manager.current_wave < game_manager.final_wave - 1:
+				base_status = "Day %d. Explore, build, and eat dinner at the table to start night %d." % [game_manager.current_wave + 1, game_manager.current_wave + 1]
+			else:
+				base_status = "Final day. Make repairs, gather food, and eat dinner before the last night."
+		game_manager.RunState.ACTIVE_WAVE:
+			base_status = "Night %d in progress. Hold the base." % game_manager.current_wave
+		game_manager.RunState.POST_WAVE:
+			base_status = "Night %d cleared. Sleep on the bed to start the next day." % game_manager.current_wave
+		_:
+			return
 
 	var modifier_summary := _get_daily_modifier_summary()
 	if modifier_summary.is_empty():
@@ -385,6 +420,7 @@ func _on_run_reset() -> void:
 	_defeated_exploration_enemy_counts.clear()
 	_current_exploration_target_counts.clear()
 	_daily_poi_modifiers.clear()
+	_selected_buildable_profile_index = 0
 	for pickup in get_tree().get_nodes_in_group("pickups"):
 		pickup.queue_free()
 	player.reset_for_new_run()
@@ -392,6 +428,9 @@ func _on_run_reset() -> void:
 	for socket in defense_sockets.get_children():
 		if socket.has_method("reset_for_new_run"):
 			socket.reset_for_new_run()
+	for child in construction_placeables.get_children():
+		if is_instance_valid(child):
+			child.queue_free()
 	_register_fixed_grid_footprints()
 	for node in get_tree().get_nodes_in_group("scavenge_nodes"):
 		if node.has_method("reset_for_new_run"):
@@ -417,11 +456,90 @@ func _apply_test_mode_loadout() -> void:
 		player.add_resource("food", test_mode_food, false)
 
 
+func _get_buildable_placeable_profiles() -> Array[PlaceableProfile]:
+	var profiles: Array[PlaceableProfile] = []
+	for raw_profile in buildable_placeable_profiles:
+		var profile: PlaceableProfile = raw_profile as PlaceableProfile
+		if profile == null or profile.get_script() != PLACEABLE_PROFILE_SCRIPT:
+			continue
+		profiles.append(profile)
+
+	if profiles.is_empty():
+		var fallback_profile: PlaceableProfile = barricade_placeable_profile as PlaceableProfile
+		if fallback_profile != null and fallback_profile.get_script() == PLACEABLE_PROFILE_SCRIPT:
+			profiles.append(fallback_profile)
+	return profiles
+
+
+func get_selected_buildable_profile() -> PlaceableProfile:
+	var profiles := _get_buildable_placeable_profiles()
+	if profiles.is_empty():
+		return null
+	_selected_buildable_profile_index = clampi(_selected_buildable_profile_index, 0, profiles.size() - 1)
+	return profiles[_selected_buildable_profile_index]
+
+
+func get_selected_buildable_rotation() -> int:
+	return posmod(_selected_buildable_rotation, 4)
+
+
+func _cycle_selected_buildable_profile(step: int) -> void:
+	var profiles := _get_buildable_placeable_profiles()
+	if profiles.is_empty():
+		return
+	if step == 0:
+		return
+	_selected_buildable_profile_index = posmod(_selected_buildable_profile_index + step, profiles.size())
+	_selected_buildable_rotation = 0
+	_refresh_build_mode_preview()
+	_refresh_build_mode_status()
+	player.refresh_interaction_prompt()
+
+
+func _cycle_selected_buildable_rotation(step: int) -> void:
+	var profile := get_selected_buildable_profile()
+	if profile == null:
+		return
+	if step == 0:
+		return
+	_selected_buildable_rotation = posmod(_selected_buildable_rotation + step, 4)
+	_refresh_build_mode_preview()
+	_refresh_build_mode_status()
+	player.refresh_interaction_prompt()
+
+
+func _refresh_build_mode_preview() -> void:
+	if construction_grid == null or not construction_grid.is_build_mode_active():
+		return
+	var profile := get_selected_buildable_profile()
+	if profile == null:
+		return
+	construction_grid.set_preview_footprint_offsets(profile.get_rotated_footprint_offsets(_selected_buildable_rotation))
+	construction_grid.set_preview_world_position(player.global_position)
+
+
+func _refresh_build_mode_status() -> void:
+	if game_manager.run_state == game_manager.RunState.LOSS or game_manager.run_state == game_manager.RunState.WIN:
+		return
+	var profile := get_selected_buildable_profile()
+	if profile == null:
+		hud.set_status("Build mode active")
+		return
+	var footprint := profile.get_rotated_footprint_dimensions(_selected_buildable_rotation)
+	hud.set_status("Build mode active. %s (%dx%d, rot %d). E place, Q prev, Tab next, R rotate, wheel next, C recycle." % [
+		profile.display_name,
+		footprint.x,
+		footprint.y,
+		get_selected_buildable_rotation()
+	])
+
+
 func _register_fixed_grid_footprints() -> void:
 	if construction_grid == null:
 		return
 
 	construction_grid.clear_runtime_occupancy()
+	construction_grid.clear_runtime_reserved_cells()
 	_register_fixed_grid_rect(sleep_point, _get_area_shape_size(sleep_point), &"sleep_point")
 	_register_fixed_grid_rect(food_table, _get_area_shape_size(food_table), &"food_table")
 
@@ -431,6 +549,25 @@ func _register_fixed_grid_footprints() -> void:
 		if socket.has_method("is_breached") and socket.is_breached():
 			continue
 		_register_fixed_grid_rect(socket, socket.socket_size, StringName(socket.socket_id))
+
+	for placeable in construction_placeables.get_children():
+		if placeable == null or not is_instance_valid(placeable):
+			continue
+		if not placeable.has_method("get_footprint_cells"):
+			continue
+		if placeable.has_method("is_breached") and placeable.is_breached():
+			continue
+		var footprint: PackedVector2Array = placeable.get_footprint_cells()
+		if footprint.is_empty():
+			continue
+		var anchor_cell: Vector2i = construction_grid.get_cell_for_world_position(placeable.global_position)
+		if placeable.has_method("get_footprint_anchor_cell"):
+			anchor_cell = placeable.get_footprint_anchor_cell()
+		construction_grid.register_occupied_footprint(
+			anchor_cell,
+			footprint,
+			StringName(placeable.get_placeable_id())
+		)
 
 
 func _register_fixed_grid_rect(node: Node2D, rect_size: Vector2, occupant_id: StringName) -> void:
@@ -444,6 +581,66 @@ func _register_fixed_grid_rect(node: Node2D, rect_size: Vector2, occupant_id: St
 	)
 
 
+func _on_player_build_placement_requested() -> void:
+	if game_manager.run_state == game_manager.RunState.LOSS or game_manager.run_state == game_manager.RunState.WIN:
+		return
+	if construction_grid == null or construction_placeables == null:
+		return
+	if construction_placeable_scene == null:
+		hud.set_status("Placeable scene missing")
+		return
+
+	var profile := get_selected_buildable_profile()
+	if profile == null:
+		hud.set_status("Build profile missing")
+		return
+	var preview_cell: Vector2i = construction_grid.get_preview_cell()
+	var footprint_offsets := profile.get_rotated_footprint_offsets(_selected_buildable_rotation)
+	var footprint_cells: Array[Vector2i] = construction_grid.get_footprint_cells(preview_cell, footprint_offsets)
+	if not construction_grid.is_footprint_valid_for_basic_placeable(preview_cell, footprint_offsets):
+		hud.set_status(construction_grid.get_preview_reason())
+		return
+	if profile.blocks_movement and _would_block_all_door_routes(footprint_cells):
+		hud.set_status("Would seal both doors")
+		return
+	if not player.has_resources(profile.build_cost):
+		hud.set_status("Need %s" % _format_cost(profile.build_cost))
+		return
+	if not player.spend_resources(profile.build_cost):
+		hud.set_status("Need %s" % _format_cost(profile.build_cost))
+		return
+
+	var placeable = construction_placeable_scene.instantiate()
+	placeable.profile = profile
+	placeable.footprint_anchor_cell = preview_cell
+	placeable.placement_rotation_steps = get_selected_buildable_rotation()
+	placeable.global_position = construction_grid.get_preview_world_position() + profile.get_rotated_footprint_center_offset(_selected_buildable_rotation) * construction_grid.cell_size
+	var footprint_dimensions := profile.get_rotated_footprint_dimensions(_selected_buildable_rotation)
+	placeable.scale = Vector2(maxf(float(footprint_dimensions.x), 1.0), maxf(float(footprint_dimensions.y), 1.0))
+	placeable.state_changed.connect(_on_construction_placeable_state_changed)
+	construction_placeables.add_child(placeable)
+	if placeable.has_method("begin_player_collision_grace"):
+		placeable.begin_player_collision_grace(player, construction_grid, footprint_cells, 1)
+	_register_fixed_grid_footprints()
+	_refresh_build_mode_preview()
+	_refresh_build_mode_status()
+	player.refresh_interaction_prompt()
+
+
+func _on_construction_placeable_state_changed(_placeable) -> void:
+	_register_fixed_grid_footprints()
+
+
+func _format_cost(cost: Dictionary) -> String:
+	var parts: Array[String] = []
+	for resource_id in ["salvage", "parts", "medicine", "food", "bullets"]:
+		var amount := int(cost.get(resource_id, 0))
+		if amount <= 0:
+			continue
+		parts.append("%d %s" % [amount, resource_id.capitalize()])
+	return ", ".join(parts)
+
+
 func _get_area_shape_size(area: Area2D) -> Vector2:
 	if area == null or not is_instance_valid(area):
 		return Vector2.ZERO
@@ -454,6 +651,35 @@ func _get_area_shape_size(area: Area2D) -> Vector2:
 	if rectangle == null:
 		return Vector2.ZERO
 	return rectangle.size
+
+
+func _would_block_all_door_routes(footprint_cells: Array) -> bool:
+	var west_zone: Array[Vector2i] = [Vector2i(-1, 2), Vector2i(-1, 3), Vector2i(-1, 4)]
+	var east_zone: Array[Vector2i] = [Vector2i(9, 2), Vector2i(9, 3), Vector2i(9, 4)]
+	var footprint_blocks_west := _cell_list_intersects(footprint_cells, west_zone)
+	var footprint_blocks_east := _cell_list_intersects(footprint_cells, east_zone)
+	if not footprint_blocks_west and not footprint_blocks_east:
+		return false
+	if footprint_blocks_west and _has_any_occupied_cell(east_zone):
+		return true
+	if footprint_blocks_east and _has_any_occupied_cell(west_zone):
+		return true
+	return false
+
+
+func _cell_list_intersects(cells_a: Array, cells_b: Array) -> bool:
+	for cell_a in cells_a:
+		for cell_b in cells_b:
+			if cell_a == cell_b:
+				return true
+	return false
+
+
+func _has_any_occupied_cell(cells: Array) -> bool:
+	for cell in cells:
+		if construction_grid.is_cell_occupied(cell):
+			return true
+	return false
 
 
 func _on_player_weapon_noise_emitted(source_position: Vector2, noise_radius: float, noise_alert_budget: float, _weapon_id: StringName) -> void:

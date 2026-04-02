@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="PlaceableProfile" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/placeable_profile.gd" id="1_profile"]
+
+[resource]
+script = ExtResource("1_profile")
+placeable_id = &"spike_trap"
+display_name = "Spike Trap"
+category = "trap"
+placement_layer = "tactical"
+footprint_cells = PackedVector2Array(0, 0, 1, 0)
+build_cost = {"salvage": 12, "parts": 2}
+repair_cost = {"salvage": 5, "parts": 1}
+max_hp = 55
+blocks_movement = true
+blocks_projectiles = false
+can_stack_with_other_placeables = false
+interaction_priority = 14
+contact_damage = 10
+slow_factor = 0.25
+lure_radius = 0.0
+fire_range = 0.0
+fire_arc = 90.0
+fire_interval = 1.0
+bullet_cost_per_shot = 0
+burst_count = 1
+burst_spacing = 0.1
+reload_time = 0.0
+line_of_fire_required = true
+visual_color = Color(0.76, 0.56, 0.22, 1)

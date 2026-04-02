@@ -27,7 +27,7 @@ The repo currently includes:
 - fortified wall/door upgrades beyond the original reinforced tier
 - review-driven guardrails around elite-only weapon drops, spitter structure range, reset-state UI consistency, and bat-only attack interrupt behavior
 - HUD for core status display, including the currently equipped weapon
-- construction-system foundation for an authored free-build grid, including build-mode preview scaffolding and generic placeable/profile classes
+- construction-system foundation for a whole-map authored build grid, build-mode placement, tactical cell reservations, selectable multi-cell buildables, and the first barricade placeable with repair/recycle support; this is now an active tactical layer, not just scaffolding
 - placeholder world scenes for sockets, scavenging nodes, bed/table interactions, pickups, and zombie enemy
 - consolidated MVP0 design/spec documentation
 
@@ -59,17 +59,22 @@ godot --headless --path . --quit
 - Use medicine: `F` or `Q`
 - Switch weapon: `X`
 - Reload firearm: `C`
-- Toggle build mode preview: `B`
+- Toggle build mode: `B`
+- Cycle buildables while in build mode: `Q` for previous, `Tab` or mouse wheel for next
+- Rotate selected buildable while in build mode: `R`
+- Place selected buildable while in build mode: `E`
+- Recycle full-health buildable while in build mode: `C`
 - Eat dinner at table / sleep on bed: `E` when in range
-- Restart after win/loss: `R`
+- Restart after win/loss: `Shift+R`
 
 ## Important Docs
 - [`MVP0_SPEC.md`](MVP0_SPEC.md): implementation source of truth
+- [`MVP1_SPEC.md`](MVP1_SPEC.md): expansion spec for power, dog synergy, and heirlooms
 - [`MVP0_ONE_PAGER.md`](MVP0_ONE_PAGER.md): product framing
 - [`TASK_BREAKDOWN.md`](TASK_BREAKDOWN.md): milestone plan
 - [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md): coding and review workflow, including the picky post-change review rule
 - [`PROJECT_EXECUTION_LOG.md`](PROJECT_EXECUTION_LOG.md): append-only project execution log
-- [`CONSTRUCTION_SYSTEM_PLAN.md`](CONSTRUCTION_SYSTEM_PLAN.md): staged plan for controlled free-grid construction and future turrets
+- [`CONSTRUCTION_SYSTEM_PLAN.md`](CONSTRUCTION_SYSTEM_PLAN.md): staged plan for controlled free-grid construction, barricades, and future turrets
 - [`MVP0_DESIGN.md`](MVP0_DESIGN.md): archive pointer for the old design doc path
 
 ## Change Checklist
@@ -92,4 +97,5 @@ godot --headless --path . --quit
 - tune elite weapon-drop odds and duplicate-conversion economy
 - decide whether elite variants need even stronger silhouette differentiation beyond the new aura/marker treatment
 - decide whether the next content step is enemy patrols, reserve-ammo scarcity, or the fifth weapon pickup
+- tune the selectable buildable catalog and add the next construction-placeable type after barricades
 - continue UI and readability polish from playtest feedback

@@ -74,6 +74,26 @@ func _init() -> void:
 	print("construction_grid_probe_valid_cell=%s" % str(grid.get_preview_cell()))
 	print("construction_grid_probe_valid_tactical=%s" % str(grid.is_cell_tactical(grid.get_preview_cell())))
 
+	player.global_position = grid.to_global(Vector2(12.0 * grid.cell_size.x, 12.0 * grid.cell_size.y))
+	await _wait_frames()
+	print("construction_grid_probe_non_buildable_reason=%s" % grid.get_preview_reason())
+	print("construction_grid_probe_non_buildable_cell=%s" % str(grid.get_preview_cell()))
+	print("construction_grid_probe_non_buildable_tactical=%s" % str(grid.is_cell_tactical(grid.get_preview_cell())))
+
+	player.global_position = grid.to_global(Vector2(-2.0 * grid.cell_size.x, 3.0 * grid.cell_size.y))
+	await _wait_frames()
+	print("construction_grid_probe_expanded_valid_reason=%s" % grid.get_preview_reason())
+	print("construction_grid_probe_expanded_valid_cell=%s" % str(grid.get_preview_cell()))
+	print("construction_grid_probe_expanded_valid_tactical=%s" % str(grid.is_cell_tactical(grid.get_preview_cell())))
+
+	player.global_position = grid.to_global(Vector2(-2.0 * grid.cell_size.x, -2.0 * grid.cell_size.y))
+	await _wait_frames()
+	print("construction_grid_probe_corner_reason=%s" % grid.get_preview_reason())
+	print("construction_grid_probe_corner_cell=%s" % str(grid.get_preview_cell()))
+	print("construction_grid_probe_corner_reserved=%s" % str(grid.is_cell_reserved(grid.get_preview_cell())))
+	print("construction_grid_probe_corner_valid=%s" % str(grid.is_cell_valid_for_basic_placeable(grid.get_preview_cell())))
+	print("construction_grid_probe_corner_buffer=%s" % str(grid.would_trap_player_local(grid.get_preview_cell(), [Vector2i(-1, -2), Vector2i(-2, -1)], 2)))
+
 	var wall_n = _find_defense_socket(game, &"wall_n")
 	if wall_n == null:
 		push_error("wall_n defense socket not found")
@@ -111,9 +131,29 @@ func _init() -> void:
 
 	game._on_food_table_requested(player)
 	await _wait_frames()
+	game.game_manager.set_run_state(game.game_manager.RunState.ACTIVE_WAVE)
+	await _wait_frames()
+	if player.is_build_mode_active():
+		await _toggle_build_mode()
+		await _wait_frames()
 	await _toggle_build_mode()
 	await _wait_frames()
-	print("construction_grid_probe_night_blocked=%s" % str(not player.is_build_mode_active()))
+	print("construction_grid_probe_active_stage_build_mode=%s" % str(player.is_build_mode_active()))
+	await _toggle_build_mode()
+	await _wait_frames()
+	print("construction_grid_probe_active_stage_status=%s" % str(game.hud.status_label.text))
+	game.game_manager.set_run_state(game.game_manager.RunState.POST_WAVE)
+	await _wait_frames()
+	print("construction_grid_probe_post_stage_persist=%s" % str(player.is_build_mode_active()))
+	if player.is_build_mode_active():
+		await _toggle_build_mode()
+		await _wait_frames()
+	await _toggle_build_mode()
+	await _wait_frames()
+	print("construction_grid_probe_post_stage_build_mode=%s" % str(player.is_build_mode_active()))
+	await _toggle_build_mode()
+	await _wait_frames()
+	print("construction_grid_probe_post_stage_status=%s" % str(game.hud.status_label.text))
 	quit()
 
 

@@ -151,9 +151,16 @@ Key tuning areas:
 Started:
 - Stage 0 rule documentation
 - Stage 1 foundation scaffolding
+- Stage 2 barricade slice
 
 Not started yet:
-- actual placement spending
-- route-preservation graph checks
-- live placeable spawning
-- barricade gameplay
+- spike trap
+- utility placeables
+- turret framework
+- broader lane-graph validation beyond the current door-route guard
+
+Implemented:
+- whole-map construction grid
+- build-mode preview and placement
+- barricade placement, repair, dismantle, and occupancy refresh
+- trap-prevention guard against sealing the player in

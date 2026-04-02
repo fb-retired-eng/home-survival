@@ -20,6 +20,8 @@ const DEFAULT_HELD_WEAPON_OFFSET := Vector2(10.0, -10.0)
 const DEFAULT_HELD_WEAPON_COLOR := Color(0.86, 0.86, 0.9, 1.0)
 const DEFAULT_SPREAD_HITSCAN_CONE_DEGREES := 30.0
 const STRUCTURE_ATTACK_BLOCKER_MASK := 2 | 4
+const RECYCLE_SEARCH_RADIUS := 72.0
+const PLACEABLE_PROFILE_SCRIPT := preload("res://scripts/data/placeable_profile.gd")
 const WEAPON_DEFINITION_SCRIPT := preload("res://scripts/data/weapon_definition.gd")
 const DEFAULT_WEAPON_RESOURCE := preload("res://data/weapons/kitchen_knife.tres")
 
@@ -34,6 +36,10 @@ signal weapon_status_changed(text: String)
 signal weapon_trait_changed(text: String)
 signal weapon_noise_emitted(source_position: Vector2, noise_radius: float, noise_alert_budget: float, weapon_id: StringName)
 signal build_mode_toggled(active: bool)
+signal build_placement_requested()
+signal build_selection_prev_requested()
+signal build_selection_next_requested()
+signal build_rotation_requested()
 
 @export var max_health: int = 100
 @export var max_energy: int = 100
@@ -72,6 +78,9 @@ var _interaction_gate_callback: Callable
 var _attack_windup_pending: bool = false
 var _attack_windup_weapon: Resource
 var _attack_windup_visual_only: bool = false
+var _collision_mask_base: int = 0
+var _collision_mask_exemption_counts: Dictionary = {}
+var _recycle_action_was_down: bool = false
 var _attack_flash_color: Color = DEFAULT_ATTACK_FLASH_COLOR
 var _attack_flash_start_scale: Vector2 = DEFAULT_ATTACK_FLASH_START_SCALE
 var _attack_flash_peak_scale: Vector2 = DEFAULT_ATTACK_FLASH_PEAK_SCALE
@@ -129,9 +138,11 @@ var _spawn_position: Vector2
 
 func _ready() -> void:
 	add_to_group("player")
+	set_process_input(true)
 	_spawn_position = global_position
 	current_health = max_health
 	current_energy = max_energy
+	_collision_mask_base = collision_mask
 	_base_body_color = body_visual.color
 	if attack_area_shape.shape != null:
 		attack_area_shape.shape = attack_area_shape.shape.duplicate()
@@ -178,7 +189,21 @@ func _physics_process(delta: float) -> void:
 		_attempt_toggle_build_mode()
 
 	if _build_mode_active:
+		if Input.is_action_just_pressed("build_prev"):
+			build_selection_prev_requested.emit()
+		if Input.is_action_just_pressed("build_next"):
+			build_selection_next_requested.emit()
+		if Input.is_action_just_pressed("build_rotate"):
+			build_rotation_requested.emit()
+		if Input.is_action_just_pressed("interact"):
+			build_placement_requested.emit()
+		var recycle_action_down := Input.is_action_pressed("recycle")
+		if recycle_action_down and not _recycle_action_was_down:
+			_attempt_recycle()
+		_recycle_action_was_down = recycle_action_down
 		return
+
+	_recycle_action_was_down = false
 
 	if Input.is_action_just_pressed("interact"):
 		_attempt_interact()
@@ -194,6 +219,10 @@ func _physics_process(delta: float) -> void:
 
 	if Input.is_action_just_pressed("reload_weapon"):
 		_attempt_reload(false)
+
+
+func _input(event: InputEvent) -> void:
+	pass
 
 
 func add_resource(resource_id: String, amount: int, show_message: bool = true) -> bool:
@@ -327,6 +356,29 @@ func set_build_mode_allowed(allowed: bool) -> void:
 	_build_mode_allowed = allowed
 	if not allowed and _build_mode_active:
 		set_build_mode_active(false, false)
+
+
+func push_collision_mask_exemption(layer_number: int) -> void:
+	if layer_number <= 0:
+		return
+	_collision_mask_exemption_counts[layer_number] = int(_collision_mask_exemption_counts.get(layer_number, 0)) + 1
+	_rebuild_collision_mask()
+
+
+func pop_collision_mask_exemption(layer_number: int) -> void:
+	if layer_number <= 0:
+		return
+	var current_count := int(_collision_mask_exemption_counts.get(layer_number, 0))
+	if current_count <= 1:
+		_collision_mask_exemption_counts.erase(layer_number)
+	else:
+		_collision_mask_exemption_counts[layer_number] = current_count - 1
+	_rebuild_collision_mask()
+
+
+func clear_collision_mask_exemptions() -> void:
+	_collision_mask_exemption_counts.clear()
+	_rebuild_collision_mask()
 
 
 func set_build_mode_active(active: bool, show_message: bool = true) -> void:
@@ -580,10 +632,10 @@ func _attempt_toggle_build_mode() -> void:
 	if is_dead or is_busy:
 		return
 	if _build_mode_active:
-		set_build_mode_active(false)
+		set_build_mode_active(false, false)
 		return
 	if not _build_mode_allowed:
-		message_requested.emit("Can only build during the day")
+		message_requested.emit("Build mode unavailable")
 		return
 	if _has_active_combat_action():
 		message_requested.emit("Finish current action first")
@@ -630,10 +682,60 @@ func _attempt_interact() -> void:
 		interactable.interact(self)
 
 
+func _attempt_recycle() -> void:
+	if is_dead or is_busy or not _build_mode_active or _has_active_combat_action():
+		return
+	var recyclable := _get_active_interactable()
+	if recyclable == null or not _can_recycle_placeable(recyclable):
+		recyclable = _get_nearest_recyclable_placeable()
+	if recyclable == null:
+		return
+	if recyclable.has_method("recycle"):
+		recyclable.recycle(self)
+
+
+func _get_nearest_recyclable_placeable() -> Node2D:
+	var best_placeable: Node2D = null
+	var best_distance := INF
+	for placeable in get_tree().get_nodes_in_group("placeables"):
+		if placeable == null or not is_instance_valid(placeable):
+			continue
+		if not placeable.has_method("recycle"):
+			continue
+		if not placeable.has_method("can_interact") or not placeable.can_interact(self):
+			continue
+		var profile: PlaceableProfile = placeable.get("profile") as PlaceableProfile
+		if profile == null or profile.get_script() != PLACEABLE_PROFILE_SCRIPT:
+			continue
+		if int(placeable.get("current_hp")) < int(profile.max_hp):
+			continue
+		var distance := global_position.distance_to(placeable.global_position)
+		if distance > RECYCLE_SEARCH_RADIUS:
+			continue
+		if distance < best_distance:
+			best_distance = distance
+			best_placeable = placeable
+	return best_placeable
+
+
+func _can_recycle_placeable(placeable: Node2D) -> bool:
+	if placeable == null or not is_instance_valid(placeable):
+		return false
+	if not placeable.has_method("recycle"):
+		return false
+	if not placeable.has_method("can_interact") or not placeable.can_interact(self):
+		return false
+	var profile: PlaceableProfile = placeable.get("profile") as PlaceableProfile
+	if profile == null or profile.get_script() != PLACEABLE_PROFILE_SCRIPT:
+		return false
+	return int(placeable.get("current_hp")) >= int(profile.max_hp)
+
+
 func _die() -> void:
 	is_dead = true
 	cancel_timed_action()
 	_cancel_attack_windup()
+	clear_collision_mask_exemptions()
 	velocity = Vector2.ZERO
 	message_requested.emit("You died")
 	player_died.emit()
@@ -644,6 +746,7 @@ func reset_for_new_run() -> void:
 	is_dead = false
 	cancel_timed_action()
 	set_build_mode_active(false, false)
+	clear_collision_mask_exemptions()
 	current_health = max_health
 	current_energy = max_energy
 	resources = {
@@ -658,6 +761,7 @@ func reset_for_new_run() -> void:
 	_reload_time_remaining = 0.0
 	_reload_weapon_id = StringName()
 	_knockback_velocity = Vector2.ZERO
+	_recycle_action_was_down = false
 	velocity = Vector2.ZERO
 	_nearby_interactables.clear()
 	_obtained_weapons.clear()
@@ -670,6 +774,16 @@ func reset_for_new_run() -> void:
 	_emit_full_state()
 	_update_interaction_prompt()
 	_update_render_order()
+
+
+func _rebuild_collision_mask() -> void:
+	var updated_mask := _collision_mask_base
+	for layer_number in _collision_mask_exemption_counts.keys():
+		var layer := int(layer_number)
+		if layer <= 0:
+			continue
+		updated_mask &= ~(1 << (layer - 1))
+	collision_mask = updated_mask
 
 
 func _emit_full_state() -> void:
@@ -839,7 +953,7 @@ func _update_interaction_prompt() -> void:
 		return
 
 	if _build_mode_active:
-		interaction_prompt_changed.emit("Build Mode")
+		interaction_prompt_changed.emit("Build Mode | E place | Q prev | Tab next | R rotate | Wheel next | C recycle")
 		return
 
 	var interactable := _get_active_interactable()

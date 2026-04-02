@@ -13,10 +13,13 @@ const CELL_BORDER_INSET := 2.0
 var _build_mode_active: bool = false
 var _preview_cell: Vector2i = Vector2i.ZERO
 var _preview_reason: String = ""
+var _preview_footprint_offsets: PackedVector2Array = PackedVector2Array([Vector2.ZERO])
 var _occupied_cells: Dictionary = {}
+var _extra_reserved_cells: Dictionary = {}
 
 @onready var buildable_overlay: Node2D = $BuildableOverlay
 @onready var reserved_overlay: Node2D = $ReservedOverlay
+@onready var preview_footprint: Node2D = $PreviewFootprint
 @onready var preview: Polygon2D = $Preview
 @onready var preview_outline: Line2D = $PreviewOutline
 
@@ -30,6 +33,7 @@ func set_build_mode_active(active: bool) -> void:
 	_build_mode_active = active
 	buildable_overlay.visible = active
 	reserved_overlay.visible = active
+	preview_footprint.visible = active
 	preview.visible = active
 	preview_outline.visible = active
 
@@ -42,6 +46,14 @@ func set_preview_world_position(world_position: Vector2) -> void:
 	var local_position: Vector2 = to_local(world_position)
 	var target_cell: Vector2i = _world_to_cell(local_position)
 	_preview_cell = target_cell
+	_update_preview_visual()
+
+
+func set_preview_footprint_offsets(footprint_offsets: PackedVector2Array) -> void:
+	if footprint_offsets.is_empty():
+		_preview_footprint_offsets = PackedVector2Array([Vector2.ZERO])
+	else:
+		_preview_footprint_offsets = footprint_offsets.duplicate()
 	_update_preview_visual()
 
 
@@ -79,7 +91,7 @@ func is_cell_in_bounds(cell: Vector2i) -> bool:
 
 
 func is_cell_reserved(cell: Vector2i) -> bool:
-	return _has_cell(reserved_cells, cell)
+	return _has_cell(reserved_cells, cell) or _extra_reserved_cells.has(cell)
 
 
 func is_cell_occupied(cell: Vector2i) -> bool:
@@ -95,12 +107,124 @@ func is_footprint_valid_for_basic_placeable(anchor_cell: Vector2i, footprint_off
 	if footprint_cells.is_empty():
 		return false
 	for cell in footprint_cells:
-		if not is_cell_tactical(cell):
-			return false
 		if is_cell_reserved(cell):
+			return false
+		if not is_cell_tactical(cell):
 			return false
 		if is_cell_occupied(cell):
 			return false
+	return true
+
+
+func would_overlap_player_buffer(player_cell: Vector2i, extra_blocked_cells: Array, buffer_radius_cells: int = 1) -> bool:
+	if buffer_radius_cells < 0:
+		return false
+	if not is_cell_in_bounds(player_cell):
+		return false
+	for raw_cell in extra_blocked_cells:
+		var cell: Vector2i = raw_cell
+		if cell == player_cell:
+			continue
+		if abs(cell.x - player_cell.x) <= buffer_radius_cells and abs(cell.y - player_cell.y) <= buffer_radius_cells:
+			return true
+	return false
+
+
+func would_cramp_player_with_existing_occupancy(player_cell: Vector2i, extra_blocked_cells: Array, buffer_radius_cells: int = 1) -> bool:
+	if buffer_radius_cells < 0:
+		return false
+	if not is_cell_in_bounds(player_cell):
+		return false
+
+	var candidate_near_player := false
+	for raw_cell in extra_blocked_cells:
+		var cell: Vector2i = raw_cell
+		if abs(cell.x - player_cell.x) <= buffer_radius_cells and abs(cell.y - player_cell.y) <= buffer_radius_cells:
+			candidate_near_player = true
+			break
+
+	if not candidate_near_player:
+		return false
+
+	for existing_cell in _occupied_cells.keys():
+		var cell: Vector2i = existing_cell
+		if cell == player_cell:
+			continue
+		var occupant_id: StringName = StringName(_occupied_cells.get(cell, StringName()))
+		if not _is_runtime_placeable_occupant_id(occupant_id):
+			continue
+		if abs(cell.x - player_cell.x) <= buffer_radius_cells and abs(cell.y - player_cell.y) <= buffer_radius_cells:
+			return true
+	return false
+
+
+func would_reduce_player_escape_routes(player_cell: Vector2i, extra_blocked_cells: Array, minimum_open_neighbors: int = 3) -> bool:
+	if minimum_open_neighbors < 0:
+		return false
+	if not is_cell_in_bounds(player_cell):
+		return false
+
+	var blocked_cells := {}
+	for cell in _occupied_cells.keys():
+		blocked_cells[cell] = true
+	for raw_cell in reserved_cells:
+		blocked_cells[Vector2i(roundi(raw_cell.x), roundi(raw_cell.y))] = true
+	for cell in _extra_reserved_cells.keys():
+		blocked_cells[cell] = true
+	for cell in extra_blocked_cells:
+		blocked_cells[cell] = true
+
+	var open_neighbors := 0
+	for neighbor in _get_cardinal_neighbors(player_cell):
+		if not is_cell_in_bounds(neighbor):
+			continue
+		if blocked_cells.has(neighbor):
+			continue
+		open_neighbors += 1
+		if open_neighbors >= minimum_open_neighbors:
+			return false
+	return true
+
+
+func would_trap_player_local(player_cell: Vector2i, extra_blocked_cells: Array, local_radius: int = 2) -> bool:
+	if local_radius < 1:
+		return false
+	if not is_cell_in_bounds(player_cell):
+		return false
+
+	var blocked_cells := {}
+	for cell in _occupied_cells.keys():
+		blocked_cells[cell] = true
+	for raw_cell in reserved_cells:
+		blocked_cells[Vector2i(roundi(raw_cell.x), roundi(raw_cell.y))] = true
+	for cell in _extra_reserved_cells.keys():
+		blocked_cells[cell] = true
+	for cell in extra_blocked_cells:
+		blocked_cells[cell] = true
+
+	var visited := {}
+	var queue: Array[Vector2i] = [player_cell]
+	visited[player_cell] = true
+
+	while not queue.is_empty():
+		var current_cell: Vector2i = queue.pop_front()
+		var dx: int = abs(current_cell.x - player_cell.x)
+		var dy: int = abs(current_cell.y - player_cell.y)
+		if max(dx, dy) == local_radius and not blocked_cells.has(current_cell):
+			return false
+
+		for neighbor in _get_cardinal_neighbors(current_cell):
+			if visited.has(neighbor):
+				continue
+			if not is_cell_in_bounds(neighbor):
+				continue
+			if abs(neighbor.x - player_cell.x) > local_radius or abs(neighbor.y - player_cell.y) > local_radius:
+				continue
+			if neighbor != player_cell and blocked_cells.has(neighbor):
+				continue
+			visited[neighbor] = true
+			queue.append(neighbor)
+
 	return true
 
 
@@ -133,6 +257,17 @@ func clear_runtime_occupancy() -> void:
 	_occupied_cells.clear()
 
 
+func clear_runtime_reserved_cells() -> void:
+	_extra_reserved_cells.clear()
+
+
+func register_reserved_cells(cells: Array[Vector2i]) -> void:
+	for cell in cells:
+		if not is_cell_in_bounds(cell):
+			continue
+		_extra_reserved_cells[cell] = true
+
+
 func register_occupied_cells(cells: Array[Vector2i], occupant_id: StringName) -> void:
 	for cell in cells:
 		if not is_cell_in_bounds(cell):
@@ -160,25 +295,30 @@ func _cell_to_world(cell: Vector2i) -> Vector2:
 
 
 func _update_preview_visual() -> void:
+	for child in preview_footprint.get_children():
+		child.queue_free()
+
 	var center: Vector2 = _cell_to_world(_preview_cell)
 	preview.position = center
 	preview_outline.position = center
-	if is_cell_valid_for_basic_placeable(_preview_cell):
+	var footprint_offsets := _preview_footprint_offsets
+	if footprint_offsets.is_empty():
+		footprint_offsets = PackedVector2Array([Vector2.ZERO])
+	var footprint_cells := get_footprint_cells(_preview_cell, footprint_offsets)
+	for footprint_cell in footprint_cells:
+		_add_preview_footprint_cell(footprint_cell)
+
+	var preview_reason := _get_footprint_preview_reason(_preview_cell, footprint_offsets)
+	if preview_reason.is_empty():
 		preview.color = Color(0.36, 0.9, 0.48, 0.58)
 		preview_outline.default_color = Color(0.92, 1.0, 0.94, 0.96)
 		_preview_reason = ""
-	elif is_cell_reserved(_preview_cell):
-		preview.color = Color(0.92, 0.34, 0.3, 0.58)
-		preview_outline.default_color = Color(1.0, 0.92, 0.9, 0.96)
-		_preview_reason = "Reserved"
-	elif is_cell_occupied(_preview_cell):
-		preview.color = Color(0.92, 0.34, 0.3, 0.58)
-		preview_outline.default_color = Color(1.0, 0.92, 0.9, 0.96)
-		_preview_reason = "Blocked"
 	else:
 		preview.color = Color(0.92, 0.34, 0.3, 0.58)
 		preview_outline.default_color = Color(1.0, 0.92, 0.9, 0.96)
-		_preview_reason = "Blocked"
+		_preview_reason = preview_reason
+
+	_update_preview_footprint_color(is_footprint_valid_for_basic_placeable(_preview_cell, footprint_offsets))
 
 
 func _rebuild_overlays() -> void:
@@ -216,6 +356,40 @@ func _rebuild_overlays() -> void:
 		)
 
 
+func _add_preview_footprint_cell(cell: Vector2i) -> void:
+	var fill_color := Color(0.36, 0.9, 0.48, 0.28)
+	var border_color := Color(0.92, 1.0, 0.94, 0.72)
+	_add_overlay_cell(preview_footprint, cell, fill_color, border_color)
+
+
+func _get_footprint_preview_reason(anchor_cell: Vector2i, footprint_offsets: PackedVector2Array) -> String:
+	var footprint_cells := get_footprint_cells(anchor_cell, footprint_offsets)
+	if footprint_cells.is_empty():
+		return "Blocked"
+
+	for cell in footprint_cells:
+		if not is_cell_in_bounds(cell):
+			return "Outside grid"
+		if is_cell_reserved(cell):
+			return "Reserved"
+		if not is_cell_tactical(cell):
+			return "Not buildable"
+		if is_cell_occupied(cell):
+			return "Occupied"
+
+	return ""
+
+
+func _update_preview_footprint_color(is_valid: bool) -> void:
+	for child in preview_footprint.get_children():
+		var polygon := child as Polygon2D
+		if polygon != null:
+			polygon.color = Color(0.36, 0.9, 0.48, 0.28) if is_valid else Color(0.92, 0.34, 0.3, 0.28)
+		var border := child as Line2D
+		if border != null:
+			border.default_color = Color(0.92, 1.0, 0.94, 0.72) if is_valid else Color(1.0, 0.92, 0.9, 0.72)
+
+
 func _add_overlay_cell(parent_node: Node, cell: Vector2i, fill_color: Color, border_color: Color) -> void:
 	var half_size := cell_size * 0.5 - Vector2(CELL_OUTLINE_INSET, CELL_OUTLINE_INSET)
 	var polygon := Polygon2D.new()
@@ -249,3 +423,22 @@ func _has_cell(cells: PackedVector2Array, target: Vector2i) -> bool:
 		if Vector2i(roundi(raw_cell.x), roundi(raw_cell.y)) == target:
 			return true
 	return false
+
+
+func _get_cardinal_neighbors(cell: Vector2i) -> Array[Vector2i]:
+	return [
+		Vector2i(cell.x + 1, cell.y),
+		Vector2i(cell.x - 1, cell.y),
+		Vector2i(cell.x, cell.y + 1),
+		Vector2i(cell.x, cell.y - 1),
+	]
+
+
+func _is_runtime_placeable_occupant_id(occupant_id: StringName) -> bool:
+	if occupant_id == StringName():
+		return false
+	match occupant_id:
+		&"sleep_point", &"food_table", &"wall_n", &"wall_s", &"door_e", &"door_w":
+			return false
+		_:
+			return true

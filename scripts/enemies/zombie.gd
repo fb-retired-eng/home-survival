@@ -280,19 +280,19 @@ func _get_current_target():
 	if _behavior_context != &"wave" and _should_idle_until_player_detected() and not _is_chasing_player:
 		return null
 
-	var socket = _get_closest_intact_socket()
+	var structure_target = _get_closest_intact_structure()
 	match target_mode:
 		EnemyDefinitionResource.WaveTargetMode.SOCKET_THEN_PLAYER:
-			if socket != null:
-				return socket
+			if structure_target != null:
+				return structure_target
 			return live_player
 		EnemyDefinitionResource.WaveTargetMode.PLAYER_THEN_SOCKET:
 			if live_player != null:
 				return live_player
-			return socket
+			return structure_target
 		EnemyDefinitionResource.WaveTargetMode.SOCKET_ONLY:
-			if socket != null:
-				return socket
+			if structure_target != null:
+				return structure_target
 			if _should_fallback_to_player_when_no_sockets():
 				return live_player
 			return null
@@ -318,24 +318,24 @@ func _get_attack_target(primary_target):
 	return primary_target
 
 
-func _get_closest_intact_socket():
-	var preferred_sockets := _get_intact_preferred_sockets()
-	if not preferred_sockets.is_empty():
-		return _get_closest_socket_from_list(preferred_sockets)
+func _get_closest_intact_structure():
+	var preferred_structures := _get_intact_preferred_structures()
+	if not preferred_structures.is_empty():
+		return _get_closest_structure_from_list(preferred_structures)
 
-	return _get_closest_socket_from_list(_wave_sockets)
+	return _get_closest_structure_from_list(_get_all_structure_targets())
 
 
-func _get_intact_preferred_sockets() -> Array:
-	var preferred_sockets: Array = []
+func _get_intact_preferred_structures() -> Array:
+	var preferred_structures: Array = []
 	if _preferred_socket_ids.is_empty():
-		return preferred_sockets
+		return preferred_structures
 
 	for socket in _wave_sockets:
 		if not is_instance_valid(socket):
 			continue
 
-		if not socket.is_in_group("defense_sockets"):
+		if not _is_structure_target(socket):
 			continue
 
 		if not _preferred_socket_ids.has(String(socket.socket_id)):
@@ -344,38 +344,63 @@ func _get_intact_preferred_sockets() -> Array:
 		if socket.has_method("is_breached") and socket.is_breached():
 			continue
 
-		preferred_sockets.append(socket)
+		preferred_structures.append(socket)
 
-	return preferred_sockets
+	for placeable in get_tree().get_nodes_in_group("placeables"):
+		if not is_instance_valid(placeable):
+			continue
+		if not placeable.has_method("get_placeable_id"):
+			continue
+		if placeable.has_method("is_breached") and placeable.is_breached():
+			continue
+		preferred_structures.append(placeable)
+
+	return preferred_structures
 
 
-func _get_closest_socket_from_list(socket_list: Array):
-	var closest_socket = null
+func _get_all_structure_targets() -> Array:
+	var structures: Array = []
+	for socket in _wave_sockets:
+		if is_instance_valid(socket) and _is_structure_target(socket) and not (socket.has_method("is_breached") and socket.is_breached()):
+			structures.append(socket)
+	for placeable in get_tree().get_nodes_in_group("placeables"):
+		if not is_instance_valid(placeable):
+			continue
+		if not placeable.has_method("get_placeable_id"):
+			continue
+		if placeable.has_method("is_breached") and placeable.is_breached():
+			continue
+		structures.append(placeable)
+	return structures
+
+
+func _get_closest_structure_from_list(structure_list: Array):
+	var closest_structure = null
 	var best_distance := INF
 
-	for socket in socket_list:
-		if not is_instance_valid(socket):
+	for structure in structure_list:
+		if not is_instance_valid(structure):
 			continue
 
-		if not socket.is_in_group("defense_sockets"):
-			continue
-
-		if socket.has_method("is_breached") and socket.is_breached():
-			continue
-
-		var distance := global_position.distance_squared_to(socket.global_position)
+		var distance := global_position.distance_squared_to(structure.global_position)
 		if distance < best_distance:
 			best_distance = distance
-			closest_socket = socket
+			closest_structure = structure
 
-	return closest_socket
+	return closest_structure
+
+
+func _is_structure_target(target) -> bool:
+	if target == null or not is_instance_valid(target):
+		return false
+	return target.is_in_group("defense_sockets") or target.is_in_group("placeables")
 
 
 func _is_target_in_damage_range(target) -> bool:
 	if target == null or not is_instance_valid(target):
 		return false
 
-	if target.is_in_group("defense_sockets"):
+	if _is_structure_target(target):
 		return global_position.distance_to(_get_target_point(target)) <= _get_structure_damage_range_estimate()
 
 	if attack_range_override > 0.0:
@@ -395,7 +420,7 @@ func _try_damage_target(target) -> bool:
 		return false
 
 	var damage_amount := _get_damage_amount_for_target(target)
-	if target.is_in_group("defense_sockets"):
+	if _is_structure_target(target):
 		target.take_damage(damage_amount, {
 			"attacker": self,
 			"damage_type": structure_damage_type,
@@ -421,7 +446,7 @@ func _can_execute_attack(target) -> bool:
 	if not _is_target_in_damage_range(target):
 		return false
 
-	if target.is_in_group("defense_sockets"):
+	if _is_structure_target(target):
 		return true
 
 	if not _has_clear_attack_path(target):
@@ -443,7 +468,7 @@ func _can_begin_attack_prep(target) -> bool:
 	if not _is_target_in_damage_range(target):
 		return false
 
-	if target.is_in_group("defense_sockets"):
+	if _is_structure_target(target):
 		return true
 
 	if not _is_facing_target_for_attack(target):
