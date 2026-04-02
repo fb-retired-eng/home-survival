@@ -8,6 +8,8 @@ const EXPLORATION_SPAWN_POINT_SCRIPT := preload("res://scripts/world/exploration
 const ENEMY_DEFINITION_SCRIPT := preload("res://scripts/data/enemy_definition.gd")
 const ROAMING_SPAWN_ZONE_SCRIPT := preload("res://scripts/world/roaming_spawn_zone.gd")
 const PLACEABLE_PROFILE_SCRIPT := preload("res://scripts/data/placeable_profile.gd")
+const FOG_MEMORY_CELL_SIZE := 80.0
+const FOG_VISIT_RADIUS_CELLS := 1
 const POSITIVE_POI_MODIFIERS: Array[StringName] = [&"bountiful_food", &"extra_parts"]
 const NEGATIVE_POI_MODIFIERS: Array[StringName] = [&"disturbed", &"elite_present"]
 const ELITE_MODIFIER_POIS := {
@@ -47,6 +49,7 @@ const ELITE_MODIFIER_POIS := {
 @onready var spawn_markers_root: Node2D = $World/SpawnMarkers
 @onready var defense_sockets: Node2D = $World/DefenseSockets
 @onready var construction_grid = $World/ConstructionGrid
+@onready var player_camera: Camera2D = $Player/Camera2D
 @onready var exploration_spawn_points_root: Node2D = $World/ExplorationSpawnPoints
 @onready var roaming_spawn_zones_root: Node2D = $World/RoamingSpawnZones
 @onready var construction_placeables: Node2D = $World/ConstructionPlaceables
@@ -64,6 +67,14 @@ var _debug_forced_next_daily_poi_modifiers: Dictionary = {}
 var _last_daily_refilled_pois: Array[StringName] = []
 var _selected_buildable_profile_index: int = 0
 var _selected_buildable_rotation: int = 0
+var _fog_home_world_position: Vector2 = Vector2.ZERO
+var _fog_world_min: Vector2 = Vector2(-1280.0, -720.0)
+var _fog_world_max: Vector2 = Vector2(3840.0, 2160.0)
+var _fog_memory_image: Image
+var _fog_memory_texture: ImageTexture
+var _fog_memory_cells_x: int = 0
+var _fog_memory_cells_y: int = 0
+var _fog_last_revealed_cell: Vector2i = Vector2i(2147483647, 2147483647)
 
 
 func _ready() -> void:
@@ -98,6 +109,8 @@ func _ready() -> void:
 	player.build_rotation_requested.connect(_on_player_build_rotation_requested)
 	game_manager.run_state_changed.connect(_on_run_state_changed)
 	_configure_scavenge_nodes()
+	_fog_home_world_position = player.global_position
+	_initialize_fog_memory()
 	player.set_build_mode_allowed(true)
 	_on_wave_changed(game_manager.current_wave)
 	_on_run_state_changed(game_manager.run_state)
@@ -106,12 +119,22 @@ func _ready() -> void:
 
 func _physics_process(_delta: float) -> void:
 	if construction_grid == null:
-		return
-	if not construction_grid.is_build_mode_active():
-		return
-	if player == null or not is_instance_valid(player):
-		return
-	construction_grid.set_preview_world_position(player.global_position)
+		pass
+	elif construction_grid.is_build_mode_active() and player != null and is_instance_valid(player):
+		construction_grid.set_preview_world_position(player.global_position)
+
+	_update_fog_memory()
+	if hud != null and is_instance_valid(hud) and player != null and is_instance_valid(player) and player_camera != null and is_instance_valid(player_camera):
+		var camera_screen_center := player_camera.get_screen_center_position()
+		hud.set_home_fog_state(
+			_fog_home_world_position,
+			camera_screen_center,
+			player_camera.zoom,
+			get_viewport_rect().size,
+			_fog_memory_texture,
+			_fog_world_min,
+			_fog_world_max
+		)
 
 
 func _build_defense_sockets() -> void:
@@ -1546,3 +1569,53 @@ func _refresh_base_status() -> void:
 		hp_percent = int(round((float(total_hp) / float(total_max_hp)) * 100.0))
 
 	hud.set_base_status(intact_count, breached_count, hp_percent)
+
+
+func _initialize_fog_memory() -> void:
+	_fog_memory_cells_x = int((_fog_world_max.x - _fog_world_min.x) / FOG_MEMORY_CELL_SIZE)
+	_fog_memory_cells_y = int((_fog_world_max.y - _fog_world_min.y) / FOG_MEMORY_CELL_SIZE)
+	_fog_memory_image = Image.create(_fog_memory_cells_x, _fog_memory_cells_y, false, Image.FORMAT_RGBA8)
+	_fog_memory_image.fill(Color(0.0, 0.0, 0.0, 1.0))
+	_fog_memory_texture = ImageTexture.create_from_image(_fog_memory_image)
+	_reveal_fog_at_world_position(_fog_home_world_position)
+
+
+func _update_fog_memory() -> void:
+	if player == null or not is_instance_valid(player):
+		return
+	_reveal_fog_at_world_position(player.global_position)
+
+
+func _reveal_fog_at_world_position(world_position: Vector2) -> void:
+	if _fog_memory_image == null:
+		return
+	var cell := _fog_world_position_to_cell(world_position)
+	if cell == _fog_last_revealed_cell:
+		return
+	_fog_last_revealed_cell = cell
+
+	for dx in range(-FOG_VISIT_RADIUS_CELLS, FOG_VISIT_RADIUS_CELLS + 1):
+		for dy in range(-FOG_VISIT_RADIUS_CELLS, FOG_VISIT_RADIUS_CELLS + 1):
+			var reveal_cell := Vector2i(cell.x + dx, cell.y + dy)
+			if not _is_fog_cell_in_bounds(reveal_cell):
+				continue
+			_fog_memory_image.set_pixel(reveal_cell.x, reveal_cell.y, Color(1.0, 1.0, 1.0, 1.0))
+
+	_fog_memory_texture = ImageTexture.create_from_image(_fog_memory_image)
+
+
+func _fog_world_position_to_cell(world_position: Vector2) -> Vector2i:
+	var local := world_position - _fog_world_min
+	return Vector2i(
+		floori(local.x / FOG_MEMORY_CELL_SIZE),
+		floori(local.y / FOG_MEMORY_CELL_SIZE)
+	)
+
+
+func _is_fog_cell_in_bounds(cell: Vector2i) -> bool:
+	return (
+		cell.x >= 0
+		and cell.y >= 0
+		and cell.x < _fog_memory_cells_x
+		and cell.y < _fog_memory_cells_y
+	)

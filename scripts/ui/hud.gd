@@ -1,6 +1,11 @@
 extends CanvasLayer
 class_name HUD
 
+const FOG_START_DISTANCE := 720.0
+const FOG_END_DISTANCE := 1320.0
+const FOG_MAX_ALPHA := 0.82
+const FOG_COLOR := Color(0.03, 0.05, 0.06, 1.0)
+
 var player
 var _health_current: int = 0
 var _health_maximum: int = 0
@@ -20,6 +25,7 @@ var _phase_text: String = "Pre-Wave"
 @onready var weapon_trait_label: Label = %WeaponTraitLabel
 @onready var resources_label: Label = %ResourcesLabel
 @onready var status_label: Label = %StatusLabel
+@onready var fog_overlay: ColorRect = %FogOverlay
 @onready var interaction_panel: PanelContainer = %InteractionLabel.get_parent()
 @onready var interaction_label: Label = %InteractionLabel
 @onready var end_overlay: Control = %EndOverlay
@@ -47,6 +53,23 @@ func bind_player(target) -> void:
 
 func set_status(text: String) -> void:
 	status_label.text = text
+
+
+func set_home_fog_state(home_world_position: Vector2, camera_world_position: Vector2, camera_zoom: Vector2, viewport_size: Vector2, reveal_texture: Texture2D, reveal_world_min: Vector2, reveal_world_max: Vector2) -> void:
+	var material := fog_overlay.material as ShaderMaterial
+	if material == null:
+		return
+	material.set_shader_parameter("home_world_position", home_world_position)
+	material.set_shader_parameter("camera_world_position", camera_world_position)
+	material.set_shader_parameter("camera_zoom", camera_zoom)
+	material.set_shader_parameter("viewport_size", viewport_size)
+	material.set_shader_parameter("reveal_texture", reveal_texture)
+	material.set_shader_parameter("reveal_world_min", reveal_world_min)
+	material.set_shader_parameter("reveal_world_max", reveal_world_max)
+	material.set_shader_parameter("fog_start_distance", FOG_START_DISTANCE)
+	material.set_shader_parameter("fog_end_distance", FOG_END_DISTANCE)
+	material.set_shader_parameter("fog_max_alpha", FOG_MAX_ALPHA)
+	material.set_shader_parameter("fog_color", FOG_COLOR)
 
 
 func set_interaction_prompt(text: String) -> void:

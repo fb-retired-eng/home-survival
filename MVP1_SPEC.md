@@ -70,6 +70,14 @@ Construction now supports tactical placement on a grid, separate from fixed wall
   - **Spike Traps**: One-time use items that damage/slow zombies.
 - **Scope**: MVP1 extends the existing construction layer; it does not add player-built walls or freeform structural editing.
 
+### 2.4 Map Fog
+To keep the larger map readable without exposing everything at once, the world should fade into fog once the player moves a meaningful distance away from the home, while preserving memory of places the player has already explored.
+
+- **Home Anchor**: Fog is centered on the home/base area, not on the player.
+- **Readability Rule**: The local home band should remain clear, while the far map becomes progressively obscured.
+- **Exploration Memory**: Areas the player has already visited remain revealed for the rest of the run.
+- **Scope**: This is a presentation layer for exploration and pacing, not a stealth or visibility simulation.
+
 ## 3. Updated Core Loop
 The loop remains consistent with MVP0 but adds a "Strategic Allocation" layer during the evening.
 
@@ -111,6 +119,7 @@ Add these IDs to the stable resource list:
 2. **The Grid**: Extend the existing tactical grid for `0`-energy barricade building and spike traps.
 3. **Power v1.0**: Create the `PowerManager` and the visual radius effect for turrets and floodlights.
 4. **Heirloom Logic**: Implement the persistence layer to detect, save, and restore "Golden Debris" positions between runs.
+5. **Map Fog**: Add a home-anchored fog overlay that keeps the immediate base area readable, fades distant map regions, and preserves visited-area memory.
 
 ## 7. Out of Scope for MVP1
 - Player-built walls or freeform base architecture

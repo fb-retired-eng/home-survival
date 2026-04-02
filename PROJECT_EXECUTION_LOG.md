@@ -50,6 +50,41 @@ Validation:
   - `construction_grid_probe_active_stage_build_mode=true`
   - `construction_grid_probe_post_stage_build_mode=true`
 
+### Map Layout Optimization
+- Spread the authored exploration POIs and their guard / roaming spawn anchors outward into the larger map so the added world space carries actual traversal and encounter value instead of only dead margins.
+- Kept the wave spawn markers and the home/base layout stable so defense pacing and the core loop remain unchanged.
+- Extended the map layout probe to print the full POI and roaming-anchor layout for easier future review.
+
+Validation:
+- Headless Godot project load succeeded after the layout optimization pass.
+- `map_layout_probe` confirmed the new exploration spread:
+  - `map_layout_probe_poi_a=(205.0, 220.0)`
+  - `map_layout_probe_poi_b=(2355.0, 220.0)`
+  - `map_layout_probe_poi_c=(205.0, 1220.0)`
+  - `map_layout_probe_poi_d=(2355.0, 1220.0)`
+  - `map_layout_probe_poi_e=(1280.0, 95.0)`
+  - `map_layout_probe_poi_f=(1280.0, 1345.0)`
+  - `map_layout_probe_roam_nw=(580.0, 95.0)`
+  - `map_layout_probe_roam_se=(1980.0, 1345.0)`
+- `construction_grid_probe` still confirmed the local build band and reserved home corners remained intact.
+
+### MVP1 Fog Pass
+- Added a home-anchored fog-of-war overlay so the enlarged map starts to fade once the player moves beyond the local home area.
+- Wired the fog overlay through the HUD with explicit shader parameters for the home anchor, camera position, viewport size, fade distances, and a reveal texture.
+- Added exploration-memory support so areas the player has already visited remain revealed for the rest of the run.
+- Corrected the fog center update to use the camera's rendered screen center, which keeps the overlay from drifting as the player moves with camera smoothing enabled.
+- Added a headless fog probe to verify the overlay exists, that distant map positions receive more fog than the home area, and that visited areas clear once explored.
+
+Validation:
+- Headless Godot project load succeeded after the fog pass.
+- `map_fog_probe` confirmed:
+  - `map_fog_probe_home_alpha=0.000`
+  - `map_fog_probe_far_alpha_before_visit=0.636`
+  - `map_fog_probe_far_alpha_after_visit=0.000`
+  - `map_fog_probe_overlay_visible=true`
+  - `map_fog_probe_home_center=(1280.0, 720.0)`
+  - `map_fog_probe_camera_screen_center=(1464.159, 634.3447)`
+
 ### Expanded Grid Playtest
 - Added a dedicated probe for the outer-ring tactical build cells so the widened grid is exercised through the real barricade placement flow, not just validity checks.
 - Confirmed the new expanded cell at `(-2, 3)` accepts barricade placement, spends salvage, and occupies the expected cell.
