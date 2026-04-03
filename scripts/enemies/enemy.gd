@@ -9,8 +9,10 @@ const GAMEPLAY_Z_BASE := 1000
 const CHASE_LOST_SIGHT_DISTANCE_FACTOR := 1.25
 const CHASE_LOST_SIGHT_DISTANCE_PADDING := 20.0
 const CHASE_SCREEN_MARGIN := 48.0
-const VISUAL_BOB_HEIGHT := 1.8
-const VISUAL_BREATHE_SCALE := 0.02
+const VISUAL_BOB_HEIGHT := 1.2
+const VISUAL_BREATHE_SCALE := 0.016
+const VISUAL_TURN_SPEED := 10.0
+const THREAT_INDICATOR_GRACE_TIME := 0.65
 
 signal died(enemy)
 
@@ -64,6 +66,10 @@ var _base_facing_marker_color: Color
 var _base_elite_aura_color: Color
 var _visual_time: float = 0.0
 var _health_bar_alpha: float = 0.0
+var _visual_movement_ratio: float = 0.0
+var _visual_bob_offset_y: float = 0.0
+var _visual_body_rotation: float = 0.0
+var _threat_indicator_grace_remaining: float = 0.0
 
 @onready var body_shadow: Polygon2D = $BodyShadow
 @onready var state_indicator: Polygon2D = $StateIndicator
@@ -93,6 +99,10 @@ func _ready() -> void:
 	_cache_runtime_context()
 	_refresh_player_reference()
 	_update_facing_direction(_facing_direction)
+	_visual_body_rotation = _facing_direction.angle() - PI / 2.0
+	body_visual.rotation = _visual_body_rotation
+	facing_marker.rotation = _visual_body_rotation + PI
+	attack_flash.rotation = facing_marker.rotation
 	_refresh_health_bar()
 	_update_render_order()
 
@@ -200,6 +210,7 @@ func _physics_process(delta: float) -> void:
 	_noise_investigation_remaining = max(_noise_investigation_remaining - delta, 0.0)
 	_noise_investigation_detect_delay_remaining = max(_noise_investigation_detect_delay_remaining - delta, 0.0)
 	_slow_effect_remaining = max(_slow_effect_remaining - delta, 0.0)
+	_threat_indicator_grace_remaining = max(_threat_indicator_grace_remaining - delta, 0.0)
 	if _slow_effect_remaining <= 0.0:
 		_slow_effect_multiplier = 1.0
 	_decay_knockback(delta)
@@ -275,9 +286,6 @@ func _update_facing_direction(direction: Vector2) -> void:
 		return
 
 	_facing_direction = direction.normalized()
-	body_visual.rotation = _facing_direction.angle() - PI / 2.0
-	facing_marker.rotation = _facing_direction.angle() + PI / 2.0
-	attack_flash.rotation = facing_marker.rotation
 
 
 func _refresh_spawn_facing(preferred_direction: Vector2 = Vector2.ZERO) -> void:
@@ -307,6 +315,7 @@ func take_damage(amount: int, _source: Variant = null) -> void:
 		return
 
 	current_health = max(current_health - damage_amount, 0)
+	_threat_indicator_grace_remaining = maxf(_threat_indicator_grace_remaining, THREAT_INDICATOR_GRACE_TIME)
 	_refresh_health_bar()
 	_flash_body(Color(1.0, 0.55, 0.55, 1.0))
 	_play_damage_feedback(_source)
@@ -736,6 +745,7 @@ func receive_noise_alert(player_ref, source_position: Vector2) -> void:
 	_noise_investigation_position = source_position
 	_noise_investigation_remaining = _get_noise_investigation_duration()
 	_noise_investigation_detect_delay_remaining = _get_noise_investigation_detect_delay()
+	_threat_indicator_grace_remaining = maxf(_threat_indicator_grace_remaining, THREAT_INDICATOR_GRACE_TIME)
 	_update_facing_direction(source_position - global_position)
 
 
@@ -1224,6 +1234,7 @@ func _alert_to_player(player_ref, propagate: bool = true) -> void:
 	var was_alerted := _is_alerted_to_player
 	_is_alerted_to_player = true
 	_is_chasing_player = true
+	_threat_indicator_grace_remaining = maxf(_threat_indicator_grace_remaining, THREAT_INDICATOR_GRACE_TIME)
 	if not was_alerted and propagate:
 		_alert_nearby_enemies(player_ref)
 
@@ -1348,20 +1359,27 @@ func _update_visual_animation(delta: float) -> void:
 		return
 
 	var movement_ratio := clampf(velocity.length() / maxf(move_speed, 1.0), 0.0, 1.0)
-	_visual_time += delta * lerpf(1.8, 8.2, movement_ratio)
+	_visual_movement_ratio = move_toward(_visual_movement_ratio, movement_ratio, delta * 6.0)
+	_visual_time += delta * lerpf(1.8, 7.2, _visual_movement_ratio)
 	var breathe := sin(_visual_time * 1.9) * VISUAL_BREATHE_SCALE
-	var bob := sin(_visual_time * 8.5) * VISUAL_BOB_HEIGHT * movement_ratio
-	visual_root.position = Vector2(0.0, bob)
+	var bob_target := sin(_visual_time * 7.6) * VISUAL_BOB_HEIGHT * _visual_movement_ratio
+	_visual_bob_offset_y = lerpf(_visual_bob_offset_y, bob_target, minf(delta * 8.0, 1.0))
+	visual_root.position = Vector2(0.0, _visual_bob_offset_y)
 	visual_root.scale = Vector2(
-		1.0 + 0.04 * movement_ratio + maxf(breathe, 0.0),
-		1.0 - 0.03 * movement_ratio - minf(breathe, 0.0)
+		1.0 + 0.03 * _visual_movement_ratio + maxf(breathe, 0.0),
+		1.0 - 0.022 * _visual_movement_ratio - minf(breathe, 0.0)
 	)
+	var target_body_rotation := _facing_direction.angle() - PI / 2.0
+	_visual_body_rotation = lerp_angle(_visual_body_rotation, target_body_rotation, minf(delta * VISUAL_TURN_SPEED, 1.0))
+	body_visual.rotation = _visual_body_rotation
+	facing_marker.rotation = _visual_body_rotation + PI
+	attack_flash.rotation = facing_marker.rotation
 
-	body_shadow.scale = Vector2(1.0 - 0.12 * movement_ratio, 1.0 + 0.08 * movement_ratio)
-	body_shadow.modulate = Color(1.0, 1.0, 1.0, 0.18 + 0.06 * movement_ratio)
+	body_shadow.scale = Vector2(1.0 - 0.09 * _visual_movement_ratio, 1.0 + 0.06 * _visual_movement_ratio)
+	body_shadow.modulate = Color(1.0, 1.0, 1.0, 0.18 + 0.05 * _visual_movement_ratio)
 
 	if elite_aura.visible:
-		var aura_pulse := 1.0 + 0.06 * sin(_visual_time * 3.8)
+		var aura_pulse := 1.0 + 0.05 * sin(_visual_time * 3.2)
 		elite_aura.scale = Vector2.ONE * aura_pulse
 
 	_update_state_indicator()
@@ -1373,18 +1391,18 @@ func _update_state_indicator() -> void:
 		return
 	if _attack_prep_armed:
 		state_indicator.visible = true
-		state_indicator.color = Color(1.0, 0.9, 0.72, 0.92)
-		state_indicator.scale = Vector2.ONE * (1.0 + 0.1 * sin(_visual_time * 7.0))
+		state_indicator.color = Color(1.0, 0.9, 0.72, 0.96)
+		state_indicator.scale = Vector2.ONE * (1.02 + 0.12 * sin(_visual_time * 8.0))
 		return
 	if _is_alerted_to_player or _is_chasing_player:
 		state_indicator.visible = true
-		state_indicator.color = Color(1.0, 0.52, 0.42, 0.82)
-		state_indicator.scale = Vector2.ONE * (0.96 + 0.08 * sin(_visual_time * 5.0))
+		state_indicator.color = Color(1.0, 0.52, 0.42, 0.86)
+		state_indicator.scale = Vector2.ONE * (0.98 + 0.09 * sin(_visual_time * 5.4))
 		return
-	if _has_active_noise_investigation():
+	if _has_active_noise_investigation() or _threat_indicator_grace_remaining > 0.0:
 		state_indicator.visible = true
-		state_indicator.color = Color(0.58, 0.84, 1.0, 0.72)
-		state_indicator.scale = Vector2.ONE * (0.9 + 0.06 * sin(_visual_time * 4.2))
+		state_indicator.color = Color(0.58, 0.84, 1.0, 0.72 if _has_active_noise_investigation() else 0.42)
+		state_indicator.scale = Vector2.ONE * (0.92 + 0.05 * sin(_visual_time * 4.2))
 		return
 	state_indicator.visible = false
 

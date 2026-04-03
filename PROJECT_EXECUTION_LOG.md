@@ -1872,3 +1872,16 @@ Validation:
 - `zombie_chase_drop_probe_far_alerted=false`
 - `combat_audio_probe_enemy_tell=enemy_attack_tell`
 - `combat_audio_probe_enemy_hit=enemy_attack_hit`
+
+## 2026-04-03 Enemy Polish Follow-up
+- Smoothed enemy presentation further by reducing bob/stretch jitter, blending enemy turning visually instead of snap-rotating, and softening shadow/aura pulse response so roaming motion reads cleaner.
+- Kept alert readability higher by letting noise/alert indicators linger briefly after real alert events and incoming hits, while explicitly removing the accidental indicator trigger from ordinary roaming-facing updates.
+- Simplified enemy health-bar visibility by removing the redundant recent-hit grace path and keeping the bar visible through actual damaged/alerted states only.
+
+Validation:
+- `actor_visual_probe_enemy_noise_indicator=true`
+- `actor_visual_probe_enemy_health_bar=true`
+- `zombie_chase_drop_probe_on_screen_engaged=true`
+- `zombie_chase_drop_probe_far_engaged=false`
+- `combat_audio_probe_enemy_hit=enemy_attack_hit`
+- `barricade_attack_probe_enemy_target=barricade`
