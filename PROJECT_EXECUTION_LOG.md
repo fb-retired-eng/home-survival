@@ -1697,3 +1697,51 @@ Validation:
 - `barricade_probe_prompt=Build: E place | Q prev | Tab next | R rotate | C recycle`
 - `build_selector_probe_rotation=1`
 - `construction_grid_probe_active_stage_build_mode=true`
+
+## 2026-04-02 Map Landmark Pass
+- Added authored district landmark shells and route-island shapes across the enlarged world so the outer map reads as distinct regions instead of a mostly empty field.
+- Kept the new landmark layer visual-only, preserving collisions, wave spawns, and the local home construction band while improving spatial identity.
+
+Validation:
+- `map_layout_probe_landmark_nw=true`
+- `map_layout_probe_landmark_se=true`
+- `map_layout_probe_route_islands=true`
+- `construction_grid_probe_active=true`
+
+## 2026-04-02 Micro-Loot Pass
+- Added ten authored micro-loot spawn markers along district routes and landmark edges, using the existing `ResourcePickup` flow instead of hard-placed pickup instances.
+- Tracked collected micro-loot in run save data so these travel rewards stay depleted after collection and restore cleanly on load.
+
+Validation:
+- `micro_loot_probe_initial_count=10`
+- `micro_loot_probe_after_count=9`
+- `micro_loot_probe_salvage_before=72`
+- `micro_loot_probe_salvage_after=74`
+- `micro_loot_probe_collected_saved=true`
+
+## 2026-04-02 Ambient Threat Pass
+- Expanded roaming exploration pressure from six outer anchors to twelve authored roaming zones, adding landmark-adjacent ambient threat around the yard, checkpoint, truck-stop, garden, clinic, and scrapyard districts.
+- Increased the roaming spawn budget by one across the run so the enlarged map carries light ambient pressure without turning travel into constant combat.
+
+Validation:
+- `roaming_zone_probe_count=12`
+- `roaming_zone_probe_has_landmark_zones=true`
+- `roaming_spawn_probe_initial_roaming=3`
+- `roaming_spawn_probe_mid_roaming=5`
+- `roaming_spawn_probe_late_roaming=6`
+
+## 2026-04-02 Combat Audio Pass
+- Added a reusable `CombatAudio2D` node backed by a generated `CombatSfxLibrary`, so the game now has scene-owned positional combat SFX without requiring external audio assets first.
+- Wired player attack, reload, and hurt events; zombie hurt, attack tell, and attack impact; and structure/trap hit events through the shared combat-audio component.
+- Routed combat audio through a dedicated runtime-created `SFX` bus instead of `Master`, moved trap trigger playback behind the successful-hit gate, split player attack sounds by weapon id, and added hit-vs-miss impact layering.
+
+Validation:
+- `combat_audio_probe_player_miss_history=knife_swing,attack_miss`
+- `combat_audio_probe_player_hit_history=knife_swing,attack_miss,pistol_shot,attack_hit_enemy`
+- `combat_audio_probe_reload_start=player_reload_start`
+- `combat_audio_probe_reload_done=player_reload_done`
+- `combat_audio_probe_player_hurt=player_hurt`
+- `combat_audio_probe_zombie_hurt=zombie_hurt`
+- `combat_audio_probe_zombie_tell=zombie_attack_tell`
+- `combat_audio_probe_zombie_hit=zombie_attack_hit`
+- `combat_audio_probe_structure_hit=structure_hit`

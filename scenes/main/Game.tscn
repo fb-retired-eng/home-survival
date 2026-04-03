@@ -33,6 +33,8 @@
 [ext_resource type="Resource" path="res://data/placeables/spike_trap.tres" id="32_spike_trap_profile"]
 [ext_resource type="Script" path="res://scripts/main/construction_controller.gd" id="33_construction_controller"]
 [ext_resource type="Script" path="res://scripts/main/fog_controller.gd" id="34_fog_controller"]
+[ext_resource type="PackedScene" path="res://scenes/world/ResourcePickup.tscn" id="35_resource_pickup_scene"]
+[ext_resource type="Script" path="res://scripts/world/micro_loot_spawn.gd" id="36_micro_loot_spawn"]
 
 [sub_resource type="RectangleShape2D" id="1_horizontal_wall"]
 size = Vector2(5120, 32)
@@ -47,6 +49,7 @@ exploration_enemy_scene = ExtResource("12_zombie_scene")
 perimeter_definition = ExtResource("13_perimeter")
 default_daily_elite_enemy = ExtResource("27_elite_spitter_enemy")
 construction_placeable_scene = ExtResource("30_placeable_scene")
+resource_pickup_scene = ExtResource("35_resource_pickup_scene")
 barricade_placeable_profile = ExtResource("31_barricade_profile")
 buildable_placeable_profiles = Array[Resource]([ExtResource("31_barricade_profile"), ExtResource("32_spike_trap_profile")])
 enable_test_mode = true
@@ -104,6 +107,80 @@ reserved_cells = PackedVector2Array(1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 1,
 
 [node name="ConstructionPlaceables" type="Node2D" parent="World" unique_id=1923428710]
 
+[node name="AmbientPickups" type="Node2D" parent="World" unique_id=1502165081]
+
+[node name="MicroLootSpawns" type="Node2D" parent="World" unique_id=49357384]
+
+[node name="NW_RouteSalvage" type="Marker2D" parent="World/MicroLootSpawns" unique_id=834639831]
+position = Vector2(744, 646)
+script = ExtResource("36_micro_loot_spawn")
+spawn_id = &"micro_nw_route_salvage"
+resource_id = "salvage"
+amount = 2
+
+[node name="NW_YardParts" type="Marker2D" parent="World/MicroLootSpawns" unique_id=982460649]
+position = Vector2(548, 286)
+script = ExtResource("36_micro_loot_spawn")
+spawn_id = &"micro_nw_yard_parts"
+resource_id = "parts"
+amount = 1
+
+[node name="NE_RouteAmmo" type="Marker2D" parent="World/MicroLootSpawns" unique_id=1968142725]
+position = Vector2(1806, 648)
+script = ExtResource("36_micro_loot_spawn")
+spawn_id = &"micro_ne_route_bullets"
+resource_id = "bullets"
+amount = 2
+
+[node name="NE_DepotSalvage" type="Marker2D" parent="World/MicroLootSpawns" unique_id=802153987]
+position = Vector2(2048, 486)
+script = ExtResource("36_micro_loot_spawn")
+spawn_id = &"micro_ne_depot_salvage"
+resource_id = "salvage"
+amount = 2
+
+[node name="NorthCenterFood" type="Marker2D" parent="World/MicroLootSpawns" unique_id=2116939616]
+position = Vector2(1280, 326)
+script = ExtResource("36_micro_loot_spawn")
+spawn_id = &"micro_n_center_food"
+resource_id = "food"
+amount = 1
+
+[node name="SW_RouteSalvage" type="Marker2D" parent="World/MicroLootSpawns" unique_id=1666726640]
+position = Vector2(770, 932)
+script = ExtResource("36_micro_loot_spawn")
+spawn_id = &"micro_sw_route_salvage"
+resource_id = "salvage"
+amount = 2
+
+[node name="SW_GardenFood" type="Marker2D" parent="World/MicroLootSpawns" unique_id=1675717506]
+position = Vector2(600, 1292)
+script = ExtResource("36_micro_loot_spawn")
+spawn_id = &"micro_sw_garden_food"
+resource_id = "food"
+amount = 1
+
+[node name="SE_RouteBullets" type="Marker2D" parent="World/MicroLootSpawns" unique_id=1368735390]
+position = Vector2(1792, 948)
+script = ExtResource("36_micro_loot_spawn")
+spawn_id = &"micro_se_route_bullets"
+resource_id = "bullets"
+amount = 2
+
+[node name="SE_ClinicMedicine" type="Marker2D" parent="World/MicroLootSpawns" unique_id=1738068363]
+position = Vector2(2014, 1294)
+script = ExtResource("36_micro_loot_spawn")
+spawn_id = &"micro_se_clinic_medicine"
+resource_id = "medicine"
+amount = 1
+
+[node name="SouthCenterParts" type="Marker2D" parent="World/MicroLootSpawns" unique_id=1164826170]
+position = Vector2(1288, 1058)
+script = ExtResource("36_micro_loot_spawn")
+spawn_id = &"micro_s_center_parts"
+resource_id = "parts"
+amount = 1
+
 [node name="NorthLane" type="Polygon2D" parent="World" unique_id=348883657]
 color = Color(0.46, 0.19, 0.16, 0.5)
 polygon = PackedVector2Array(1180, 0, 1380, 0, 1380, 420, 1180, 420)
@@ -115,6 +192,162 @@ polygon = PackedVector2Array(2140, 500, 2560, 500, 2560, 940, 2140, 940)
 [node name="WestLane" type="Polygon2D" parent="World" unique_id=894463935]
 color = Color(0.46, 0.19, 0.16, 0.5)
 polygon = PackedVector2Array(0, 500, 420, 500, 420, 940, 0, 940)
+
+[node name="MainRoadVertical" type="Polygon2D" parent="World" unique_id=146623778]
+color = Color(0.31, 0.36, 0.33, 0.4)
+polygon = PackedVector2Array(1226, -120, 1334, -120, 1334, 1630, 1226, 1630)
+
+[node name="MainRoadHorizontal" type="Polygon2D" parent="World" unique_id=1308439009]
+color = Color(0.31, 0.36, 0.33, 0.4)
+polygon = PackedVector2Array(-40, 668, 2600, 668, 2600, 772, -40, 772)
+
+[node name="DistrictNorthWest" type="Polygon2D" parent="World" unique_id=819241337]
+color = Color(0.22, 0.27, 0.23, 0.42)
+polygon = PackedVector2Array(20, 40, 610, 40, 610, 520, 20, 520)
+
+[node name="DistrictNorthEast" type="Polygon2D" parent="World" unique_id=1206533108]
+color = Color(0.22, 0.25, 0.29, 0.42)
+polygon = PackedVector2Array(1940, 40, 2540, 40, 2540, 520, 1940, 520)
+
+[node name="DistrictSouthWest" type="Polygon2D" parent="World" unique_id=752108239]
+color = Color(0.21, 0.26, 0.21, 0.42)
+polygon = PackedVector2Array(20, 980, 610, 980, 610, 1560, 20, 1560)
+
+[node name="DistrictSouthEast" type="Polygon2D" parent="World" unique_id=1701918768]
+color = Color(0.24, 0.23, 0.27, 0.42)
+polygon = PackedVector2Array(1940, 980, 2540, 980, 2540, 1560, 1940, 1560)
+
+[node name="DistrictNorthCenter" type="Polygon2D" parent="World" unique_id=1435065012]
+color = Color(0.26, 0.23, 0.2, 0.42)
+polygon = PackedVector2Array(1030, -40, 1530, -40, 1530, 370, 1030, 370)
+
+[node name="DistrictSouthCenter" type="Polygon2D" parent="World" unique_id=190446365]
+color = Color(0.25, 0.21, 0.2, 0.42)
+polygon = PackedVector2Array(1030, 1060, 1530, 1060, 1530, 1620, 1030, 1620)
+
+[node name="ConnectorNorthWest" type="Polygon2D" parent="World" unique_id=163659952]
+color = Color(0.58, 0.63, 0.58, 0.26)
+polygon = PackedVector2Array(520, 322, 622, 236, 1120, 636, 1028, 726)
+
+[node name="ConnectorNorthEast" type="Polygon2D" parent="World" unique_id=1056146228]
+color = Color(0.58, 0.63, 0.58, 0.26)
+polygon = PackedVector2Array(1938, 228, 2048, 314, 1534, 724, 1448, 636)
+
+[node name="ConnectorSouthWest" type="Polygon2D" parent="World" unique_id=1109460864]
+color = Color(0.58, 0.63, 0.58, 0.26)
+polygon = PackedVector2Array(1040, 718, 1128, 808, 630, 1218, 526, 1130)
+
+[node name="ConnectorSouthEast" type="Polygon2D" parent="World" unique_id=101996482]
+color = Color(0.58, 0.63, 0.58, 0.26)
+polygon = PackedVector2Array(1434, 806, 1538, 714, 2042, 1122, 1946, 1218)
+
+[node name="ConnectorNorthCenter" type="Polygon2D" parent="World" unique_id=936639821]
+color = Color(0.58, 0.63, 0.58, 0.26)
+polygon = PackedVector2Array(1234, 350, 1338, 350, 1338, 580, 1234, 580)
+
+[node name="ConnectorSouthCenter" type="Polygon2D" parent="World" unique_id=794036733]
+color = Color(0.58, 0.63, 0.58, 0.26)
+polygon = PackedVector2Array(1234, 856, 1338, 856, 1338, 1110, 1234, 1110)
+
+[node name="NorthYardAccent" type="Polygon2D" parent="World" unique_id=108428369]
+color = Color(0.68, 0.74, 0.6, 0.12)
+polygon = PackedVector2Array(110, 120, 500, 120, 500, 420, 110, 420)
+
+[node name="DepotAccent" type="Polygon2D" parent="World" unique_id=1878129681]
+color = Color(0.62, 0.68, 0.76, 0.12)
+polygon = PackedVector2Array(2060, 120, 2450, 120, 2450, 420, 2060, 420)
+
+[node name="GardenAccent" type="Polygon2D" parent="World" unique_id=1861820030]
+color = Color(0.62, 0.72, 0.58, 0.12)
+polygon = PackedVector2Array(110, 1070, 520, 1070, 520, 1460, 110, 1460)
+
+[node name="ClinicAccent" type="Polygon2D" parent="World" unique_id=200875198]
+color = Color(0.74, 0.62, 0.66, 0.12)
+polygon = PackedVector2Array(2050, 1060, 2460, 1060, 2460, 1460, 2050, 1460)
+
+[node name="NorthWestShedA" type="Polygon2D" parent="World" unique_id=199006381]
+color = Color(0.44, 0.34, 0.26, 0.78)
+polygon = PackedVector2Array(96, 128, 232, 128, 232, 236, 96, 236)
+
+[node name="NorthWestShedB" type="Polygon2D" parent="World" unique_id=1225779867]
+color = Color(0.38, 0.31, 0.24, 0.74)
+polygon = PackedVector2Array(302, 260, 468, 260, 468, 378, 302, 378)
+
+[node name="NorthWestFenceBreak" type="Polygon2D" parent="World" unique_id=442363275]
+color = Color(0.72, 0.7, 0.58, 0.2)
+polygon = PackedVector2Array(480, 156, 536, 156, 536, 430, 480, 430)
+
+[node name="NorthEastDepotA" type="Polygon2D" parent="World" unique_id=697792171]
+color = Color(0.33, 0.37, 0.42, 0.82)
+polygon = PackedVector2Array(2058, 124, 2260, 124, 2260, 258, 2058, 258)
+
+[node name="NorthEastDepotB" type="Polygon2D" parent="World" unique_id=2075593524]
+color = Color(0.29, 0.34, 0.4, 0.8)
+polygon = PackedVector2Array(2288, 274, 2478, 274, 2478, 414, 2288, 414)
+
+[node name="NorthEastCheckpoint" type="Polygon2D" parent="World" unique_id=1975764984]
+color = Color(0.76, 0.7, 0.54, 0.18)
+polygon = PackedVector2Array(1950, 330, 2046, 330, 2046, 470, 1950, 470)
+
+[node name="NorthCenterTruckStop" type="Polygon2D" parent="World" unique_id=1538523492]
+color = Color(0.47, 0.34, 0.24, 0.8)
+polygon = PackedVector2Array(1118, 34, 1440, 34, 1440, 150, 1118, 150)
+
+[node name="NorthCenterCanopy" type="Polygon2D" parent="World" unique_id=1497061212]
+color = Color(0.72, 0.68, 0.54, 0.18)
+polygon = PackedVector2Array(1048, 196, 1510, 196, 1510, 270, 1048, 270)
+
+[node name="SouthWestGreenhouseA" type="Polygon2D" parent="World" unique_id=788083087]
+color = Color(0.28, 0.42, 0.31, 0.72)
+polygon = PackedVector2Array(98, 1096, 258, 1096, 258, 1252, 98, 1252)
+
+[node name="SouthWestGreenhouseB" type="Polygon2D" parent="World" unique_id=1517321706]
+color = Color(0.24, 0.37, 0.28, 0.7)
+polygon = PackedVector2Array(324, 1260, 522, 1260, 522, 1436, 324, 1436)
+
+[node name="SouthWestPlanterStrip" type="Polygon2D" parent="World" unique_id=412093669]
+color = Color(0.66, 0.78, 0.54, 0.14)
+polygon = PackedVector2Array(150, 1464, 498, 1464, 498, 1518, 150, 1518)
+
+[node name="SouthEastClinicA" type="Polygon2D" parent="World" unique_id=1299846387]
+color = Color(0.42, 0.31, 0.35, 0.8)
+polygon = PackedVector2Array(2052, 1076, 2234, 1076, 2234, 1248, 2052, 1248)
+
+[node name="SouthEastClinicB" type="Polygon2D" parent="World" unique_id=2094878686]
+color = Color(0.36, 0.28, 0.34, 0.78)
+polygon = PackedVector2Array(2278, 1258, 2472, 1258, 2472, 1450, 2278, 1450)
+
+[node name="SouthEastHousingShell" type="Polygon2D" parent="World" unique_id=984299925]
+color = Color(0.76, 0.66, 0.72, 0.14)
+polygon = PackedVector2Array(1974, 1366, 2100, 1366, 2100, 1516, 1974, 1516)
+
+[node name="SouthCenterScrapyardA" type="Polygon2D" parent="World" unique_id=1625476970]
+color = Color(0.36, 0.27, 0.22, 0.82)
+polygon = PackedVector2Array(1080, 1166, 1272, 1166, 1272, 1382, 1080, 1382)
+
+[node name="SouthCenterScrapyardB" type="Polygon2D" parent="World" unique_id=1254495007]
+color = Color(0.4, 0.3, 0.24, 0.78)
+polygon = PackedVector2Array(1310, 1264, 1502, 1264, 1502, 1494, 1310, 1494)
+
+[node name="SouthCenterCrateYard" type="Polygon2D" parent="World" unique_id=495991227]
+color = Color(0.72, 0.62, 0.46, 0.14)
+polygon = PackedVector2Array(1150, 1078, 1462, 1078, 1462, 1138, 1150, 1138)
+
+[node name="RouteIslandWest" type="Polygon2D" parent="World" unique_id=187592003]
+color = Color(0.24, 0.29, 0.26, 0.46)
+polygon = PackedVector2Array(738, 590, 906, 590, 906, 846, 738, 846)
+
+[node name="RouteIslandEast" type="Polygon2D" parent="World" unique_id=1810828890]
+color = Color(0.24, 0.29, 0.26, 0.46)
+polygon = PackedVector2Array(1654, 590, 1822, 590, 1822, 846, 1654, 846)
+
+[node name="RouteIslandNorth" type="Polygon2D" parent="World" unique_id=966496921]
+color = Color(0.24, 0.29, 0.26, 0.46)
+polygon = PackedVector2Array(1144, 414, 1416, 414, 1416, 534, 1144, 534)
+
+[node name="RouteIslandSouth" type="Polygon2D" parent="World" unique_id=1074480534]
+color = Color(0.24, 0.29, 0.26, 0.46)
+polygon = PackedVector2Array(1144, 898, 1416, 898, 1416, 1022, 1144, 1022)
 
 [node name="POI_A" type="Node2D" parent="World" unique_id=1508732079]
 position = Vector2(205, 220)
@@ -494,38 +727,85 @@ enemy_definition = ExtResource("27_elite_spitter_enemy")
 position = Vector2(580, 95)
 script = ExtResource("25_roaming_zone")
 zone_id = &"roam_nw"
+scatter_radius = 136.0
+spawn_weight = 0.7
+
+[node name="NorthWestYard" type="Marker2D" parent="World/RoamingSpawnZones" unique_id=474500111]
+position = Vector2(404, 318)
+script = ExtResource("25_roaming_zone")
+zone_id = &"roam_nw_yard"
+scatter_radius = 104.0
+spawn_weight = 0.55
 
 [node name="NorthEastOuter" type="Marker2D" parent="World/RoamingSpawnZones" unique_id=1074507864]
 position = Vector2(1980, 95)
 script = ExtResource("25_roaming_zone")
 zone_id = &"roam_ne"
-spawn_weight = 0.9
+scatter_radius = 136.0
+spawn_weight = 0.7
+
+[node name="NorthEastCheckpoint" type="Marker2D" parent="World/RoamingSpawnZones" unique_id=1588369928]
+position = Vector2(2162, 344)
+script = ExtResource("25_roaming_zone")
+zone_id = &"roam_ne_checkpoint"
+scatter_radius = 112.0
+spawn_weight = 0.6
 
 [node name="NorthMidOuter" type="Marker2D" parent="World/RoamingSpawnZones" unique_id=368854500]
 position = Vector2(1280, 168)
 script = ExtResource("25_roaming_zone")
 zone_id = &"roam_n"
 scatter_radius = 148.0
-spawn_weight = 1.35
+spawn_weight = 1.1
+
+[node name="NorthTruckStop" type="Marker2D" parent="World/RoamingSpawnZones" unique_id=213463001]
+position = Vector2(1276, 402)
+script = ExtResource("25_roaming_zone")
+zone_id = &"roam_n_truck"
+scatter_radius = 118.0
+spawn_weight = 0.75
 
 [node name="SouthWestOuter" type="Marker2D" parent="World/RoamingSpawnZones" unique_id=1793730484]
 position = Vector2(580, 1345)
 script = ExtResource("25_roaming_zone")
 zone_id = &"roam_sw"
-spawn_weight = 0.9
+scatter_radius = 136.0
+spawn_weight = 0.7
+
+[node name="SouthWestGarden" type="Marker2D" parent="World/RoamingSpawnZones" unique_id=715680177]
+position = Vector2(424, 1088)
+script = ExtResource("25_roaming_zone")
+zone_id = &"roam_sw_garden"
+scatter_radius = 112.0
+spawn_weight = 0.6
 
 [node name="SouthEastOuter" type="Marker2D" parent="World/RoamingSpawnZones" unique_id=1545835077]
 position = Vector2(1980, 1345)
 script = ExtResource("25_roaming_zone")
 zone_id = &"roam_se"
-spawn_weight = 0.9
+scatter_radius = 136.0
+spawn_weight = 0.7
+
+[node name="SouthEastClinic" type="Marker2D" parent="World/RoamingSpawnZones" unique_id=1754160024]
+position = Vector2(2144, 1094)
+script = ExtResource("25_roaming_zone")
+zone_id = &"roam_se_clinic"
+scatter_radius = 112.0
+spawn_weight = 0.6
 
 [node name="SouthMidOuter" type="Marker2D" parent="World/RoamingSpawnZones" unique_id=978747866]
 position = Vector2(1280, 1273)
 script = ExtResource("25_roaming_zone")
 zone_id = &"roam_s"
 scatter_radius = 148.0
-spawn_weight = 1.35
+spawn_weight = 1.1
+
+[node name="SouthScrapyard" type="Marker2D" parent="World/RoamingSpawnZones" unique_id=1538528861]
+position = Vector2(1284, 1038)
+script = ExtResource("25_roaming_zone")
+zone_id = &"roam_s_scrapyard"
+scatter_radius = 120.0
+spawn_weight = 0.75
 
 [node name="ExplorationEnemies" type="Node2D" parent="World" unique_id=1108712987]
 

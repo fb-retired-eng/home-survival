@@ -23,6 +23,7 @@ signal state_changed(socket: DefenseSocket)
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
 @onready var interaction_area: Area2D = $InteractionArea
 @onready var interaction_shape: CollisionShape2D = $InteractionArea/CollisionShape2D
+@onready var combat_audio = $CombatAudio
 
 var _initial_tier: String = "damaged"
 var _initial_hp: int = 90
@@ -108,6 +109,8 @@ func interact(player) -> void:
 			player.message_requested.emit("Not enough resources")
 			return
 		current_hp = _get_max_hp_for_tier(tier)
+		if player != null and player.has_method("play_feedback_sound"):
+			player.play_feedback_sound(&"build_repair", randf_range(0.98, 1.04), -3.0)
 		player.message_requested.emit("Base repaired")
 	elif action == "strengthen":
 		var strengthen_cost := _get_strengthen_cost()
@@ -117,6 +120,8 @@ func interact(player) -> void:
 		tier = "reinforced"
 		max_hp = _get_max_hp_for_tier(tier)
 		current_hp = max_hp
+		if player != null and player.has_method("play_feedback_sound"):
+			player.play_feedback_sound(&"build_upgrade", randf_range(0.98, 1.03), -2.5)
 		player.message_requested.emit("Base strengthened")
 	elif action == "fortify":
 		var fortify_cost := _get_fortify_cost()
@@ -126,6 +131,8 @@ func interact(player) -> void:
 		tier = "fortified"
 		max_hp = _get_max_hp_for_tier(tier)
 		current_hp = max_hp
+		if player != null and player.has_method("play_feedback_sound"):
+			player.play_feedback_sound(&"build_upgrade", randf_range(0.94, 0.99), -2.0)
 		player.message_requested.emit("Base fortified")
 
 	_refresh_visuals()
@@ -142,6 +149,7 @@ func take_damage(amount: int, _source: Variant = null) -> void:
 	current_hp = max(current_hp - damage_amount, 0)
 	_refresh_visuals()
 	_flash_damage_feedback()
+	_play_combat_sound(&"structure_hit", randf_range(0.95, 1.02), -3.5)
 
 
 func is_breached() -> bool:
@@ -368,3 +376,8 @@ func _flash_damage_feedback() -> void:
 	_damage_feedback_tween = create_tween()
 	_damage_feedback_tween.parallel().tween_property(visual, "color", settled_color, 0.16)
 	_damage_feedback_tween.parallel().tween_property(visual, "scale", Vector2.ONE, 0.16)
+
+
+func _play_combat_sound(sound_id: StringName, pitch_scale: float = 1.0, volume_db: float = 0.0) -> void:
+	if combat_audio != null and is_instance_valid(combat_audio) and combat_audio.has_method("play_sound"):
+		combat_audio.play_sound(sound_id, pitch_scale, volume_db)

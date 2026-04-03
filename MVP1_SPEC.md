@@ -59,24 +59,25 @@ The Dog acts as a tactical extension of the player’s stamina and route plannin
   - Dog actions should feel useful, but not replace the player.
 
 ### 2.3 Grid-Based Construction (System: `PlacementManager`)
-Construction now supports tactical placement on a grid, separate from fixed wall/door sockets.
+Construction already supports tactical placement on a grid, separate from fixed wall/door sockets. MVP1 extends that existing layer instead of introducing it.
 
 - **Rules**:
-  - Available only in `PRE_WAVE` via the `B` key.
+  - Uses the existing `B` build mode and grid placement flow from MVP0/MVP0.5.
   - **Energy Cost**: `0` (Building is a mental/strategic act, not a physical drain).
   - **Resource Cost**: Consumes `Salvage` and `Parts`.
 - **New Placeables**:
-  - **Barricades**: Low-HP wooden blocks used to create funnels (Mazing).
-  - **Spike Traps**: One-time use items that damage/slow zombies.
+  - **Barricades**: Existing low-HP wooden blockers used to create funnels (Mazing).
+  - **Spike Traps**: Existing floor traps that damage/slow zombies.
+  - **Powered Placeables**: New MVP1 additions such as turrets and floodlights that plug into the power system.
 - **Scope**: MVP1 extends the existing construction layer; it does not add player-built walls or freeform structural editing.
 
 ### 2.4 Map Fog
-To keep the larger map readable without exposing everything at once, the world should fade into fog once the player moves a meaningful distance away from the home, while preserving memory of places the player has already explored.
+The larger map already uses home-anchored fog-of-war. MVP1 keeps that system and tunes it as the world becomes denser and more strategically layered.
 
 - **Home Anchor**: Fog is centered on the home/base area, not on the player.
 - **Readability Rule**: The local home band should remain clear, while the far map becomes progressively obscured.
 - **Exploration Memory**: Areas the player has already visited remain revealed for the rest of the run.
-- **Scope**: This is a presentation layer for exploration and pacing, not a stealth or visibility simulation.
+- **Scope**: This remains a presentation layer for exploration and pacing, not a stealth or visibility simulation.
 
 ## 3. Updated Core Loop
 The loop remains consistent with MVP0 but adds a "Strategic Allocation" layer during the evening.
@@ -111,15 +112,15 @@ Add these IDs to the stable resource list:
 
 ### 5.2 Updated Script Boundaries
 - **`PowerManager`**: New manager responsible for power radius overlap, slot math, and activation state.
-- **`PlacementManager`**: New manager responsible for `B` build mode, grid snapping, placement validity, and ghost previews.
+- **`ConstructionController`**: Extends the current construction controller for powered placeables, placement validity, and ghost previews. If a later rename to `PlacementManager` happens, it should be a code-alignment pass rather than a design change.
 - **`DogAI`**: New companion state machine for follow/scavenge/lure behavior. It should share pathing helpers with other actors, but it is not a zombie variant.
 
 ## 6. Implementation Order
 1. **Dog v1.0**: Implement the `Follow` and `Scavenge` state machine using existing POI data.
-2. **The Grid**: Extend the existing tactical grid for `0`-energy barricade building and spike traps.
+2. **Powered Construction**: Extend the existing tactical grid and construction controller for powered placeables such as turrets and floodlights.
 3. **Power v1.0**: Create the `PowerManager` and the visual radius effect for turrets and floodlights.
 4. **Heirloom Logic**: Implement the persistence layer to detect, save, and restore "Golden Debris" positions between runs.
-5. **Map Fog**: Add a home-anchored fog overlay that keeps the immediate base area readable, fades distant map regions, and preserves visited-area memory.
+5. **Fog Tuning**: Tune the existing home-anchored fog and exploration memory against the denser MVP1 map.
 
 ## 7. Out of Scope for MVP1
 - Player-built walls or freeform base architecture

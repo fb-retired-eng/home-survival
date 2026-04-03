@@ -17,4 +17,12 @@ func _init() -> void:
 
 	print("roaming_zone_probe_count=%d" % zone_ids.size())
 	print("roaming_zone_probe_ids=%s" % ",".join(zone_ids))
+	print("roaming_zone_probe_has_landmark_zones=%s" % str(
+		zone_ids.has("roam_nw_yard")
+		and zone_ids.has("roam_ne_checkpoint")
+		and zone_ids.has("roam_n_truck")
+		and zone_ids.has("roam_sw_garden")
+		and zone_ids.has("roam_se_clinic")
+		and zone_ids.has("roam_s_scrapyard")
+	))
 	quit()

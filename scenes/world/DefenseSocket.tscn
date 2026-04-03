@@ -1,7 +1,8 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/defense_socket.gd" id="1_socket"]
 [ext_resource type="Script" path="res://scripts/world/socket_interaction_proxy.gd" id="2_proxy"]
+[ext_resource type="Script" path="res://scripts/audio/combat_audio_2d.gd" id="3_combat_audio"]
 
 [sub_resource type="RectangleShape2D" id="1_socket_shape"]
 size = Vector2(48, 16)
@@ -31,3 +32,9 @@ offset_top = 12.0
 offset_right = 46.0
 offset_bottom = 32.0
 text = "socket"
+
+[node name="CombatAudio" type="Node2D" parent="."]
+script = ExtResource("3_combat_audio")
+voice_count = 2
+max_distance = 1000.0
+attenuation = 1.6

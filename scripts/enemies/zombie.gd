@@ -64,6 +64,7 @@ var _base_elite_aura_color: Color
 @onready var damage_area: Area2D = $DamageArea
 @onready var body_touch_area: Area2D = $BodyTouchArea
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
+@onready var combat_audio = $CombatAudio
 
 
 func _ready() -> void:
@@ -274,6 +275,7 @@ func take_damage(amount: int, _source: Variant = null) -> void:
 	_refresh_health_bar()
 	_flash_body(Color(1.0, 0.55, 0.55, 1.0))
 	_play_damage_feedback(_source)
+	_play_combat_sound(&"zombie_hurt", randf_range(0.94, 1.06), -2.0)
 
 	if current_health == 0:
 		_spawn_death_drop()
@@ -443,6 +445,7 @@ func _try_damage_target(target) -> bool:
 			"knockback_direction": _facing_direction,
 		})
 	_play_attack_flash()
+	_play_combat_sound(&"zombie_attack_hit", randf_range(0.96, 1.05), -1.5)
 	return true
 
 
@@ -773,6 +776,7 @@ func _process_attack_prep(attack_target) -> bool:
 		_attack_prep_armed = true
 		_attack_prep_target_id = target_id
 		_attack_prep_remaining = _get_attack_prep_time()
+		_play_combat_sound(&"zombie_attack_tell", randf_range(0.94, 1.03), -5.0)
 
 	_attack_prep_lost_target_grace_remaining = 0.08
 	return _attack_prep_remaining > 0.0
@@ -1367,3 +1371,8 @@ func _play_attack_flash() -> void:
 			_get_attack_tell_start_alpha()
 		)
 	)
+
+
+func _play_combat_sound(sound_id: StringName, pitch_scale: float = 1.0, volume_db: float = 0.0) -> void:
+	if combat_audio != null and is_instance_valid(combat_audio) and combat_audio.has_method("play_sound"):
+		combat_audio.play_sound(sound_id, pitch_scale, volume_db)

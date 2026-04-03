@@ -30,6 +30,8 @@ The repo currently includes:
 - construction-system foundation for a larger authored map with a local buildable band around the home, build-mode placement, tactical cell reservations, selectable multi-cell buildables, and the first barricade placeable with repair/recycle support; this is now an active tactical layer, not just scaffolding
 - home-anchored fog-of-war that starts beyond the local home area and keeps areas the player has already visited revealed, so the enlarged map has clearer nearby readability and persistent exploration memory
 - MVP0.5 boot shell with authored menu and pause scenes, continue/load slots, persistent settings, pause-menu save/quit, and versioned run saves that restore construction and fog memory; manual saves are blocked during active waves, loading a slot no longer rewrites it on entry, and fullscreen now applies through Godot's window mode API
+- enriched outer-map structure with authored district landmarks, route islands, micro-loot between POIs, and a broader ambient roaming-threat layer so the enlarged map has actual travel value instead of empty margins
+- generated positional combat and interaction SFX, including weapon-specific attack sounds, hit-vs-miss feedback, zombie attack tell/impact, structure hits, trap triggers, pickup sounds, and construction feedback routed through a dedicated `SFX` bus
 - placeholder world scenes for sockets, scavenging nodes, bed/table interactions, pickups, and zombie enemy
 - consolidated MVP0 design/spec documentation
 
@@ -101,5 +103,7 @@ godot --headless --path . --quit
 - tune elite weapon-drop odds and duplicate-conversion economy
 - decide whether elite variants need even stronger silhouette differentiation beyond the new aura/marker treatment
 - decide whether the next content step is enemy patrols, reserve-ammo scarcity, or the fifth weapon pickup
-- tune the selectable buildable catalog and add the next construction-placeable type after barricades
+- tune the selectable buildable catalog and add the next construction-placeable type after barricades and spike traps
+- tune the enlarged-map enrichment pass so landmark density, micro-loot, and ambient roaming pressure feel worthwhile without crowding prep-time scavenging
+- keep improving combat and interaction audio feel now that the basic SFX layer is in place
 - continue UI and readability polish from playtest feedback

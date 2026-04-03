@@ -1,7 +1,8 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
 [ext_resource type="Resource" path="res://data/weapons/kitchen_knife.tres" id="2_weapon"]
+[ext_resource type="Script" path="res://scripts/audio/combat_audio_2d.gd" id="3_combat_audio"]
 
 [sub_resource type="RectangleShape2D" id="1_body_shape"]
 size = Vector2(24, 24)
@@ -19,7 +20,7 @@ radius = 44.0
 script = ExtResource("1_player")
 position = Vector2(1280, 720)
 collision_layer = 1
-collision_mask = 10
+collision_mask = 11
 equipped_weapon = ExtResource("2_weapon")
 
 [node name="Body" type="Polygon2D" parent="."]
@@ -97,3 +98,9 @@ one_shot = true
 
 [node name="AttackWindupTimer" type="Timer" parent="."]
 one_shot = true
+
+[node name="CombatAudio" type="Node2D" parent="."]
+script = ExtResource("3_combat_audio")
+voice_count = 4
+max_distance = 1200.0
+attenuation = 1.4

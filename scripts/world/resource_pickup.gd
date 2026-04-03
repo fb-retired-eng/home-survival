@@ -1,6 +1,8 @@
 extends Area2D
 class_name ResourcePickup
 
+signal collected(pickup: ResourcePickup, player)
+
 @export_enum("salvage", "parts", "medicine", "bullets", "food") var resource_id: String = "salvage"
 @export var amount: int = 1
 @export var is_weapon_drop: bool = false
@@ -27,12 +29,18 @@ func collect(player) -> void:
 			else:
 				player.add_resource("salvage", 2, false)
 				player.add_resource("parts", 1, false)
+		if player.has_method("play_feedback_sound"):
+			player.play_feedback_sound(&"pickup_weapon", randf_range(0.98, 1.03), -3.0)
+		collected.emit(self, player)
 		queue_free()
 		return
 
 	if not player.add_resource(resource_id, amount):
 		return
 
+	if player.has_method("play_feedback_sound"):
+		player.play_feedback_sound(&"pickup_resource", randf_range(0.98, 1.05), -4.0)
+	collected.emit(self, player)
 	queue_free()
 
 

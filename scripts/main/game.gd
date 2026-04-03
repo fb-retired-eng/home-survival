@@ -5,8 +5,11 @@ const BASE_PERIMETER_DEFINITION_SCRIPT := preload("res://scripts/data/base_perim
 const PERIMETER_SEGMENT_DEFINITION_SCRIPT := preload("res://scripts/data/perimeter_segment_definition.gd")
 const STRUCTURE_PROFILE_SCRIPT := preload("res://scripts/data/structure_profile.gd")
 const EXPLORATION_SPAWN_POINT_SCRIPT := preload("res://scripts/world/exploration_spawn_point.gd")
+const MICRO_LOOT_SPAWN_SCRIPT := preload("res://scripts/world/micro_loot_spawn.gd")
 const ENEMY_DEFINITION_SCRIPT := preload("res://scripts/data/enemy_definition.gd")
 const ROAMING_SPAWN_ZONE_SCRIPT := preload("res://scripts/world/roaming_spawn_zone.gd")
+const MAP_WORLD_MIN := Vector2(-1280.0, -720.0)
+const MAP_WORLD_MAX := Vector2(3840.0, 2160.0)
 const POSITIVE_POI_MODIFIERS: Array[StringName] = [&"bountiful_food", &"extra_parts"]
 const NEGATIVE_POI_MODIFIERS: Array[StringName] = [&"disturbed", &"elite_present"]
 const ELITE_MODIFIER_POIS := {
@@ -22,6 +25,7 @@ signal return_to_menu_requested
 @export var perimeter_definition: Resource
 @export var default_daily_elite_enemy: Resource
 @export var construction_placeable_scene: PackedScene
+@export var resource_pickup_scene: PackedScene
 @export var barricade_placeable_profile: Resource
 @export var buildable_placeable_profiles: Array[Resource] = []
 @export var sleep_heal_amount: int = 25
@@ -52,6 +56,8 @@ signal return_to_menu_requested
 @onready var exploration_spawn_points_root: Node2D = $World/ExplorationSpawnPoints
 @onready var roaming_spawn_zones_root: Node2D = $World/RoamingSpawnZones
 @onready var construction_placeables: Node2D = $World/ConstructionPlaceables
+@onready var micro_loot_spawns_root: Node2D = $World/MicroLootSpawns
+@onready var ambient_pickups_root: Node2D = $World/AmbientPickups
 @onready var exploration_enemy_layer: Node2D = $World/ExplorationEnemies
 @onready var wave_enemy_layer: Node2D = $World/WaveEnemies
 @onready var construction_controller = $ConstructionController
@@ -66,6 +72,7 @@ var _daily_poi_modifiers: Dictionary = {}
 var _poi_visuals_by_id: Dictionary = {}
 var _debug_forced_next_daily_poi_modifiers: Dictionary = {}
 var _last_daily_refilled_pois: Array[StringName] = []
+var _collected_micro_loot_ids: Dictionary = {}
 
 
 func _ready() -> void:
@@ -73,6 +80,7 @@ func _ready() -> void:
 	_build_defense_sockets()
 	_validate_exploration_spawn_points()
 	_validate_roaming_spawn_zones()
+	_validate_micro_loot_spawns()
 	_cache_poi_visuals()
 	player.set_interaction_gate(Callable(self, "_can_player_interact_with"))
 	food_table.configure(Callable(self, "_can_player_eat"), Callable(self, "_get_food_table_label"))
@@ -121,10 +129,12 @@ func _ready() -> void:
 		"player": player,
 		"hud": hud,
 		"player_camera": player_camera,
-		"fog_world_min": Vector2(-1280.0, -720.0),
-		"fog_world_max": Vector2(3840.0, 2160.0),
+		"fog_world_min": MAP_WORLD_MIN,
+		"fog_world_max": MAP_WORLD_MAX,
 	})
+	_configure_camera_bounds()
 	_configure_scavenge_nodes()
+	_spawn_micro_loot_pickups()
 	_register_fixed_grid_footprints()
 	player.set_build_mode_allowed(true)
 	_on_wave_changed(game_manager.current_wave)
@@ -137,6 +147,15 @@ func _physics_process(_delta: float) -> void:
 		pass
 	elif construction_grid.is_build_mode_active() and player != null and is_instance_valid(player):
 		construction_grid.set_preview_world_position(player.global_position)
+
+
+func _configure_camera_bounds() -> void:
+	if player_camera == null or not is_instance_valid(player_camera):
+		return
+	player_camera.limit_left = int(MAP_WORLD_MIN.x)
+	player_camera.limit_top = int(MAP_WORLD_MIN.y)
+	player_camera.limit_right = int(MAP_WORLD_MAX.x)
+	player_camera.limit_bottom = int(MAP_WORLD_MAX.y)
 
 
 func _build_defense_sockets() -> void:
@@ -465,6 +484,7 @@ func _on_run_reset() -> void:
 	_defeated_exploration_enemy_counts.clear()
 	_current_exploration_target_counts.clear()
 	_daily_poi_modifiers.clear()
+	_collected_micro_loot_ids.clear()
 	construction_controller.reset_selection()
 	for pickup in _get_local_group_members(&"pickups"):
 		pickup.queue_free()
@@ -476,7 +496,11 @@ func _on_run_reset() -> void:
 	for child in construction_placeables.get_children():
 		if is_instance_valid(child):
 			child.queue_free()
+	for pickup in ambient_pickups_root.get_children():
+		if is_instance_valid(pickup):
+			pickup.queue_free()
 	_register_fixed_grid_footprints()
+	_spawn_micro_loot_pickups()
 	for node in _get_local_scavenge_nodes():
 		if node.has_method("reset_for_new_run"):
 			node.reset_for_new_run()
@@ -1324,12 +1348,12 @@ func _get_roaming_enemy_pool() -> Array[Resource]:
 
 func _get_roaming_spawn_budget() -> int:
 	if game_manager.current_wave <= 0:
-		return 2
-	if game_manager.current_wave <= 3:
 		return 3
-	if game_manager.current_wave <= 5:
+	if game_manager.current_wave <= 3:
 		return 4
-	return 5
+	if game_manager.current_wave <= 5:
+		return 5
+	return 6
 
 
 func _choose_weighted_roaming_zone(zones: Array):
@@ -1452,6 +1476,9 @@ func get_save_state() -> Dictionary:
 	var saved_refilled_pois: Array[String] = []
 	for poi_id in _last_daily_refilled_pois:
 		saved_refilled_pois.append(String(poi_id))
+	var saved_collected_micro_loot: Array[String] = []
+	for loot_id_variant in _collected_micro_loot_ids.keys():
+		saved_collected_micro_loot.append(String(loot_id_variant))
 	return {
 		"game": {
 			"wave": int(game_manager.current_wave),
@@ -1465,6 +1492,7 @@ func get_save_state() -> Dictionary:
 			"current_exploration_target_counts": _current_exploration_target_counts.duplicate(true),
 			"daily_poi_modifiers": saved_daily_modifiers,
 			"last_daily_refilled_pois": saved_refilled_pois,
+			"collected_micro_loot_ids": saved_collected_micro_loot,
 		},
 		"player": player.get_save_state() if player != null and is_instance_valid(player) else {},
 		"defense_sockets": _get_defense_socket_save_states(),
@@ -1504,6 +1532,7 @@ func apply_save_state(save_state: Dictionary) -> void:
 
 	_apply_defense_socket_save_states(save_state.get("defense_sockets", []))
 	_apply_scavenge_node_save_states(save_state.get("scavenge_nodes", []))
+	_spawn_micro_loot_pickups()
 	construction_controller.apply_construction_placeable_save_states(save_state.get("placeables", []))
 	fog_controller.apply_save_state(save_state.get("fog", {}))
 
@@ -1670,6 +1699,9 @@ func _restore_daily_run_state(game_state: Dictionary) -> void:
 	_last_daily_refilled_pois.clear()
 	for raw_poi_id in game_state.get("last_daily_refilled_pois", []):
 		_last_daily_refilled_pois.append(StringName(raw_poi_id))
+	_collected_micro_loot_ids.clear()
+	for raw_loot_id in game_state.get("collected_micro_loot_ids", []):
+		_collected_micro_loot_ids[StringName(raw_loot_id)] = true
 
 
 func _get_run_state_label(run_state: int) -> String:
@@ -1722,3 +1754,55 @@ func _get_weapon_definition_by_id(weapon_id: StringName) -> Resource:
 			return weapon
 
 	return null
+
+
+func _validate_micro_loot_spawns() -> void:
+	if micro_loot_spawns_root == null or not is_instance_valid(micro_loot_spawns_root):
+		return
+	var seen_spawn_ids := {}
+	for child in micro_loot_spawns_root.get_children():
+		if child == null or child.get_script() != MICRO_LOOT_SPAWN_SCRIPT:
+			continue
+		if not child.is_valid_spawn():
+			push_warning("Invalid micro-loot spawn: %s" % child.name)
+			continue
+		var spawn_id := String(child.spawn_id)
+		if seen_spawn_ids.has(spawn_id):
+			push_warning("Duplicate micro-loot spawn_id: %s" % spawn_id)
+			continue
+		seen_spawn_ids[spawn_id] = true
+
+
+func _spawn_micro_loot_pickups() -> void:
+	if ambient_pickups_root == null or not is_instance_valid(ambient_pickups_root):
+		return
+	for child in ambient_pickups_root.get_children():
+		if is_instance_valid(child):
+			child.queue_free()
+	if resource_pickup_scene == null or micro_loot_spawns_root == null or not is_instance_valid(micro_loot_spawns_root):
+		return
+	for child in micro_loot_spawns_root.get_children():
+		if child == null or child.get_script() != MICRO_LOOT_SPAWN_SCRIPT:
+			continue
+		if not child.is_valid_spawn():
+			continue
+		if _collected_micro_loot_ids.has(StringName(child.spawn_id)):
+			continue
+		var pickup = resource_pickup_scene.instantiate()
+		pickup.resource_id = child.resource_id
+		pickup.amount = int(child.amount)
+		pickup.global_position = child.global_position
+		pickup.set_meta("micro_loot_spawn_id", StringName(child.spawn_id))
+		if pickup.has_signal("collected"):
+			pickup.collected.connect(_on_micro_loot_collected)
+		ambient_pickups_root.add_child(pickup)
+
+
+func _on_micro_loot_collected(pickup, _collector) -> void:
+	if pickup == null or not is_instance_valid(pickup):
+		return
+	var spawn_id := StringName(pickup.get_meta("micro_loot_spawn_id", StringName()))
+	if spawn_id == StringName():
+		return
+	_collected_micro_loot_ids[spawn_id] = true
+	_request_autosave()

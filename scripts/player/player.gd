@@ -132,6 +132,7 @@ var _build_mode_allowed: bool = true
 @onready var interaction_detector: Area2D = $InteractionDetector
 @onready var action_timer: Timer = $ActionTimer
 @onready var attack_windup_timer: Timer = $AttackWindupTimer
+@onready var combat_audio = $CombatAudio
 
 var _spawn_position: Vector2
 
@@ -407,6 +408,7 @@ func take_damage(amount: int, _source: Variant = null) -> void:
 	health_changed.emit(current_health, max_health)
 	_flash_body(Color(1.0, 0.45, 0.45, 1.0))
 	_play_damage_feedback(_source)
+	_play_combat_sound(&"player_hurt", randf_range(0.98, 1.04), -1.0)
 
 	if current_health == 0:
 		_die()
@@ -1196,10 +1198,11 @@ func _get_attack_result_for_weapon(weapon: Resource) -> Dictionary:
 		return _get_hitscan_attack_result(weapon)
 	if weapon.attack_mode == "spread_hitscan":
 		return _get_spread_hitscan_attack_result(weapon)
+	var melee_targets := _get_melee_attack_targets()
 	return {
-		"targets": _get_melee_attack_targets(),
+		"targets": melee_targets,
 		"end_point": attack_pivot.to_global(weapon.attack_area_offset),
-		"impact_kind": "enemy",
+		"impact_kind": "enemy" if not melee_targets.is_empty() else "miss",
 	}
 
 
@@ -1601,6 +1604,7 @@ func _begin_reload(weapon: Resource, auto_triggered: bool) -> void:
 	_reload_weapon_id = weapon.weapon_id
 	_reload_time_remaining = float(weapon.reload_time)
 	_emit_weapon_state()
+	_play_combat_sound(&"player_reload_start", randf_range(0.98, 1.03), -4.0)
 	if auto_triggered:
 		message_requested.emit("%s empty. Reloading..." % weapon.display_name)
 	else:
@@ -1674,6 +1678,7 @@ func _complete_reload() -> void:
 		return
 	spend_resource("bullets", bullets_to_load)
 	_set_weapon_magazine_ammo(reloaded_weapon, current_ammo + bullets_to_load)
+	_play_combat_sound(&"player_reload_done", randf_range(0.99, 1.02), -3.0)
 	message_requested.emit("%s reloaded" % reloaded_weapon.display_name)
 
 
@@ -1715,6 +1720,9 @@ func _start_attack_sequence(weapon: Resource, visual_only: bool) -> void:
 
 
 func _play_attack_effect(weapon: Resource, attack_result: Dictionary) -> void:
+	if weapon != null:
+		_play_combat_sound(_get_attack_sound_id_for_weapon(weapon), _get_attack_sound_pitch_for_weapon(weapon), _get_attack_sound_volume_for_weapon(weapon))
+		_play_combat_sound(_get_attack_impact_sound_id(String(attack_result.get("impact_kind", "miss"))), randf_range(0.98, 1.04), _get_attack_impact_volume(String(attack_result.get("impact_kind", "miss"))))
 	if weapon != null and weapon.attack_mode == "hitscan":
 		_play_hitscan_effect(
 			attack_result.get("end_point", attack_pivot.global_position),
@@ -1722,3 +1730,74 @@ func _play_attack_effect(weapon: Resource, attack_result: Dictionary) -> void:
 		)
 		return
 	_play_attack_flash()
+
+
+func _play_combat_sound(sound_id: StringName, pitch_scale: float = 1.0, volume_db: float = 0.0) -> void:
+	if combat_audio != null and is_instance_valid(combat_audio) and combat_audio.has_method("play_sound"):
+		combat_audio.play_sound(sound_id, pitch_scale, volume_db)
+
+
+func play_feedback_sound(sound_id: StringName, pitch_scale: float = 1.0, volume_db: float = 0.0) -> void:
+	_play_combat_sound(sound_id, pitch_scale, volume_db)
+
+
+func _get_attack_sound_id_for_weapon(weapon: Resource) -> StringName:
+	if weapon == null:
+		return StringName()
+	match StringName(weapon.weapon_id):
+		&"kitchen_knife":
+			return &"knife_swing"
+		&"baseball_bat":
+			return &"bat_swing"
+		&"pistol":
+			return &"pistol_shot"
+		&"shotgun":
+			return &"shotgun_shot"
+		_:
+			if weapon.attack_mode == "melee":
+				return &"knife_swing"
+			return &"pistol_shot"
+
+
+func _get_attack_sound_pitch_for_weapon(weapon: Resource) -> float:
+	if weapon == null:
+		return 1.0
+	match StringName(weapon.weapon_id):
+		&"kitchen_knife":
+			return randf_range(1.02, 1.1)
+		&"baseball_bat":
+			return randf_range(0.9, 0.98)
+		&"pistol":
+			return randf_range(0.99, 1.03)
+		&"shotgun":
+			return randf_range(0.94, 0.99)
+		_:
+			return randf_range(0.98, 1.04)
+
+
+func _get_attack_sound_volume_for_weapon(weapon: Resource) -> float:
+	if weapon == null:
+		return 0.0
+	match StringName(weapon.weapon_id):
+		&"kitchen_knife":
+			return -3.5
+		&"baseball_bat":
+			return -1.5
+		&"pistol":
+			return -1.5
+		&"shotgun":
+			return -0.5
+		_:
+			return -1.5
+
+
+func _get_attack_impact_sound_id(impact_kind: String) -> StringName:
+	if impact_kind == "enemy":
+		return &"attack_hit_enemy"
+	return &"attack_miss"
+
+
+func _get_attack_impact_volume(impact_kind: String) -> float:
+	if impact_kind == "enemy":
+		return -5.0
+	return -8.0

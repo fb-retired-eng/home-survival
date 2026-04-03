@@ -110,6 +110,8 @@ func on_player_build_placement_requested() -> void:
 	construction_placeables.add_child(placeable)
 	if placeable.has_method("begin_player_collision_grace"):
 		placeable.begin_player_collision_grace(player, construction_grid, footprint_cells, 1)
+	if player != null and player.has_method("play_feedback_sound"):
+		player.play_feedback_sound(&"build_place", randf_range(0.98, 1.03), -2.5)
 	refresh_runtime_occupancy({}, {}, null)
 	refresh_build_mode_preview()
 	refresh_build_mode_status()

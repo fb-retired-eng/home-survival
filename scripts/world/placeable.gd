@@ -19,6 +19,7 @@ signal state_changed(placeable: Placeable)
 @onready var trap_hit_area: Area2D = $TrapHitArea
 @onready var trap_hit_shape: CollisionShape2D = $TrapHitArea/CollisionShape2D
 @onready var trap_hit_timer: Timer = $TrapHitTimer
+@onready var combat_audio = $CombatAudio
 
 var _collision_grace_player: Node = null
 var _collision_grace_grid: Node = null
@@ -167,6 +168,8 @@ func interact(player) -> void:
 			player.message_requested.emit("Not enough resources")
 			return
 		current_hp = int(profile.max_hp)
+		if player != null and player.has_method("play_feedback_sound"):
+			player.play_feedback_sound(&"build_repair", randf_range(0.98, 1.04), -3.0)
 		player.message_requested.emit("%s repaired" % get_display_name())
 		state_changed.emit(self)
 		return
@@ -180,6 +183,8 @@ func recycle(player) -> void:
 	var refund := _get_recycle_cost()
 	_apply_refund(player, refund)
 	is_dismantled = true
+	if player != null and player.has_method("play_feedback_sound"):
+		player.play_feedback_sound(&"build_recycle", randf_range(0.98, 1.03), -3.0)
 	player.message_requested.emit("%s recycled" % get_display_name())
 	state_changed.emit(self)
 	queue_free()
@@ -191,6 +196,8 @@ func dismantle(player) -> void:
 	var refund := _get_refund_cost()
 	_apply_refund(player, refund)
 	is_dismantled = true
+	if player != null and player.has_method("play_feedback_sound"):
+		player.play_feedback_sound(&"build_recycle", randf_range(0.96, 1.01), -3.5)
 	player.message_requested.emit("%s dismantled" % get_display_name())
 	state_changed.emit(self)
 	queue_free()
@@ -320,6 +327,7 @@ func take_damage(amount: int, _source: Variant = null) -> void:
 	if amount <= 0 or is_dismantled:
 		return
 	current_hp = max(current_hp - amount, 0)
+	_play_combat_sound(&"structure_hit", randf_range(0.94, 1.03), -4.0)
 	state_changed.emit(self)
 	if current_hp <= 0:
 		is_dismantled = true
@@ -343,12 +351,16 @@ func _on_trap_hit_timer_timeout() -> void:
 	if contact_damage <= 0:
 		return
 
+	var triggered := false
 	for zombie in zombies:
 		var zombie_id: int = int(zombie.get_instance_id())
 		var cooldown_remaining := float(_trap_hit_cooldowns.get(zombie_id, 0.0))
 		if cooldown_remaining > 0.0:
 			_trap_hit_cooldowns[zombie_id] = maxf(cooldown_remaining - trap_hit_timer.wait_time, 0.0)
 			continue
+		if not triggered:
+			_play_combat_sound(&"trap_trigger", randf_range(0.98, 1.04), -3.5)
+			triggered = true
 		zombie.take_damage(contact_damage, {
 			"attacker": self,
 			"damage_type": &"trap",
@@ -361,6 +373,11 @@ func _on_trap_hit_timer_timeout() -> void:
 			is_dismantled = true
 			queue_free()
 			return
+
+
+func _play_combat_sound(sound_id: StringName, pitch_scale: float = 1.0, volume_db: float = 0.0) -> void:
+	if combat_audio != null and is_instance_valid(combat_audio) and combat_audio.has_method("play_sound"):
+		combat_audio.play_sound(sound_id, pitch_scale, volume_db)
 
 
 func _get_trap_target_count() -> int:
