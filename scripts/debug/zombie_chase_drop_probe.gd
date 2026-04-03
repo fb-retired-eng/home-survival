@@ -36,8 +36,8 @@ func _init() -> void:
 	var screen_world_top_left: Vector2 = canvas_to_world * viewport_rect.position
 	var screen_world_bottom_right: Vector2 = canvas_to_world * viewport_rect.end
 	var visible_world_size: Vector2 = (screen_world_bottom_right - screen_world_top_left).abs()
-	var on_screen_offset_x := visible_world_size.x * 0.35
-	player.global_position += Vector2(on_screen_offset_x, 0.0)
+	var on_screen_offset_x := minf(visible_world_size.x * 0.18, zombie._get_player_screen_detect_keep_radius() - 12.0)
+	player.global_position = zombie.global_position + Vector2(on_screen_offset_x, 0.0)
 	await _wait_frames()
 	var chase_rect := Rect2(
 		player.global_position - visible_world_size * 0.5,
@@ -46,6 +46,19 @@ func _init() -> void:
 	print("zombie_chase_drop_probe_on_screen_engaged=%s" % str(zombie.is_engaged_with_player()))
 	print("zombie_chase_drop_probe_on_screen_alerted=%s" % str(zombie._is_alerted_to_player))
 	print("zombie_chase_drop_probe_enemy_still_on_screen=%s" % str(chase_rect.has_point(zombie.global_position)))
+
+	player.global_position = zombie.global_position + Vector2(
+		minf(visible_world_size.x * 0.35, zombie._get_player_screen_detect_keep_radius() + 48.0),
+		0.0
+	)
+	await _wait_frames()
+	chase_rect = Rect2(
+		player.global_position - visible_world_size * 0.5,
+		visible_world_size
+	)
+	print("zombie_chase_drop_probe_far_on_screen_engaged=%s" % str(zombie.is_engaged_with_player()))
+	print("zombie_chase_drop_probe_far_on_screen_alerted=%s" % str(zombie._is_alerted_to_player))
+	print("zombie_chase_drop_probe_far_on_screen_enemy_visible=%s" % str(chase_rect.has_point(zombie.global_position)))
 
 	player.global_position += Vector2(visible_world_size.x * 0.8, 0.0)
 	await _wait_frames()

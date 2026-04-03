@@ -13,6 +13,33 @@ enum WaveTargetMode {
 
 @export var enemy_id: StringName = &"enemy"
 @export var body_color: Color = Color(0.39, 0.68, 0.38, 1.0)
+@export var shadow_polygon: PackedVector2Array = PackedVector2Array([
+	Vector2(-12.0, -6.0),
+	Vector2(12.0, -6.0),
+	Vector2(16.0, 0.0),
+	Vector2(12.0, 6.0),
+	Vector2(-12.0, 6.0),
+	Vector2(-16.0, 0.0),
+])
+@export var body_polygon: PackedVector2Array = PackedVector2Array([
+	Vector2(-10.0, -12.0),
+	Vector2(10.0, -12.0),
+	Vector2(12.0, 4.0),
+	Vector2(0.0, 12.0),
+	Vector2(-12.0, 4.0),
+])
+@export var facing_marker_polygon: PackedVector2Array = PackedVector2Array([
+	Vector2(0.0, -18.0),
+	Vector2(6.0, -6.0),
+	Vector2(-6.0, -6.0),
+])
+@export var attack_flash_polygon: PackedVector2Array = PackedVector2Array([
+	Vector2(-10.0, -26.0),
+	Vector2(10.0, -26.0),
+	Vector2(16.0, -8.0),
+	Vector2(0.0, 6.0),
+	Vector2(-16.0, -8.0),
+])
 @export var max_health: int = 50
 @export var defense_flat_reduction: int = 0
 @export_range(0.0, 4.0, 0.05) var defense_multiplier: float = 1.0
@@ -47,6 +74,15 @@ enum WaveTargetMode {
 @export_range(0.0, 4.0, 0.05) var sidestep_weight: float = 0.9
 @export_range(-1.0, 1.0, 0.05) var detection_facing_dot_threshold: float = 0.0
 @export_range(-1.0, 1.0, 0.05) var attack_facing_dot_threshold: float = 0.25
+@export var presentation_scale: Vector2 = Vector2.ONE
+@export_range(0.0, 8.0, 0.05) var visual_bob_height: float = 1.2
+@export_range(0.0, 0.2, 0.001) var visual_breathe_scale: float = 0.016
+@export_range(0.0, 40.0, 0.1) var visual_turn_speed: float = 10.0
+@export_range(0.0, 0.2, 0.001) var visual_move_stretch_x: float = 0.03
+@export_range(0.0, 0.2, 0.001) var visual_move_stretch_y: float = 0.022
+@export var prep_pose_offset: Vector2 = Vector2.ZERO
+@export var prep_pose_scale: Vector2 = Vector2.ONE
+@export_range(-45.0, 45.0, 0.5) var prep_pose_tilt_degrees: float = 0.0
 @export var attack_tell_color: Color = Color(1.0, 0.82, 0.42, 0.72)
 @export var attack_tell_start_scale: Vector2 = Vector2(0.62, 0.62)
 @export var attack_tell_ready_scale: Vector2 = Vector2(0.98, 0.98)
@@ -57,6 +93,9 @@ enum WaveTargetMode {
 @export var attack_flash_start_scale: Vector2 = Vector2(0.78, 0.78)
 @export var attack_flash_peak_scale: Vector2 = Vector2(1.08, 1.08)
 @export_range(0.01, 1.0, 0.01) var attack_flash_duration: float = 0.08
+@export_range(0.0, 16.0, 0.1) var damage_feedback_distance: float = 4.0
+@export var damage_feedback_scale: Vector2 = Vector2(1.06, 0.94)
+@export_range(0.01, 0.5, 0.01) var damage_feedback_duration: float = 0.12
 @export var is_elite: bool = false
 @export var drop_salvage: int = 1
 @export var drop_parts: int = 0
@@ -70,6 +109,14 @@ enum WaveTargetMode {
 
 func is_valid_definition() -> bool:
 	if enemy_id == StringName():
+		return false
+	if shadow_polygon.size() < 3:
+		return false
+	if body_polygon.size() < 3:
+		return false
+	if facing_marker_polygon.size() < 3:
+		return false
+	if attack_flash_polygon.size() < 3:
 		return false
 	if max_health <= 0:
 		return false
@@ -113,6 +160,20 @@ func is_valid_definition() -> bool:
 		return false
 	if attack_facing_dot_threshold < -1.0 or attack_facing_dot_threshold > 1.0:
 		return false
+	if presentation_scale.x <= 0.0 or presentation_scale.y <= 0.0:
+		return false
+	if visual_bob_height < 0.0:
+		return false
+	if visual_breathe_scale < 0.0:
+		return false
+	if visual_turn_speed < 0.0:
+		return false
+	if visual_move_stretch_x < 0.0 or visual_move_stretch_y < 0.0:
+		return false
+	if prep_pose_scale.x <= 0.0 or prep_pose_scale.y <= 0.0:
+		return false
+	if prep_pose_tilt_degrees < -45.0 or prep_pose_tilt_degrees > 45.0:
+		return false
 	if attack_tell_start_scale.x <= 0.0 or attack_tell_start_scale.y <= 0.0:
 		return false
 	if attack_tell_ready_scale.x <= 0.0 or attack_tell_ready_scale.y <= 0.0:
@@ -128,6 +189,12 @@ func is_valid_definition() -> bool:
 	if attack_flash_peak_scale.x <= 0.0 or attack_flash_peak_scale.y <= 0.0:
 		return false
 	if attack_flash_duration <= 0.0:
+		return false
+	if damage_feedback_distance < 0.0:
+		return false
+	if damage_feedback_scale.x <= 0.0 or damage_feedback_scale.y <= 0.0:
+		return false
+	if damage_feedback_duration <= 0.0:
 		return false
 	if drop_parts < 0 or drop_bullets < 0 or drop_food < 0:
 		return false

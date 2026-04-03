@@ -1885,3 +1885,31 @@ Validation:
 - `zombie_chase_drop_probe_far_engaged=false`
 - `combat_audio_probe_enemy_hit=enemy_attack_hit`
 - `barricade_attack_probe_enemy_target=barricade`
+
+## 2026-04-03 Enemy Archetype and Detection Tuning
+- Extended `EnemyDefinition` with data-driven presentation fields for enemy archetype readability, including silhouette polygons, presentation scale, locomotion bob/breathe/turn tuning, prep-pose shaping, and damage-feedback tuning.
+- Tuned the four core enemy profiles so runner, basic, spitter, and brute now differ in silhouette and feel through data instead of more hardcoded branches.
+- Fixed the stale elite visual probe to match the current `Enemy.tscn` hierarchy under `VisualRoot`.
+- Tightened screen-aware chase retention so alerted exploration enemies only keep chase a little beyond their authored chase radius while still on-screen, instead of treating “still visible” as an unlimited chase override.
+- Fixed the regular brute exploration behavior so it now respects `idle_until_player_detected` and no longer starts chasing the player immediately at spawn with no prior engagement.
+- Expanded elite brute and elite spitter detection/chase ranges in data so elite variants notice and hold the player from farther away than their normal counterparts.
+
+Validation:
+- `enemy_archetype_probe_runner_scale_smaller=true`
+- `enemy_archetype_probe_brute_scale_larger=true`
+- `enemy_archetype_probe_runner_body_narrower=true`
+- `enemy_archetype_probe_brute_body_wider=true`
+- `enemy_archetype_probe_spitter_flash_larger=true`
+- `enemy_archetype_probe_runner_turns_faster=true`
+- `enemy_archetype_probe_spitter_profile_taller_prep=true`
+- `enemy_archetype_probe_brute_prep_heavier=true`
+- `enemy_archetype_probe_runner_hit_reacts_more=true`
+- `elite_visual_probe_basic_aura_visible=false`
+- `elite_visual_probe_elite_aura_visible=true`
+- `zombie_chase_drop_probe_on_screen_engaged=true`
+- `zombie_chase_drop_probe_far_on_screen_engaged=false`
+- `enemy_screen_chase_cap_probe_brute_engaged=false`
+- `brute_initial_detection_probe_idle_target=true`
+- `brute_initial_detection_probe_detected_engaged=true`
+- `elite_detection_probe_brute_engaged=false`
+- `elite_detection_probe_elite_brute_engaged=true`

@@ -9,9 +9,6 @@ const GAMEPLAY_Z_BASE := 1000
 const CHASE_LOST_SIGHT_DISTANCE_FACTOR := 1.25
 const CHASE_LOST_SIGHT_DISTANCE_PADDING := 20.0
 const CHASE_SCREEN_MARGIN := 48.0
-const VISUAL_BOB_HEIGHT := 1.2
-const VISUAL_BREATHE_SCALE := 0.016
-const VISUAL_TURN_SPEED := 10.0
 const THREAT_INDICATOR_GRACE_TIME := 0.65
 
 signal died(enemy)
@@ -70,6 +67,18 @@ var _visual_movement_ratio: float = 0.0
 var _visual_bob_offset_y: float = 0.0
 var _visual_body_rotation: float = 0.0
 var _threat_indicator_grace_remaining: float = 0.0
+var _presentation_scale: Vector2 = Vector2.ONE
+var _visual_bob_height: float = 1.2
+var _visual_breathe_scale: float = 0.016
+var _visual_turn_speed: float = 10.0
+var _visual_move_stretch_x: float = 0.03
+var _visual_move_stretch_y: float = 0.022
+var _prep_pose_offset: Vector2 = Vector2.ZERO
+var _prep_pose_scale: Vector2 = Vector2.ONE
+var _prep_pose_tilt_radians: float = 0.0
+var _damage_feedback_distance: float = 4.0
+var _damage_feedback_scale: Vector2 = Vector2(1.06, 0.94)
+var _damage_feedback_duration: float = 0.12
 
 @onready var body_shadow: Polygon2D = $BodyShadow
 @onready var state_indicator: Polygon2D = $StateIndicator
@@ -511,6 +520,10 @@ func _apply_definition() -> void:
 	enemy_id = definition.enemy_id
 	body_visual.color = definition.body_color
 	_base_color = definition.body_color
+	body_shadow.polygon = definition.shadow_polygon
+	body_visual.polygon = definition.body_polygon
+	facing_marker.polygon = definition.facing_marker_polygon
+	attack_flash.polygon = definition.attack_flash_polygon
 	max_health = definition.max_health
 	defense_flat_reduction = definition.defense_flat_reduction
 	defense_multiplier = definition.defense_multiplier
@@ -525,6 +538,18 @@ func _apply_definition() -> void:
 	knockback_decay = definition.knockback_decay
 	attack_cooldown = definition.attack_interval
 	attack_prep_time = definition.attack_prep_time
+	_presentation_scale = definition.presentation_scale
+	_visual_bob_height = definition.visual_bob_height
+	_visual_breathe_scale = definition.visual_breathe_scale
+	_visual_turn_speed = definition.visual_turn_speed
+	_visual_move_stretch_x = definition.visual_move_stretch_x
+	_visual_move_stretch_y = definition.visual_move_stretch_y
+	_prep_pose_offset = definition.prep_pose_offset
+	_prep_pose_scale = definition.prep_pose_scale
+	_prep_pose_tilt_radians = deg_to_rad(definition.prep_pose_tilt_degrees)
+	_damage_feedback_distance = definition.damage_feedback_distance
+	_damage_feedback_scale = definition.damage_feedback_scale
+	_damage_feedback_duration = definition.damage_feedback_duration
 	if definition.is_elite:
 		elite_aura.visible = true
 		var aura_color := definition.body_color.lerp(Color(1.0, 0.84, 0.34, 1.0), 0.5)
@@ -682,11 +707,15 @@ func _update_player_chase_state() -> void:
 	if _is_alerted_to_player:
 		var blind_pursuit_break_radius := _get_player_lost_sight_break_radius()
 		var is_within_screen_chase_rect := _is_within_player_screen_chase_rect(live_player, CHASE_SCREEN_MARGIN)
+		var screen_detect_keep_radius := _get_player_screen_detect_keep_radius()
+		var screen_blind_keep_radius := _get_player_screen_blind_keep_radius()
 		if can_detect_player:
-			_is_chasing_player = distance_to_player <= _get_player_chase_break_radius() or is_within_screen_chase_rect
+			_is_chasing_player = distance_to_player <= _get_player_chase_break_radius() or (
+				is_within_screen_chase_rect and distance_to_player <= screen_detect_keep_radius
+			)
 		elif distance_to_player <= _get_player_detection_radius():
 			_is_chasing_player = true
-		elif is_within_screen_chase_rect:
+		elif is_within_screen_chase_rect and distance_to_player <= screen_blind_keep_radius:
 			_is_chasing_player = true
 		else:
 			_is_chasing_player = distance_to_player <= blind_pursuit_break_radius
@@ -912,6 +941,18 @@ func _get_player_lost_sight_break_radius() -> float:
 		detection_radius + CHASE_LOST_SIGHT_DISTANCE_PADDING
 	)
 	return minf(chase_break_radius, blind_pursuit_radius)
+
+
+func _get_player_screen_detect_keep_radius() -> float:
+	var chase_break_radius := _get_player_chase_break_radius()
+	var detection_radius := _get_player_detection_radius()
+	return maxf(chase_break_radius, minf(chase_break_radius + 32.0, detection_radius + 56.0))
+
+
+func _get_player_screen_blind_keep_radius() -> float:
+	var blind_pursuit_radius := _get_player_lost_sight_break_radius()
+	var detection_radius := _get_player_detection_radius()
+	return maxf(blind_pursuit_radius, minf(blind_pursuit_radius + 20.0, detection_radius + 32.0))
 
 
 func _is_within_player_screen_chase_rect(player_target, margin: float = 0.0) -> bool:
@@ -1317,16 +1358,16 @@ func _play_damage_feedback(source: Variant) -> void:
 		_damage_feedback_tween.kill()
 
 	var knock_direction := _get_damage_knock_direction(source)
-	body_visual.position = knock_direction * 4.0
-	body_visual.scale = Vector2(1.06, 0.94)
-	facing_marker.position = knock_direction * 4.0
-	facing_marker.scale = Vector2(1.06, 0.94)
+	body_visual.position = knock_direction * _damage_feedback_distance
+	body_visual.scale = _damage_feedback_scale
+	facing_marker.position = knock_direction * _damage_feedback_distance
+	facing_marker.scale = _damage_feedback_scale
 
 	_damage_feedback_tween = create_tween()
-	_damage_feedback_tween.parallel().tween_property(body_visual, "position", Vector2.ZERO, 0.12)
-	_damage_feedback_tween.parallel().tween_property(body_visual, "scale", Vector2.ONE, 0.12)
-	_damage_feedback_tween.parallel().tween_property(facing_marker, "position", Vector2.ZERO, 0.12)
-	_damage_feedback_tween.parallel().tween_property(facing_marker, "scale", Vector2.ONE, 0.12)
+	_damage_feedback_tween.parallel().tween_property(body_visual, "position", Vector2.ZERO, _damage_feedback_duration)
+	_damage_feedback_tween.parallel().tween_property(body_visual, "scale", Vector2.ONE, _damage_feedback_duration)
+	_damage_feedback_tween.parallel().tween_property(facing_marker, "position", Vector2.ZERO, _damage_feedback_duration)
+	_damage_feedback_tween.parallel().tween_property(facing_marker, "scale", Vector2.ONE, _damage_feedback_duration)
 
 
 func _get_damage_knock_direction(source: Variant) -> Vector2:
@@ -1361,16 +1402,25 @@ func _update_visual_animation(delta: float) -> void:
 	var movement_ratio := clampf(velocity.length() / maxf(move_speed, 1.0), 0.0, 1.0)
 	_visual_movement_ratio = move_toward(_visual_movement_ratio, movement_ratio, delta * 6.0)
 	_visual_time += delta * lerpf(1.8, 7.2, _visual_movement_ratio)
-	var breathe := sin(_visual_time * 1.9) * VISUAL_BREATHE_SCALE
-	var bob_target := sin(_visual_time * 7.6) * VISUAL_BOB_HEIGHT * _visual_movement_ratio
+	var breathe := sin(_visual_time * 1.9) * _visual_breathe_scale
+	var bob_target := sin(_visual_time * 7.6) * _visual_bob_height * _visual_movement_ratio
 	_visual_bob_offset_y = lerpf(_visual_bob_offset_y, bob_target, minf(delta * 8.0, 1.0))
-	visual_root.position = Vector2(0.0, _visual_bob_offset_y)
-	visual_root.scale = Vector2(
-		1.0 + 0.03 * _visual_movement_ratio + maxf(breathe, 0.0),
-		1.0 - 0.022 * _visual_movement_ratio - minf(breathe, 0.0)
+	var prep_progress := 0.0
+	if _attack_prep_armed:
+		var prep_time := maxf(_get_attack_prep_time(), 0.001)
+		prep_progress = clampf(1.0 - (_attack_prep_remaining / prep_time), 0.0, 1.0)
+	visual_root.position = Vector2(0.0, _visual_bob_offset_y) + (_prep_pose_offset * prep_progress)
+	var locomotion_scale := Vector2(
+		1.0 + _visual_move_stretch_x * _visual_movement_ratio + maxf(breathe, 0.0),
+		1.0 - _visual_move_stretch_y * _visual_movement_ratio - minf(breathe, 0.0)
 	)
-	var target_body_rotation := _facing_direction.angle() - PI / 2.0
-	_visual_body_rotation = lerp_angle(_visual_body_rotation, target_body_rotation, minf(delta * VISUAL_TURN_SPEED, 1.0))
+	var prep_scale := Vector2.ONE.lerp(_prep_pose_scale, prep_progress)
+	visual_root.scale = Vector2(
+		_presentation_scale.x * locomotion_scale.x * prep_scale.x,
+		_presentation_scale.y * locomotion_scale.y * prep_scale.y
+	)
+	var target_body_rotation := (_facing_direction.angle() - PI / 2.0) + (_prep_pose_tilt_radians * prep_progress)
+	_visual_body_rotation = lerp_angle(_visual_body_rotation, target_body_rotation, minf(delta * _visual_turn_speed, 1.0))
 	body_visual.rotation = _visual_body_rotation
 	facing_marker.rotation = _visual_body_rotation + PI
 	attack_flash.rotation = facing_marker.rotation
@@ -1424,3 +1474,7 @@ func _update_health_bar_visibility(delta: float) -> void:
 	health_bar_fill.visible = current_health > 0 and _health_bar_alpha > 0.01
 	health_bar_background.modulate.a = 0.88 * _health_bar_alpha
 	health_bar_fill.modulate.a = 0.96 * _health_bar_alpha
+
+
+func get_visual_turn_speed() -> float:
+	return _visual_turn_speed
