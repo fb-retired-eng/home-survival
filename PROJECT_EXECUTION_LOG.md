@@ -1949,3 +1949,28 @@ Validation:
 - `spitter_structure_range_probe_near=true`
 - `combat_audio_probe_enemy_hit=enemy_attack_hit`
 - `save_probe_continue_did_not_rewrite=true`
+
+## 2026-04-03 Player Firearm and HUD Tightening Pass
+- Switched pistol and shotgun to true player-fired projectiles through a dedicated `PlayerProjectile` scene/script and projectile-backed firearm attack flow in `player_combat_controller.gd`, instead of the previous fake instant-hit presentation.
+- Fixed firearm projectile behavior so blocked shots respect nearby structure blockers, pistol and shotgun probes account for windup plus projectile travel, and projectile weapons no longer reuse the old long hitscan telegraph shape in the HUD attack indicator.
+- Split firearm costs so pistol is ammo-only while shotgun keeps only a light stamina commitment, then added `weapon_balance_probe.gd` to report shots, time, and ammo use against basic, runner, and brute enemies for future tuning.
+- Tightened the authored HUD layout, moved phase and wave onto one row, switched the resource strip to icon-first rich text, removed duplicate ammo display from the top strip, and fixed the weapon/resource status signal timing so reserve ammo and firearm state reflect immediately without causing text-growth relayout.
+- Clarified active-wave pause behavior: save stays blocked during `ACTIVE_WAVE`, but quitting during a wave now returns to menu without saving, and the pause buttons/status text explicitly communicate `Save Blocked` and `Quit Without Saving`.
+
+Validation:
+- `firearm_projectile_probe_spawned=true`
+- `firearm_projectile_probe_visible=true`
+- `pistol_probe_projectile_spawned=true`
+- `pistol_probe_health_after=28`
+- `shotgun_probe_health_a_after=10`
+- `shotgun_probe_health_b_after=10`
+- `shotgun_probe_health_c_after=10`
+- `weapon_blocked_by_structure_probe_door_blocked_pistol_health=50`
+- `weapon_blocked_by_structure_probe_open_pistol_health=26`
+- `pistol_energy_probe_cost=0`
+- `after_pistol_ammo_label=Weapon: Pistol 6/6 | ◉6`
+- `during_pistol_windup_label=Weapon: Pistol 6/6 | ◉6`
+- `pause_probe_active_wave_save_label=Save Blocked`
+- `pause_probe_active_wave_quit_label=Quit Without Saving`
+- `pause_probe_active_wave_quit_back_to_menu=true`
+- `save_probe_continue_did_not_rewrite=true`

@@ -15,9 +15,9 @@ corner_radius_top_right = 14
 corner_radius_bottom_right = 14
 corner_radius_bottom_left = 14
 content_margin_left = 14.0
-content_margin_top = 12.0
-content_margin_right = 14.0
-content_margin_bottom = 12.0
+content_margin_top = 10.0
+content_margin_right = 12.0
+content_margin_bottom = 10.0
 
 [sub_resource type="StyleBoxFlat" id="2_stat_track"]
 bg_color = Color(0.12, 0.16, 0.2, 0.94)
@@ -56,9 +56,9 @@ corner_radius_top_right = 12
 corner_radius_bottom_right = 12
 corner_radius_bottom_left = 12
 content_margin_left = 12.0
-content_margin_top = 10.0
-content_margin_right = 12.0
-content_margin_bottom = 10.0
+content_margin_top = 8.0
+content_margin_right = 10.0
+content_margin_bottom = 8.0
 
 [sub_resource type="StyleBoxFlat" id="10_phase_chip"]
 bg_color = Color(0.19, 0.25, 0.19, 0.94)
@@ -71,10 +71,10 @@ corner_radius_top_left = 10
 corner_radius_top_right = 10
 corner_radius_bottom_right = 10
 corner_radius_bottom_left = 10
-content_margin_left = 10.0
-content_margin_top = 6.0
-content_margin_right = 10.0
-content_margin_bottom = 6.0
+content_margin_left = 8.0
+content_margin_top = 5.0
+content_margin_right = 8.0
+content_margin_bottom = 5.0
 
 [sub_resource type="StyleBoxFlat" id="11_warning_panel"]
 bg_color = Color(0.19, 0.11, 0.06, 0.94)
@@ -193,11 +193,11 @@ color = Color(1, 1, 1, 1)
 material = SubResource("8_home_fog_material")
 
 [node name="MainPanel" type="PanelContainer" parent="."]
-custom_minimum_size = Vector2(362, 0)
+custom_minimum_size = Vector2(316, 0)
 offset_left = 16.0
 offset_top = 16.0
-offset_right = 378.0
-offset_bottom = 184.0
+offset_right = 332.0
+offset_bottom = 154.0
 theme_override_styles/panel = SubResource("1_main_panel")
 
 [node name="MarginContainer" type="MarginContainer" parent="MainPanel"]
@@ -206,44 +206,50 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 
 [node name="VBoxContainer" type="VBoxContainer" parent="MainPanel/MarginContainer"]
-theme_override_constants/separation = 8
+theme_override_constants/separation = 6
 
 [node name="TopRow" type="HBoxContainer" parent="MainPanel/MarginContainer/VBoxContainer"]
-theme_override_constants/separation = 10
+theme_override_constants/separation = 6
 
-[node name="HeaderStack" type="VBoxContainer" parent="MainPanel/MarginContainer/VBoxContainer/TopRow"]
+[node name="HeaderRow" type="HBoxContainer" parent="MainPanel/MarginContainer/VBoxContainer/TopRow"]
 size_flags_horizontal = 3
-theme_override_constants/separation = 4
+theme_override_constants/separation = 6
 
-[node name="PhaseChip" type="PanelContainer" parent="MainPanel/MarginContainer/VBoxContainer/TopRow/HeaderStack"]
+[node name="PhaseChip" type="PanelContainer" parent="MainPanel/MarginContainer/VBoxContainer/TopRow/HeaderRow"]
 unique_name_in_owner = true
 size_flags_horizontal = 0
 theme_override_styles/panel = SubResource("10_phase_chip")
 
-[node name="PhaseLabel" type="Label" parent="MainPanel/MarginContainer/VBoxContainer/TopRow/HeaderStack/PhaseChip"]
+[node name="PhaseLabel" type="Label" parent="MainPanel/MarginContainer/VBoxContainer/TopRow/HeaderRow/PhaseChip"]
 unique_name_in_owner = true
 theme_override_font_sizes/font_size = 12
 theme_override_colors/font_color = Color(0.91, 0.96, 0.89, 0.98)
 text = "DAY PREP"
 
-[node name="WaveLabel" type="Label" parent="MainPanel/MarginContainer/VBoxContainer/TopRow/HeaderStack"]
+[node name="WaveLabel" type="Label" parent="MainPanel/MarginContainer/VBoxContainer/TopRow/HeaderRow"]
 unique_name_in_owner = true
-theme_override_font_sizes/font_size = 18
+theme_override_font_sizes/font_size = 17
 theme_override_colors/font_color = Color(0.95, 0.97, 0.99, 1)
+vertical_alignment = 1
 text = "Night 0 / 0"
 
-[node name="ResourcesLabel" type="Label" parent="MainPanel/MarginContainer/VBoxContainer/TopRow"]
+[node name="ResourcesLabel" type="RichTextLabel" parent="MainPanel/MarginContainer/VBoxContainer/TopRow"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(142, 22)
+size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 13
-theme_override_colors/font_color = Color(0.94, 0.88, 0.69, 1)
-horizontal_alignment = 2
-text = "🔩0 ⚙️0 🩹0 ◉0 🍗0"
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+context_menu_enabled = false
+selection_enabled = false
+text = "[right][color=#a69f86]🔩[/color] [color=#f5e6ae]0[/color]  [color=#a69f86]⚙️[/color] [color=#f5e6ae]0[/color]  [color=#a69f86]🩹[/color] [color=#f5e6ae]0[/color]  [color=#a69f86]🍗[/color] [color=#f5e6ae]0[/color][/right]"
 
 [node name="VitalsRow" type="HBoxContainer" parent="MainPanel/MarginContainer/VBoxContainer"]
-theme_override_constants/separation = 8
+theme_override_constants/separation = 4
 
 [node name="HealthTextLabel" type="Label" parent="MainPanel/MarginContainer/VBoxContainer/VitalsRow"]
-custom_minimum_size = Vector2(0, 18)
+custom_minimum_size = Vector2(18, 18)
 theme_override_font_sizes/font_size = 14
 theme_override_colors/font_color = Color(0.95, 0.56, 0.58, 1)
 vertical_alignment = 1
@@ -251,7 +257,7 @@ text = "❤️"
 
 [node name="HealthBar" type="ProgressBar" parent="MainPanel/MarginContainer/VBoxContainer/VitalsRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(78, 18)
+custom_minimum_size = Vector2(68, 16)
 size_flags_horizontal = 3
 theme_override_styles/background = SubResource("2_stat_track")
 theme_override_styles/fill = SubResource("3_health_fill")
@@ -261,13 +267,14 @@ show_percentage = false
 
 [node name="HealthValueLabel" type="Label" parent="MainPanel/MarginContainer/VBoxContainer/VitalsRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 18)
+custom_minimum_size = Vector2(58, 18)
 theme_override_font_sizes/font_size = 13
+horizontal_alignment = 2
 vertical_alignment = 1
 text = "100 / 100"
 
 [node name="EnergyTextLabel" type="Label" parent="MainPanel/MarginContainer/VBoxContainer/VitalsRow"]
-custom_minimum_size = Vector2(0, 18)
+custom_minimum_size = Vector2(18, 18)
 theme_override_font_sizes/font_size = 14
 theme_override_colors/font_color = Color(0.48, 0.84, 0.95, 1)
 vertical_alignment = 1
@@ -275,7 +282,7 @@ text = "⚡"
 
 [node name="EnergyBar" type="ProgressBar" parent="MainPanel/MarginContainer/VBoxContainer/VitalsRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(78, 18)
+custom_minimum_size = Vector2(68, 16)
 size_flags_horizontal = 3
 theme_override_styles/background = SubResource("2_stat_track")
 theme_override_styles/fill = SubResource("4_energy_fill")
@@ -285,13 +292,14 @@ show_percentage = false
 
 [node name="EnergyValueLabel" type="Label" parent="MainPanel/MarginContainer/VBoxContainer/VitalsRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 18)
+custom_minimum_size = Vector2(58, 18)
 theme_override_font_sizes/font_size = 13
+horizontal_alignment = 2
 vertical_alignment = 1
 text = "100 / 100"
 
 [node name="MetaRow" type="HBoxContainer" parent="MainPanel/MarginContainer/VBoxContainer"]
-theme_override_constants/separation = 10
+theme_override_constants/separation = 6
 
 [node name="BaseLabel" type="Label" parent="MainPanel/MarginContainer/VBoxContainer/MetaRow"]
 unique_name_in_owner = true
@@ -315,11 +323,11 @@ theme_override_colors/font_color = Color(0.78, 0.86, 0.96, 0.92)
 text = "Fast, isolated"
 
 [node name="StatusPanel" type="PanelContainer" parent="."]
-custom_minimum_size = Vector2(362, 0)
+custom_minimum_size = Vector2(316, 0)
 offset_left = 16.0
-offset_top = 192.0
-offset_right = 378.0
-offset_bottom = 280.0
+offset_top = 162.0
+offset_right = 332.0
+offset_bottom = 236.0
 theme_override_styles/panel = SubResource("5_status_panel")
 
 [node name="StatusBox" type="VBoxContainer" parent="StatusPanel"]

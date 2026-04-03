@@ -38,7 +38,7 @@ func _init() -> void:
 	var health_c_before: int = int(zombie_c.current_health)
 	print("shotgun_probe_target_count=%d" % player._get_attack_targets_for_weapon(shotgun).size())
 	player._attempt_attack()
-	await create_timer(0.28).timeout
+	await create_timer(0.52).timeout
 	print("shotgun_probe_health_a_before=%d" % health_a_before)
 	print("shotgun_probe_health_a_after=%d" % _get_enemy_health_or_zero(zombie_a))
 	print("shotgun_probe_health_b_before=%d" % health_b_before)

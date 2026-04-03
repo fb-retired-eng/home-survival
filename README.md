@@ -21,17 +21,17 @@ The current run can start with hostile POIs already active, while wave enemies r
 The repo currently includes:
 - project scaffold and main scene setup
 - player movement, health, energy, melee/ranged attack, medicine use, and inventory tracking
-- multiple weapons, including POI-obtained baseball bat, pistol, and shotgun upgrades, bullet pickups, weapon switching, reloadable firearm behavior, simple on-player weapon illustrations, and visible weapon-trait HUD text
+- multiple weapons, including POI-obtained baseball bat, pistol, and shotgun upgrades, bullet pickups, weapon switching, reloadable firearm behavior, true projectile-based pistol/shotgun shots, simple on-player weapon illustrations, and visible weapon-trait HUD text
 - food as a prep resource, a dinner-at-table transition that starts the night wave, and bed-based sleep that returns the run to the next day with partial HP restore
 - six authored POIs, eight authored waves, roaming prep-stage exploration spawns, and six live enemy definitions including elite spitter and elite brute variants
 - exploration enemies now keep chasing while they remain effectively on the current player view, then drop aggro once sight is broken and they fall off-screen/far enough away
 - fortified wall/door upgrades beyond the original reinforced tier
 - review-driven guardrails around elite-only weapon drops, spitter structure range, reset-state UI consistency, and bat-only attack interrupt behavior
-- a polished authored UI shell across the boot menu, settings/load panels, pause overlay, and HUD, with clearer phase emphasis, cleaner resource/readout labels, stronger status treatment, and more intentional interaction prompts
+- a polished authored UI shell across the boot menu, settings/load panels, pause overlay, and HUD, with clearer phase emphasis, tighter panel layout, cleaner resource/readout labels, icon-based resource display, stronger status treatment, more responsive firearm HUD state, and more intentional interaction prompts
 - smoothed player/enemy presentation polish, including lighter player bob/lean motion, smoother enemy turning and movement presentation, clearer enemy state indicators, lingering post-alert readability cues, generic enemy scene/class naming for future non-zombie enemy types, data-driven archetype silhouettes plus archetype-specific attack-tell profiles, and a red projectile-based spitter presentation with longer detection pressure
 - construction-system foundation for a larger authored map with a local buildable band around the home, build-mode placement, tactical cell reservations, selectable multi-cell buildables, and the first barricade placeable with repair/recycle support; this is now an active tactical layer, not just scaffolding
 - home-anchored fog-of-war that starts beyond the local home area and keeps areas the player has already visited revealed, so the enlarged map has clearer nearby readability and persistent exploration memory
-- MVP0.5 boot shell with authored menu and pause scenes, continue/load slots, persistent settings, pause-menu save/quit, and versioned run saves that restore construction and fog memory; manual saves are blocked during active waves, loading a slot no longer rewrites it on entry, and fullscreen now applies through Godot's window mode API
+- MVP0.5 boot shell with authored menu and pause scenes, continue/load slots, persistent settings, pause-menu save/quit, and versioned run saves that restore construction and fog memory; manual saves are blocked during active waves, active-wave quitting now cleanly returns to menu without saving, loading a slot no longer rewrites it on entry, and fullscreen now applies through Godot's window mode API
 - enriched outer-map structure with authored district landmarks, route islands, micro-loot between POIs, and a broader ambient roaming-threat layer so the enlarged map has actual travel value instead of empty margins
 - data-driven POI identity through `PoiDefinition` resources, with role-driven bonus tables, POI-tied micro-loot defaults, explicit `poi_id` wiring, and probe-visible role labels for debugging and UI
 - authored POI guard tuning and softer mid/late-wave pacing, plus an economy balance probe that reports POI yield, support loot, construction costs, and wave pressure totals for future tuning passes
@@ -114,4 +114,5 @@ godot --headless --path . --quit
 - keep pushing POI tuning through `PoiDefinition` data instead of scene-only overrides now that role-driven reward defaults and validation are in place
 - keep improving combat and interaction audio feel now that the basic SFX layer is in place
 - use the new economy probe to finish one last MVP0 route/pressure tuning pass before moving on to MVP1 feature work
+- use the new weapon balance probe to do one more firearm-versus-melee tuning pass now that pistol and shotgun are true projectile weapons
 - continue UI and readability polish from playtest feedback

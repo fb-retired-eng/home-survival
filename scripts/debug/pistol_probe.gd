@@ -23,9 +23,12 @@ func _init() -> void:
 	var health_before: int = int(zombie.current_health)
 	print("pistol_probe_target_count=%d" % player._get_attack_targets_for_weapon(pistol).size())
 	player._attempt_attack()
-	await create_timer(0.13).timeout
-	print("pistol_probe_tracer_visible=%s" % str(player.get_node("ShotTracer").visible))
-	print("pistol_probe_tracer_points=%d" % player.get_node("ShotTracer").points.size())
+	await create_timer(0.16).timeout
+	await physics_frame
+	var projectiles: Array = get_nodes_in_group("player_projectiles")
+	var projectile = projectiles[0] if not projectiles.is_empty() else null
+	print("pistol_probe_projectile_spawned=%s" % str(not projectiles.is_empty()))
+	print("pistol_probe_projectile_visible=%s" % str(projectile != null and projectile.visual.visible))
 	await create_timer(0.12).timeout
 	print("pistol_probe_health_before=%d" % health_before)
 	print("pistol_probe_health_after=%d" % zombie.current_health)

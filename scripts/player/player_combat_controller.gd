@@ -1,6 +1,7 @@
 extends Node
 class_name PlayerCombatController
 
+const PlayerProjectileScene = preload("res://scenes/player/PlayerProjectile.tscn")
 const DEFAULT_SPREAD_HITSCAN_CONE_DEGREES := 30.0
 const STRUCTURE_ATTACK_BLOCKER_MASK := 2 | 4
 
@@ -57,6 +58,8 @@ func on_attack_windup_timer_timeout() -> void:
 		cancel_attack_windup()
 		return
 
+	if player._attack_windup_weapon != null and bool(player._attack_windup_weapon.uses_projectile):
+		player.firearm_windup_changed.emit(false)
 	player._attack_windup_pending = false
 	if player._attack_windup_visual_only:
 		var windup_weapon: Resource = player._attack_windup_weapon
@@ -78,6 +81,8 @@ func apply_weapon_visuals(weapon: Resource) -> void:
 
 	var applied_attack_area_position: Vector2 = weapon.attack_area_offset
 	var applied_attack_area_size: Vector2 = weapon.attack_area_size
+	var indicator_position: Vector2 = weapon.attack_area_offset
+	var indicator_polygon: PackedVector2Array
 	if weapon.attack_mode == "hitscan":
 		applied_attack_area_position = Vector2(weapon.attack_area_offset.x, -weapon.attack_range * 0.5)
 		applied_attack_area_size = Vector2(weapon.attack_area_size.x, weapon.attack_range)
@@ -87,20 +92,32 @@ func apply_weapon_visuals(weapon: Resource) -> void:
 		applied_attack_area_position = Vector2(weapon.attack_area_offset.x, -weapon.attack_range * 0.5)
 		applied_attack_area_size = Vector2(derived_width, weapon.attack_range)
 
-	player.weapon_visual.position = weapon.held_visual_offset if weapon.held_visual_polygon.size() >= 3 else get_default_held_weapon_polygon_offset()
-	player.weapon_visual.polygon = weapon.held_visual_polygon if weapon.held_visual_polygon.size() >= 3 else get_default_held_weapon_polygon()
-	player.weapon_visual.color = weapon.held_visual_color if weapon.held_visual_polygon.size() >= 3 else player.DEFAULT_HELD_WEAPON_COLOR
-	player.attack_area.position = applied_attack_area_position
-	player.attack_indicator.position = applied_attack_area_position
-	if player.attack_area_shape.shape is RectangleShape2D:
-		var shape := player.attack_area_shape.shape as RectangleShape2D
-		shape.size = applied_attack_area_size
-		player.attack_indicator.polygon = PackedVector2Array([
+	if weapon.uses_projectile:
+		indicator_position = get_muzzle_local_position()
+		indicator_polygon = weapon.projectile_polygon if weapon.projectile_polygon.size() >= 3 else PackedVector2Array([
+			Vector2(-3.0, -10.0),
+			Vector2(3.0, -10.0),
+			Vector2(4.0, 0.0),
+			Vector2(0.0, 10.0),
+			Vector2(-4.0, 0.0),
+		])
+	else:
+		indicator_polygon = PackedVector2Array([
 			Vector2(-applied_attack_area_size.x * 0.5, -applied_attack_area_size.y * 0.5),
 			Vector2(applied_attack_area_size.x * 0.5, -applied_attack_area_size.y * 0.5),
 			Vector2(applied_attack_area_size.x * 0.5, applied_attack_area_size.y * 0.5),
 			Vector2(-applied_attack_area_size.x * 0.5, applied_attack_area_size.y * 0.5)
 		])
+
+	player.weapon_visual.position = weapon.held_visual_offset if weapon.held_visual_polygon.size() >= 3 else get_default_held_weapon_polygon_offset()
+	player.weapon_visual.polygon = weapon.held_visual_polygon if weapon.held_visual_polygon.size() >= 3 else get_default_held_weapon_polygon()
+	player.weapon_visual.color = weapon.held_visual_color if weapon.held_visual_polygon.size() >= 3 else player.DEFAULT_HELD_WEAPON_COLOR
+	player.attack_area.position = applied_attack_area_position
+	player.attack_indicator.position = indicator_position
+	if player.attack_area_shape.shape is RectangleShape2D:
+		var shape := player.attack_area_shape.shape as RectangleShape2D
+		shape.size = applied_attack_area_size
+		player.attack_indicator.polygon = indicator_polygon
 
 	player._attack_flash_color = weapon.attack_flash_color
 	player._attack_flash_start_scale = weapon.attack_flash_start_scale
@@ -197,6 +214,14 @@ func commit_attack(weapon_override: Resource = null) -> void:
 	if consumes_ammo:
 		player._consume_weapon_magazine_round(weapon)
 	_emit_weapon_noise(weapon)
+	if weapon.uses_projectile:
+		play_projectile_attack_effect(weapon)
+		player.attack_cooldown_remaining = weapon.attack_cooldown
+		_spawn_projectile_attack(weapon, attack_result, build_attack_damage_map(weapon, hit_targets))
+		player._flash_body(Color(1.0, 0.82, 0.54, 1.0))
+		player._attack_windup_weapon = null
+		player._attack_windup_visual_only = false
+		return
 	if hit_targets.is_empty():
 		play_attack_effect(weapon, attack_result)
 		player._flash_body(Color(1.0, 0.82, 0.54, 1.0))
@@ -230,6 +255,8 @@ func commit_attack(weapon_override: Resource = null) -> void:
 
 
 func cancel_attack_windup() -> void:
+	if player._attack_windup_weapon != null and bool(player._attack_windup_weapon.uses_projectile):
+		player.firearm_windup_changed.emit(false)
 	player.attack_windup_timer.stop()
 	player._attack_windup_pending = false
 	player._attack_windup_weapon = null
@@ -250,6 +277,8 @@ func start_attack_sequence(weapon: Resource, visual_only: bool) -> void:
 	player._attack_windup_pending = true
 	player._attack_windup_weapon = weapon
 	player._attack_windup_visual_only = visual_only
+	if not visual_only and bool(weapon.uses_projectile):
+		player.firearm_windup_changed.emit(true)
 	_show_attack_indicator_windup(weapon.attack_windup)
 	player.attack_windup_timer.start(weapon.attack_windup)
 
@@ -265,6 +294,13 @@ func play_attack_effect(weapon: Resource, attack_result: Dictionary) -> void:
 		)
 		return
 	_play_attack_flash()
+
+
+func play_projectile_attack_effect(weapon: Resource) -> void:
+	if weapon != null:
+		player._play_combat_sound(get_attack_sound_id_for_weapon(weapon), get_attack_sound_pitch_for_weapon(weapon), get_attack_sound_volume_for_weapon(weapon))
+	_play_muzzle_flash()
+	_show_attack_indicator_strike()
 
 
 func get_attack_sound_id_for_weapon(weapon: Resource) -> StringName:
@@ -663,3 +699,77 @@ func _play_shot_impact(end_point: Vector2, impact_kind: String) -> void:
 		player.shot_impact.scale = Vector2.ONE
 		player.shot_impact.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	)
+
+
+func _spawn_projectile_attack(weapon: Resource, attack_result: Dictionary, damage_map: Dictionary) -> void:
+	if weapon == null:
+		return
+	var projectile_parent: Node = player.get_parent()
+	if projectile_parent == null or not is_instance_valid(projectile_parent):
+		return
+	var muzzle_global: Vector2 = player.attack_pivot.to_global(get_muzzle_local_position())
+	var resolved_end_point: Vector2 = attack_result.get("end_point", muzzle_global + player.facing_direction * float(weapon.attack_range))
+	var hit_targets: Array = Array(attack_result.get("targets", []))
+	if hit_targets.is_empty():
+		var structure_hit: Dictionary = _get_structure_block_hit(player.attack_pivot.global_position, resolved_end_point)
+		if not structure_hit.is_empty():
+			var block_point: Vector2 = structure_hit.get("position", resolved_end_point)
+			player._play_combat_sound(
+				get_attack_impact_sound_id("structure"),
+				randf_range(0.98, 1.04),
+				get_attack_impact_volume("structure")
+			)
+			player._play_shot_impact(block_point, "structure")
+			return
+		var miss_direction: Vector2 = resolved_end_point - muzzle_global
+		if miss_direction.is_zero_approx():
+			miss_direction = player.facing_direction
+		_spawn_player_projectile(
+			projectile_parent,
+			weapon,
+			muzzle_global,
+			miss_direction.normalized(),
+			int(weapon.damage),
+			minf(muzzle_global.distance_to(resolved_end_point), float(weapon.attack_range))
+		)
+		return
+	for target in hit_targets:
+		if target == null or not is_instance_valid(target):
+			continue
+		var target_direction: Vector2 = (target.global_position - muzzle_global).normalized()
+		if target_direction.is_zero_approx():
+			target_direction = player.facing_direction
+		_spawn_player_projectile(
+			projectile_parent,
+			weapon,
+			muzzle_global,
+			target_direction,
+			int(damage_map.get(target, weapon.damage)),
+			minf(muzzle_global.distance_to(target.global_position), float(weapon.attack_range))
+		)
+
+
+func _spawn_player_projectile(projectile_parent: Node, weapon: Resource, origin: Vector2, direction: Vector2, damage: int, travel_range: float) -> void:
+	var projectile = PlayerProjectileScene.instantiate()
+	projectile_parent.add_child(projectile)
+	projectile.configure({
+		"attacker": player,
+		"origin": origin,
+		"direction": direction,
+		"range": maxf(travel_range, 1.0),
+		"speed": float(weapon.projectile_speed),
+		"hit_radius": float(weapon.projectile_hit_radius),
+		"damage": damage,
+		"damage_type": weapon.damage_type,
+		"knockback_force": float(weapon.knockback_force),
+		"polygon": weapon.projectile_polygon,
+		"color": weapon.projectile_color,
+		"impact_color": weapon.projectile_impact_color,
+	})
+
+
+func _get_structure_block_hit(from_position: Vector2, to_position: Vector2) -> Dictionary:
+	var ray_query := PhysicsRayQueryParameters2D.create(from_position, to_position)
+	ray_query.exclude = [player]
+	ray_query.collision_mask = STRUCTURE_ATTACK_BLOCKER_MASK
+	return player.get_world_2d().direct_space_state.intersect_ray(ray_query)

@@ -41,6 +41,18 @@ class_name WeaponDefinition
 @export var muzzle_flash_color: Color = Color(1.0, 0.87, 0.55, 0.95)
 @export var muzzle_flash_scale: Vector2 = Vector2(1.0, 1.0)
 @export_range(0.01, 1.0, 0.01) var muzzle_flash_duration: float = 0.05
+@export var uses_projectile: bool = false
+@export_range(0.0, 2400.0, 10.0) var projectile_speed: float = 1000.0
+@export_range(0.0, 64.0, 1.0) var projectile_hit_radius: float = 6.0
+@export var projectile_polygon: PackedVector2Array = PackedVector2Array([
+	Vector2(-2.0, -6.0),
+	Vector2(2.0, -6.0),
+	Vector2(3.0, 0.0),
+	Vector2(0.0, 6.0),
+	Vector2(-3.0, 0.0),
+])
+@export var projectile_color: Color = Color(1.0, 0.94, 0.74, 0.98)
+@export var projectile_impact_color: Color = Color(1.0, 0.84, 0.54, 0.95)
 @export var tracer_color: Color = Color(1.0, 0.95, 0.78, 0.9)
 @export_range(1.0, 16.0, 0.5) var tracer_width: float = 2.0
 @export_range(0.01, 1.0, 0.01) var tracer_duration: float = 0.05
@@ -105,6 +117,12 @@ func is_valid_definition() -> bool:
 	if muzzle_flash_scale.x <= 0.0 or muzzle_flash_scale.y <= 0.0:
 		return false
 	if muzzle_flash_duration <= 0.0:
+		return false
+	if projectile_speed < 0.0:
+		return false
+	if projectile_hit_radius < 0.0:
+		return false
+	if uses_projectile and projectile_polygon.size() < 3:
 		return false
 	if tracer_width <= 0.0:
 		return false

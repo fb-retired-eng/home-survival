@@ -30,6 +30,8 @@ const STATUS_COLORS := {
 	"danger": Color(0.98, 0.62, 0.62, 0.98),
 	"success": Color(0.79, 0.93, 0.74, 0.98),
 }
+const WEAPON_LABEL_IDLE_COLOR := Color(0.96, 0.82, 0.54, 1.0)
+const WEAPON_LABEL_FIRING_COLOR := Color(1.0, 0.94, 0.74, 1.0)
 
 var player
 var _health_current: int = 0
@@ -39,6 +41,8 @@ var _energy_maximum: int = 0
 var _wave_current: int = 0
 var _wave_final: int = 0
 var _phase_text: String = "Pre-Wave"
+var _weapon_status_base_text: String = "Weapon: None"
+var _firearm_windup_active: bool = false
 
 @onready var health_value_label: Label = %HealthValueLabel
 @onready var health_bar: ProgressBar = %HealthBar
@@ -52,7 +56,7 @@ var _phase_text: String = "Pre-Wave"
 @onready var base_label: Label = %BaseLabel
 @onready var weapon_label: Label = %WeaponLabel
 @onready var weapon_trait_label: Label = %WeaponTraitLabel
-@onready var resources_label: Label = %ResourcesLabel
+@onready var resources_label: RichTextLabel = %ResourcesLabel
 @onready var status_label: Label = %StatusLabel
 @onready var _status_title_label: Label = %StatusTitle
 @onready var fog_overlay: ColorRect = %FogOverlay
@@ -91,12 +95,14 @@ func bind_player(target) -> void:
 	player.weapon_changed.connect(_on_weapon_changed)
 	player.weapon_status_changed.connect(_on_weapon_status_changed)
 	player.weapon_trait_changed.connect(_on_weapon_trait_changed)
+	player.firearm_windup_changed.connect(_on_firearm_windup_changed)
 	_on_health_changed(player.current_health, player.max_health)
 	_on_energy_changed(player.current_energy, player.max_energy)
 	_on_resources_changed(player.resources.duplicate(true))
 	_on_weapon_changed(player.get_equipped_weapon_display_name(), StringName())
 	_on_weapon_status_changed(player.get_weapon_status_text())
 	_on_weapon_trait_changed(player.get_weapon_trait_text())
+	_on_firearm_windup_changed(false)
 	set_interaction_prompt("")
 
 
@@ -169,6 +175,14 @@ func is_pause_menu_visible() -> bool:
 	return _pause_overlay != null and _pause_overlay.visible
 
 
+func set_pause_actions(active_wave: bool) -> void:
+	if _pause_save_button == null or _pause_save_quit_button == null:
+		return
+	_pause_save_button.disabled = active_wave
+	_pause_save_button.text = "Save Blocked" if active_wave else "Save Game"
+	_pause_save_quit_button.text = "Quit Without Saving" if active_wave else "Save and Quit to Menu"
+
+
 func set_wave(current_wave: int, final_wave: int) -> void:
 	_wave_current = current_wave
 	_wave_final = final_wave
@@ -186,13 +200,16 @@ func set_base_status(intact_count: int, breached_count: int, hp_percent: int) ->
 
 func _on_weapon_changed(display_name: String, _weapon_id: StringName) -> void:
 	if display_name.is_empty():
-		weapon_label.text = "Weapon: None"
+		_weapon_status_base_text = "Weapon: None"
+		_refresh_weapon_status_display()
 		return
-	weapon_label.text = "Weapon: %s" % display_name
+	_weapon_status_base_text = "Weapon: %s" % display_name
+	_refresh_weapon_status_display()
 
 
 func _on_weapon_status_changed(text: String) -> void:
-	weapon_label.text = text
+	_weapon_status_base_text = text
+	_refresh_weapon_status_display()
 
 
 func _on_weapon_trait_changed(text: String) -> void:
@@ -202,6 +219,11 @@ func _on_weapon_trait_changed(text: String) -> void:
 		return
 	weapon_trait_label.visible = true
 	weapon_trait_label.text = text
+
+
+func _on_firearm_windup_changed(active: bool) -> void:
+	_firearm_windup_active = active
+	_refresh_weapon_status_display()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -239,13 +261,19 @@ func _on_energy_changed(current: int, maximum: int) -> void:
 
 
 func _on_resources_changed(resources: Dictionary) -> void:
-	resources_label.text = "SALV %d  PARTS %d  MED %d  AMMO %d" % [
+	resources_label.text = (
+		"[right]"
+		+ "[color=#a69f86]🔩[/color] [color=#f5e6ae]%d[/color]  "
+		+ "[color=#a69f86]⚙️[/color] [color=#f5e6ae]%d[/color]  "
+		+ "[color=#a69f86]🩹[/color] [color=#f5e6ae]%d[/color]  "
+		+ "[color=#a69f86]🍗[/color] [color=#f5e6ae]%d[/color]"
+		+ "[/right]"
+	) % [
 		int(resources.get("salvage", 0)),
 		int(resources.get("parts", 0)),
 		int(resources.get("medicine", 0)),
-		int(resources.get("bullets", 0)),
+		int(resources.get("food", 0)),
 	]
-	resources_label.text += "  FOOD %d" % int(resources.get("food", 0))
 
 
 func _refresh_vitals() -> void:
@@ -269,6 +297,15 @@ func _refresh_progress() -> void:
 		chip_style.bg_color = PHASE_PANEL_COLORS.get(_phase_text, Color(0.19, 0.25, 0.19, 0.94))
 		chip_style.border_color = accent.darkened(0.15)
 		_phase_chip.add_theme_stylebox_override("panel", chip_style)
+
+
+func _refresh_weapon_status_display() -> void:
+	if _weapon_status_base_text.is_empty():
+		weapon_label.text = "Weapon: None"
+		weapon_label.add_theme_color_override("font_color", WEAPON_LABEL_IDLE_COLOR)
+		return
+	weapon_label.text = _weapon_status_base_text
+	weapon_label.add_theme_color_override("font_color", WEAPON_LABEL_FIRING_COLOR if _firearm_windup_active else WEAPON_LABEL_IDLE_COLOR)
 
 
 func _get_status_severity(text: String) -> String:

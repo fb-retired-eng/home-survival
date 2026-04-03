@@ -47,6 +47,8 @@ func add_resource(resource_id: String, amount: int, show_message: bool = true) -
 	var current_amount: int = int(resources.get(resource_id, 0))
 	resources[resource_id] = max(current_amount + amount, 0)
 	resources_changed.emit(resources.duplicate(true))
+	if resource_id == "bullets":
+		_emit_weapon_state()
 	if show_message:
 		message_requested.emit("%s +%d" % [resource_id.capitalize(), amount])
 	return true
@@ -63,6 +65,8 @@ func spend_resource(resource_id: String, amount: int) -> bool:
 		return false
 	resources[resource_id] = current_amount - amount
 	resources_changed.emit(resources.duplicate(true))
+	if resource_id == "bullets":
+		_emit_weapon_state()
 	return true
 
 

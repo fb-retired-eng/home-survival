@@ -50,8 +50,18 @@ func _init() -> void:
 	var active_wave_saved_player: Dictionary = active_wave_payload.get("run", {}).get("player", {})
 	print("pause_probe_active_wave_blocked=%s" % str(int(active_wave_saved_player.get("health", 0)) == int(saved_player.get("health", 0))))
 	print("pause_probe_active_wave_status=%s" % String(game.hud.get_node("PauseOverlay/PausePanel/PauseBox/PauseStatus").text))
-	game._on_pause_resume_requested()
+	print("pause_probe_active_wave_save_label=%s" % String(game.hud.get_node("PauseOverlay/PausePanel/PauseBox/PauseSaveButton").text))
+	print("pause_probe_active_wave_save_disabled=%s" % str(bool(game.hud.get_node("PauseOverlay/PausePanel/PauseBox/PauseSaveButton").disabled)))
+	print("pause_probe_active_wave_quit_label=%s" % String(game.hud.get_node("PauseOverlay/PausePanel/PauseBox/PauseSaveQuitButton").text))
+	game._on_pause_save_quit_requested()
 	await _wait_frames()
+	await _wait_frames()
+	print("pause_probe_active_wave_quit_back_to_menu=%s" % str(boot._menu_panel.visible))
+	print("pause_probe_active_wave_quit_game_host_children=%d" % boot._game_host.get_child_count())
+
+	boot._on_continue_pressed()
+	await _wait_frames()
+	game = boot._game_host.get_children()[0]
 	game.game_manager.set_run_state(game.game_manager.RunState.PRE_WAVE)
 	await _wait_frames()
 

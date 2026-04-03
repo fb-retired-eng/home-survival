@@ -402,10 +402,9 @@ func _on_pause_save_requested() -> void:
 
 
 func _on_pause_save_quit_requested() -> void:
-	if not _save_active_run():
-		if hud != null and is_instance_valid(hud):
-			hud.show_pause_menu("Saving is blocked during active waves.")
-		return
+	var saved := _save_active_run()
+	if not saved and hud != null and is_instance_valid(hud):
+		hud.show_pause_menu("Active wave. Quitting without saving.")
 	_set_pause_state(false)
 	return_to_menu_requested.emit()
 
@@ -1033,7 +1032,12 @@ func _set_pause_state(paused: bool) -> void:
 	get_tree().paused = paused
 	if hud != null and is_instance_valid(hud):
 		if paused:
-			hud.show_pause_menu("Paused. Save before quitting or resume when ready.")
+			var active_wave: bool = game_manager != null and game_manager.run_state == game_manager.RunState.ACTIVE_WAVE
+			hud.set_pause_actions(active_wave)
+			var status_text := "Paused. Save before quitting or resume when ready."
+			if active_wave:
+				status_text = "Paused. Active wave: saving is blocked, but you can quit without saving."
+			hud.show_pause_menu(status_text)
 		else:
 			hud.hide_pause_menu()
 	if player != null and is_instance_valid(player):
