@@ -2,6 +2,7 @@ extends CharacterBody2D
 class_name GameEnemy
 
 const EnemyDefinitionResource = preload("res://scripts/data/enemy_definition.gd")
+const EnemyProjectileScene = preload("res://scenes/enemies/EnemyProjectile.tscn")
 const ResourcePickupScene = preload("res://scenes/world/ResourcePickup.tscn")
 const HEALTH_BAR_FILL_HALF_WIDTH := 14.0
 const HEALTH_BAR_FILL_HALF_HEIGHT := 2.0
@@ -1102,6 +1103,43 @@ func _get_attack_flash_duration() -> float:
 	if definition == null:
 		return 0.08
 	return definition.attack_flash_duration
+
+
+func _uses_projectile_attack_on_target(target) -> bool:
+	if definition == null or not definition.uses_projectile_attack:
+		return false
+	if target == null or not is_instance_valid(target):
+		return false
+	if not target.is_in_group("player"):
+		return false
+	return not _is_player_body_touching(target)
+
+
+func _spawn_attack_projectile(target) -> bool:
+	if not _uses_projectile_attack_on_target(target):
+		return false
+	if _enemy_layer_ref == null or not is_instance_valid(_enemy_layer_ref):
+		return false
+	var projectile := EnemyProjectileScene.instantiate()
+	var destination: Vector2 = _get_target_point(target)
+	var facing_rotation: float = _facing_direction.angle() + PI / 2.0
+	var launch_offset: Vector2 = definition.projectile_launch_offset.rotated(facing_rotation)
+	_enemy_layer_ref.add_child(projectile)
+	projectile.configure({
+		"attacker": self,
+		"target": target,
+		"origin": global_position + launch_offset,
+		"destination": destination,
+		"damage": _get_damage_amount_for_target(target),
+		"damage_type": structure_damage_type,
+		"knockback_force": player_knockback_force,
+		"speed": definition.projectile_speed,
+		"hit_radius": definition.projectile_hit_radius,
+		"polygon": definition.projectile_polygon,
+		"color": definition.projectile_color,
+		"impact_color": definition.projectile_impact_color,
+	})
+	return true
 
 
 func _get_detection_facing_dot_threshold() -> float:

@@ -103,6 +103,19 @@ enum WaveTargetMode {
 @export var attack_flash_start_scale: Vector2 = Vector2(0.78, 0.78)
 @export var attack_flash_peak_scale: Vector2 = Vector2(1.08, 1.08)
 @export_range(0.01, 1.0, 0.01) var attack_flash_duration: float = 0.08
+@export var uses_projectile_attack: bool = false
+@export_range(0.0, 600.0, 1.0) var projectile_speed: float = 220.0
+@export var projectile_launch_offset: Vector2 = Vector2(0.0, -10.0)
+@export_range(0.0, 64.0, 1.0) var projectile_hit_radius: float = 10.0
+@export var projectile_polygon: PackedVector2Array = PackedVector2Array([
+	Vector2(-4.0, -6.0),
+	Vector2(4.0, -6.0),
+	Vector2(6.0, 0.0),
+	Vector2(0.0, 7.0),
+	Vector2(-6.0, 0.0),
+])
+@export var projectile_color: Color = Color(0.72, 0.98, 0.56, 0.96)
+@export var projectile_impact_color: Color = Color(0.9, 1.0, 0.86, 0.92)
 @export_range(0.0, 16.0, 0.1) var damage_feedback_distance: float = 4.0
 @export var damage_feedback_scale: Vector2 = Vector2(1.06, 0.94)
 @export_range(0.01, 0.5, 0.01) var damage_feedback_duration: float = 0.12
@@ -205,6 +218,12 @@ func is_valid_definition() -> bool:
 	if attack_flash_peak_scale.x <= 0.0 or attack_flash_peak_scale.y <= 0.0:
 		return false
 	if attack_flash_duration <= 0.0:
+		return false
+	if projectile_speed < 0.0:
+		return false
+	if projectile_hit_radius < 0.0:
+		return false
+	if uses_projectile_attack and projectile_polygon.size() < 3:
 		return false
 	if damage_feedback_distance < 0.0:
 		return false

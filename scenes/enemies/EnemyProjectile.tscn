@@ -1,0 +1,27 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/enemy_projectile.gd" id="1_projectile_script"]
+[ext_resource type="Script" path="res://scripts/audio/combat_audio_2d.gd" id="2_combat_audio"]
+
+[node name="EnemyProjectile" type="Node2D"]
+script = ExtResource("1_projectile_script")
+
+[node name="Shadow" type="Polygon2D" parent="."]
+position = Vector2(0, 5)
+color = Color(0.03, 0.04, 0.05, 0.18)
+polygon = PackedVector2Array(-4, -6, 4, -6, 6, 0, 0, 7, -6, 0)
+
+[node name="Visual" type="Polygon2D" parent="."]
+color = Color(0.72, 0.98, 0.56, 0.96)
+polygon = PackedVector2Array(-4, -6, 4, -6, 6, 0, 0, 7, -6, 0)
+
+[node name="ImpactFlash" type="Polygon2D" parent="."]
+visible = false
+color = Color(0.9, 1, 0.86, 0.92)
+polygon = PackedVector2Array(-4, -6, 4, -6, 6, 0, 0, 7, -6, 0)
+
+[node name="CombatAudio" type="Node2D" parent="."]
+script = ExtResource("2_combat_audio")
+voice_count = 1
+max_distance = 900.0
+attenuation = 1.3

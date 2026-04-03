@@ -1930,3 +1930,22 @@ Validation:
 - `combat_audio_probe_enemy_tell=enemy_attack_tell`
 - `combat_audio_probe_enemy_hit=enemy_attack_hit`
 - `save_probe_continue_did_not_rewrite=true`
+
+## 2026-04-03 Spitter Projectile and Detection Pass
+- Added a dedicated `EnemyProjectile` scene and script, then extended `EnemyDefinition` with projectile fields so ranged enemy attacks can be scene-owned and data-driven instead of only using abstract long-range hits.
+- Switched normal and elite spitters onto the projectile path, tuned their projectile shape/color/impact presentation, and moved the spitter palette to a red family so the ranged archetype reads more distinctly from the other enemies.
+- Fixed spitter projectile reliability by spawning from gameplay-facing state instead of visual-node rotation and by giving projectiles a small hit radius so moving-player cases do not randomly slip through.
+- Increased normal and elite spitter detection/chase distances so spitters pick up the player sooner and hold pressure from farther away.
+- Added `spitter_projectile_readability_probe.gd` to verify projectile spawn, readable in-flight state, and landed player damage.
+
+Validation:
+- `spitter_projectile_probe_spawned=true`
+- `spitter_projectile_probe_projectile_visible=true`
+- `spitter_projectile_probe_projectile_red=true`
+- `spitter_projectile_probe_player_health_before=100`
+- `spitter_projectile_probe_player_health_after=90`
+- `spitter_projectile_probe_player_damaged=true`
+- `spitter_structure_range_probe_far=false`
+- `spitter_structure_range_probe_near=true`
+- `combat_audio_probe_enemy_hit=enemy_attack_hit`
+- `save_probe_continue_did_not_rewrite=true`

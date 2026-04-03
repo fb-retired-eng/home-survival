@@ -12,6 +12,10 @@ func try_damage_target(target) -> bool:
 	if not can_execute_attack(target):
 		return false
 
+	if enemy._uses_projectile_attack_on_target(target):
+		play_attack_flash()
+		return enemy._spawn_attack_projectile(target)
+
 	var damage_amount: int = enemy._get_damage_amount_for_target(target)
 	if enemy._is_structure_target(target):
 		target.take_damage(damage_amount, {
