@@ -258,6 +258,60 @@ Validation:
   - `barricade_probe_placeables=1`
   - `barricade_probe_cell_occupied=true`
   - `barricade_probe_salvage_before=72`
+
+## 2026-04-03
+
+### POI Guard And Wave Pressure Tuning
+- Tuned the authored POI guard markers so the six POIs now read as clearer risk bands:
+  - `Tool Yard`: `zombie_basic` `1-2`
+  - `Freight Depot`: `zombie_runner` `2-3`
+  - `Greenhouse`: `zombie_basic` `1-1`
+  - `Checkpoint`: `zombie_spitter` `1-2`
+  - `Truck Stop`: `zombie_basic` `2-2`
+  - `Scrapyard`: `zombie_brute` `1-2`
+- Softened the authored wave curve in `mvp0_waves.tres` by reducing several early/mid counts and easing spawn intervals from wave 1 through wave 8, so the scavenging/construction economy has more room to matter.
+- Trimmed `Checkpoint`'s parts overflow and reduced `Truck Stop` food output so those POIs keep distinct roles instead of crowding each other.
+
+Validation:
+- `map_layout_probe` confirmed the new guard profiles:
+  - `map_layout_probe_guard_a=zombie_basic:1-2`
+  - `map_layout_probe_guard_b=zombie_runner:2-3`
+  - `map_layout_probe_guard_d=zombie_spitter:1-2`
+  - `map_layout_probe_guard_f=zombie_brute:1-2`
+- `daily_poi_modifier_probe` still passed, including disturbed-count deltas and elite rolls.
+- `save_system_probe` still passed with `save_probe_continue_did_not_rewrite=true`.
+
+### Construction Economy Tuning
+- Reduced barricade build/repair costs to keep lane control viable against the softened but still threatening eight-wave curve.
+- Reduced spike trap build friction by lowering its salvage/parts cost, slightly lowering HP, and raising contact damage so it remains a tactical spend instead of a dead luxury item.
+
+Validation:
+- `barricade_placement_probe` confirmed:
+  - `barricade_probe_salvage_after=63`
+  - `barricade_probe_salvage_after_repair=60`
+  - `barricade_probe_salvage_after_recycle=69`
+- `spike_trap_probe` confirmed:
+  - `spike_trap_probe_health_before=50`
+  - `spike_trap_probe_health_after=38`
+  - `spike_trap_probe_player_health_after=100`
+
+### Economy Balance Probe
+- Added `economy_balance_probe.gd` to report:
+  - per-POI base resource totals
+  - guard composition per POI
+  - POI role-driven support-loot defaults
+  - barricade and spike-trap build/repair economics
+  - wave 3 / 5 / 7 pressure totals and enemy mix
+- This probe is now the main numeric check for future MVP0 economy tuning instead of relying only on ad hoc play feel.
+
+Validation:
+- `economy_balance_probe` reported:
+  - `economy_probe_poi_a_base_rewards=salvage:9,parts:3`
+  - `economy_probe_poi_d_base_rewards=salvage:1,parts:4,medicine:1,bullets:16`
+  - `economy_probe_poi_e_base_rewards=salvage:4,parts:1,medicine:1,food:6`
+  - `economy_probe_barricade_build=salvage:9`
+  - `economy_probe_spike_build=salvage:10,parts:1`
+  - `economy_probe_wave_7_breakdown=zombie_brute:2,zombie_runner:3,zombie_spitter:1`
   - `barricade_probe_salvage_after=64`
   - `barricade_probe_placeable_id=barricade`
   - `barricade_probe_damaged_hp=78`

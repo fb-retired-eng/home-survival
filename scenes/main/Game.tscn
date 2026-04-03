@@ -445,7 +445,7 @@ reward_salvage = 3
 position = Vector2(54, -10)
 node_id = &"poi_a_2"
 poi_id = &"poi_a"
-reward_salvage = 2
+reward_salvage = 3
 
 [node name="Node3" parent="World/POI_A" unique_id=634875660 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(-18, 46)
@@ -614,7 +614,7 @@ position = Vector2(54, -14)
 node_id = &"poi_d_2"
 poi_id = &"poi_d"
 reward_salvage = 1
-reward_parts = 2
+reward_parts = 1
 reward_bullets = 4
 
 [node name="Node3" parent="World/POI_D" unique_id=1180630554 instance=ExtResource("6_scavenge_scene")]
@@ -629,7 +629,7 @@ reward_bullets = 3
 position = Vector2(58, 70)
 node_id = &"poi_d_4"
 poi_id = &"poi_d"
-reward_parts = 2
+reward_parts = 1
 reward_bullets = 5
 weapon_reward = ExtResource("18_pistol")
 
@@ -673,6 +673,7 @@ reward_food = 2
 position = Vector2(60, -12)
 node_id = &"poi_e_2"
 poi_id = &"poi_e"
+reward_salvage = 1
 reward_parts = 1
 reward_food = 1
 
@@ -688,7 +689,7 @@ position = Vector2(52, 64)
 node_id = &"poi_e_4"
 poi_id = &"poi_e"
 reward_salvage = 1
-reward_food = 2
+reward_food = 1
 
 [node name="POI_F" type="Node2D" parent="World" unique_id=136744481]
 position = Vector2(1280, 1345)
@@ -801,13 +802,19 @@ script = ExtResource("15_exploration_spawn")
 spawn_id = &"explore_guard_a"
 poi_id = &"poi_a"
 enemy_definition = ExtResource("16_basic_enemy")
+min_count = 1
+max_count = 2
+scatter_radius = 28.0
 
 [node name="POI_B_Guard" type="Marker2D" parent="World/ExplorationSpawnPoints" unique_id=1799033528]
 position = Vector2(2215, 360)
 script = ExtResource("15_exploration_spawn")
 spawn_id = &"explore_guard_b"
 poi_id = &"poi_b"
-enemy_definition = ExtResource("26_brute_enemy")
+enemy_definition = ExtResource("23_runner_enemy")
+min_count = 2
+max_count = 3
+scatter_radius = 34.0
 
 [node name="POI_C_Guard" type="Marker2D" parent="World/ExplorationSpawnPoints" unique_id=1904742490]
 position = Vector2(345, 1090)
@@ -815,6 +822,9 @@ script = ExtResource("15_exploration_spawn")
 spawn_id = &"explore_guard_c"
 poi_id = &"poi_c"
 enemy_definition = ExtResource("16_basic_enemy")
+min_count = 1
+max_count = 1
+scatter_radius = 24.0
 
 [node name="POI_D_Guard" type="Marker2D" parent="World/ExplorationSpawnPoints" unique_id=525360921]
 position = Vector2(2200, 1085)
@@ -822,6 +832,9 @@ script = ExtResource("15_exploration_spawn")
 spawn_id = &"explore_guard_d"
 poi_id = &"poi_d"
 enemy_definition = ExtResource("24_spitter_enemy")
+min_count = 1
+max_count = 2
+scatter_radius = 30.0
 
 [node name="POI_E_Guard" type="Marker2D" parent="World/ExplorationSpawnPoints" unique_id=3365090]
 position = Vector2(1288, 235)
@@ -829,6 +842,9 @@ script = ExtResource("15_exploration_spawn")
 spawn_id = &"explore_guard_e"
 poi_id = &"poi_e"
 enemy_definition = ExtResource("16_basic_enemy")
+min_count = 2
+max_count = 2
+scatter_radius = 30.0
 
 [node name="POI_F_Guard" type="Marker2D" parent="World/ExplorationSpawnPoints" unique_id=188126142]
 position = Vector2(1285, 1195)
@@ -836,6 +852,9 @@ script = ExtResource("15_exploration_spawn")
 spawn_id = &"explore_guard_f"
 poi_id = &"poi_f"
 enemy_definition = ExtResource("26_brute_enemy")
+min_count = 1
+max_count = 2
+scatter_radius = 32.0
 
 [node name="RoamingSpawnZones" type="Node2D" parent="World" unique_id=1631930781]
 
