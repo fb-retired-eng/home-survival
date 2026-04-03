@@ -5,6 +5,11 @@ const EnemyDefinitionResource = preload("res://scripts/data/enemy_definition.gd"
 const ResourcePickupScene = preload("res://scenes/world/ResourcePickup.tscn")
 const HEALTH_BAR_FILL_HALF_WIDTH := 14.0
 const HEALTH_BAR_FILL_HALF_HEIGHT := 2.0
+const GAMEPLAY_Z_BASE := 1000
+const CHASE_LOST_SIGHT_DISTANCE_FACTOR := 1.25
+const CHASE_LOST_SIGHT_DISTANCE_PADDING := 20.0
+const VISUAL_BOB_HEIGHT := 1.8
+const VISUAL_BREATHE_SCALE := 0.02
 
 signal died(zombie: Zombie)
 
@@ -56,13 +61,18 @@ var _has_exploration_anchor: bool = false
 var _knockback_velocity: Vector2 = Vector2.ZERO
 var _base_facing_marker_color: Color
 var _base_elite_aura_color: Color
+var _visual_time: float = 0.0
+var _health_bar_alpha: float = 0.0
 
-@onready var elite_aura: Polygon2D = $EliteAura
-@onready var body_visual: Polygon2D = $Body
-@onready var facing_marker: Polygon2D = $FacingMarker
-@onready var health_bar_background: Polygon2D = $HealthBarBackground
-@onready var health_bar_fill: Polygon2D = $HealthBarFill
-@onready var attack_flash: Polygon2D = $AttackFlash
+@onready var body_shadow: Polygon2D = $BodyShadow
+@onready var state_indicator: Polygon2D = $StateIndicator
+@onready var visual_root: Node2D = $VisualRoot
+@onready var elite_aura: Polygon2D = $VisualRoot/EliteAura
+@onready var body_visual: Polygon2D = $VisualRoot/Body
+@onready var facing_marker: Polygon2D = $VisualRoot/FacingMarker
+@onready var health_bar_background: Polygon2D = $VisualRoot/HealthBarBackground
+@onready var health_bar_fill: Polygon2D = $VisualRoot/HealthBarFill
+@onready var attack_flash: Polygon2D = $VisualRoot/AttackFlash
 @onready var damage_area: Area2D = $DamageArea
 @onready var body_touch_area: Area2D = $BodyTouchArea
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
@@ -72,6 +82,7 @@ var _base_elite_aura_color: Color
 
 func _ready() -> void:
 	add_to_group("enemies")
+	set_process(true)
 	_base_color = body_visual.color
 	_base_facing_marker_color = facing_marker.color
 	_base_elite_aura_color = elite_aura.color
@@ -82,6 +93,11 @@ func _ready() -> void:
 	_refresh_player_reference()
 	_update_facing_direction(_facing_direction)
 	_refresh_health_bar()
+	_update_render_order()
+
+
+func _process(delta: float) -> void:
+	_update_visual_animation(delta)
 
 
 func configure_runtime_context(player_ref = null, enemy_layer: Node = null, placeables_root: Node = null) -> void:
@@ -209,6 +225,7 @@ func _physics_process(delta: float) -> void:
 		velocity = Vector2.ZERO
 
 	move_and_slide()
+	_update_render_order()
 	_player_obstructing_this_frame = _is_player_obstructing(primary_target)
 
 	if _is_under_knockback():
@@ -536,6 +553,7 @@ func _refresh_health_bar() -> void:
 		0.28,
 		0.96
 	)
+	_update_health_bar_visibility(0.0)
 
 
 func _apply_knockback_from_source(source: Variant) -> void:
@@ -646,17 +664,25 @@ func _update_player_chase_state() -> void:
 		return
 
 	var distance_to_player: float = global_position.distance_to(live_player.global_position)
+	var can_detect_player: bool = _can_detect_player_for_chase(live_player)
 	if _is_player_body_touching(live_player):
 		_alert_to_player(live_player)
+		can_detect_player = true
 
 	if _is_alerted_to_player:
-		_is_chasing_player = distance_to_player <= _get_player_chase_break_radius()
+		var blind_pursuit_break_radius := _get_player_lost_sight_break_radius()
+		if can_detect_player:
+			_is_chasing_player = distance_to_player <= _get_player_chase_break_radius()
+		elif distance_to_player <= _get_player_detection_radius():
+			_is_chasing_player = true
+		else:
+			_is_chasing_player = distance_to_player <= blind_pursuit_break_radius
 		if not _is_chasing_player:
 			_is_alerted_to_player = false
 			_reset_attack_prep()
 		return
 
-	if not _should_chase_player_when_nearby() or not _can_detect_player_for_chase(live_player):
+	if not _should_chase_player_when_nearby() or not can_detect_player:
 		_is_chasing_player = false
 		if was_alerted or was_chasing:
 			_is_alerted_to_player = false
@@ -862,6 +888,16 @@ func _get_player_chase_break_radius() -> float:
 	if definition == null:
 		return 128.0
 	return definition.player_chase_break_radius
+
+
+func _get_player_lost_sight_break_radius() -> float:
+	var detection_radius := _get_player_detection_radius()
+	var chase_break_radius := _get_player_chase_break_radius()
+	var blind_pursuit_radius := maxf(
+		detection_radius * CHASE_LOST_SIGHT_DISTANCE_FACTOR,
+		detection_radius + CHASE_LOST_SIGHT_DISTANCE_PADDING
+	)
+	return minf(chase_break_radius, blind_pursuit_radius)
 
 
 func _get_attack_prep_time() -> float:
@@ -1276,3 +1312,73 @@ func _get_damage_knock_direction(source: Variant) -> Vector2:
 func _play_combat_sound(sound_id: StringName, pitch_scale: float = 1.0, volume_db: float = 0.0) -> void:
 	if combat_audio != null and is_instance_valid(combat_audio) and combat_audio.has_method("play_sound"):
 		combat_audio.play_sound(sound_id, pitch_scale, volume_db)
+
+
+func _update_render_order() -> void:
+	z_as_relative = false
+	z_index = GAMEPLAY_Z_BASE + int(round(global_position.y))
+
+
+func _update_visual_animation(delta: float) -> void:
+	if visual_root == null or body_shadow == null:
+		return
+
+	var movement_ratio := clampf(velocity.length() / maxf(move_speed, 1.0), 0.0, 1.0)
+	_visual_time += delta * lerpf(1.8, 8.2, movement_ratio)
+	var breathe := sin(_visual_time * 1.9) * VISUAL_BREATHE_SCALE
+	var bob := sin(_visual_time * 8.5) * VISUAL_BOB_HEIGHT * movement_ratio
+	visual_root.position = Vector2(0.0, bob)
+	visual_root.scale = Vector2(
+		1.0 + 0.04 * movement_ratio + maxf(breathe, 0.0),
+		1.0 - 0.03 * movement_ratio - minf(breathe, 0.0)
+	)
+
+	body_shadow.scale = Vector2(1.0 - 0.12 * movement_ratio, 1.0 + 0.08 * movement_ratio)
+	body_shadow.modulate = Color(1.0, 1.0, 1.0, 0.18 + 0.06 * movement_ratio)
+
+	if elite_aura.visible:
+		var aura_pulse := 1.0 + 0.06 * sin(_visual_time * 3.8)
+		elite_aura.scale = Vector2.ONE * aura_pulse
+
+	_update_state_indicator()
+	_update_health_bar_visibility(delta)
+
+
+func _update_state_indicator() -> void:
+	if state_indicator == null:
+		return
+	if _attack_prep_armed:
+		state_indicator.visible = true
+		state_indicator.color = Color(1.0, 0.9, 0.72, 0.92)
+		state_indicator.scale = Vector2.ONE * (1.0 + 0.1 * sin(_visual_time * 7.0))
+		return
+	if _is_alerted_to_player or _is_chasing_player:
+		state_indicator.visible = true
+		state_indicator.color = Color(1.0, 0.52, 0.42, 0.82)
+		state_indicator.scale = Vector2.ONE * (0.96 + 0.08 * sin(_visual_time * 5.0))
+		return
+	if _has_active_noise_investigation():
+		state_indicator.visible = true
+		state_indicator.color = Color(0.58, 0.84, 1.0, 0.72)
+		state_indicator.scale = Vector2.ONE * (0.9 + 0.06 * sin(_visual_time * 4.2))
+		return
+	state_indicator.visible = false
+
+
+func _update_health_bar_visibility(delta: float) -> void:
+	if health_bar_background == null or health_bar_fill == null:
+		return
+	var should_show := false
+	if definition != null and definition.is_elite:
+		should_show = true
+	elif current_health < max_health:
+		should_show = true
+	elif _is_alerted_to_player or _is_chasing_player or _has_active_noise_investigation() or _attack_prep_armed:
+		should_show = true
+	var target_alpha := 1.0 if should_show else 0.0
+	var step := 1.0 if delta <= 0.0 else delta * 5.0
+	_health_bar_alpha = move_toward(_health_bar_alpha, target_alpha, step)
+	health_bar_background.visible = _health_bar_alpha > 0.01
+	health_bar_fill.visible = current_health > 0 and _health_bar_alpha > 0.01
+	health_bar_background.modulate.a = 0.88 * _health_bar_alpha
+	health_bar_fill.modulate.a = 0.96 * _health_bar_alpha

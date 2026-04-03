@@ -25,24 +25,31 @@ func configure(config: Dictionary) -> void:
 	_fog_world_max = config.get("fog_world_max", _fog_world_max)
 	if player != null and is_instance_valid(player):
 		_fog_home_world_position = player.global_position
-	_initialize_fog_memory()
+		_initialize_fog_memory()
 	set_physics_process(true)
+	set_process(true)
 
 
 func _physics_process(_delta: float) -> void:
 	_update_fog_memory()
+
+
+func _process(_delta: float) -> void:
 	if hud == null or not is_instance_valid(hud):
 		return
 	if player == null or not is_instance_valid(player):
 		return
 	if player_camera == null or not is_instance_valid(player_camera):
 		return
-	var camera_screen_center: Vector2 = player_camera.get_screen_center_position()
+	var canvas_to_world: Transform2D = get_viewport().get_canvas_transform().affine_inverse()
+	var viewport_rect := get_viewport().get_visible_rect()
+	var screen_world_top_left: Vector2 = canvas_to_world * Vector2.ZERO
+	var screen_world_bottom_right: Vector2 = canvas_to_world * viewport_rect.size
 	hud.set_home_fog_state(
 		_fog_home_world_position,
-		camera_screen_center,
-		player_camera.zoom,
-		get_viewport().get_visible_rect().size,
+		player.global_position,
+		screen_world_top_left,
+		screen_world_bottom_right,
 		_fog_memory_texture,
 		_fog_world_min,
 		_fog_world_max

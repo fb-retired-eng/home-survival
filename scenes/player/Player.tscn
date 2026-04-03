@@ -26,11 +26,24 @@ collision_layer = 1
 collision_mask = 11
 equipped_weapon = ExtResource("2_weapon")
 
-[node name="Body" type="Polygon2D" parent="."]
+[node name="BodyShadow" type="Polygon2D" parent="."]
+position = Vector2(0, 11)
+color = Color(0.03, 0.04, 0.05, 0.24)
+polygon = PackedVector2Array(-12, -6, 12, -6, 16, 0, 12, 6, -12, 6, -16, 0)
+
+[node name="StateRing" type="Polygon2D" parent="."]
+visible = false
+position = Vector2(0, 2)
+color = Color(0.98, 0.84, 0.52, 0.46)
+polygon = PackedVector2Array(-15, -3, -9, -9, 9, -9, 15, -3, 15, 3, 9, 9, -9, 9, -15, 3)
+
+[node name="VisualRoot" type="Node2D" parent="."]
+
+[node name="Body" type="Polygon2D" parent="VisualRoot"]
 color = Color(0.88, 0.92, 0.96, 1)
 polygon = PackedVector2Array(-12, -12, 12, -12, 12, 12, -12, 12)
 
-[node name="FacingMarker" type="Polygon2D" parent="."]
+[node name="FacingMarker" type="Polygon2D" parent="VisualRoot"]
 color = Color(0.96, 0.49, 0.29, 1)
 polygon = PackedVector2Array(0, -18, 6, -6, -6, -6)
 

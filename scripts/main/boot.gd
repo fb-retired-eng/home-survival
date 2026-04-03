@@ -65,6 +65,12 @@ func _bind_controls() -> void:
 	_continue_button.disabled = true
 	_load_button.disabled = true
 	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	for button in [_start_button, _continue_button, _load_button, _settings_button, _quit_button]:
+		button.focus_mode = Control.FOCUS_ALL
+	for button in _load_slot_buttons:
+		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 
 
 func _show_main_menu() -> void:
@@ -77,7 +83,7 @@ func _show_main_menu() -> void:
 	_settings_panel.visible = false
 	_load_panel.visible = false
 	_refresh_save_menu_state()
-	_update_status("Menu ready")
+	_update_status("Perimeter ready. Continue a run or start a fresh day cycle.")
 
 
 func _show_settings_menu() -> void:
@@ -85,7 +91,7 @@ func _show_settings_menu() -> void:
 	_menu_panel.visible = false
 	_settings_panel.visible = true
 	_load_panel.visible = false
-	_update_status("Settings")
+	_update_status("Adjust the shell before heading back into the run.")
 
 
 func _show_load_menu() -> void:
@@ -94,7 +100,7 @@ func _show_load_menu() -> void:
 	_settings_panel.visible = false
 	_load_panel.visible = true
 	_refresh_save_menu_state()
-	_update_status("Select a save slot")
+	_update_status("Choose a slot to restore.")
 
 
 func _sync_settings_controls() -> void:
@@ -216,7 +222,7 @@ func _refresh_save_menu_state() -> void:
 		return
 	_continue_button.disabled = not _save_manager.has_any_save()
 	if _load_status_label != null:
-		_load_status_label.text = "Choose a save slot."
+		_load_status_label.text = "Choose a save slot. Latest activity is surfaced first on Continue."
 	var summaries: Array[Dictionary] = _save_manager.get_slot_summaries()
 	for index in range(_load_slot_buttons.size()):
 		var button := _load_slot_buttons[index]
@@ -227,7 +233,7 @@ func _refresh_save_menu_state() -> void:
 			button.disabled = true
 			continue
 		var summary: Dictionary = summaries[index]
-		button.text = String(summary.get("summary_text", "Slot %d" % (index + 1)))
+		button.text = _format_slot_summary(index, summary)
 		button.disabled = not bool(summary.get("occupied", false))
 
 
@@ -239,3 +245,11 @@ func _on_game_return_to_menu_requested() -> void:
 func _update_status(text: String) -> void:
 	if _status_label != null:
 		_status_label.text = text
+
+
+func _format_slot_summary(index: int, summary: Dictionary) -> String:
+	if not bool(summary.get("occupied", false)):
+		return "Slot %d\nEmpty" % (index + 1)
+	var summary_text := String(summary.get("summary_text", "Slot %d" % (index + 1)))
+	var slot_id := String(summary.get("slot_id", "slot_%d" % (index + 1)))
+	return "%s\n%s" % [summary_text, slot_id.replace("_", " ").capitalize()]

@@ -1,10 +1,35 @@
 extends CanvasLayer
 class_name HUD
 
-const FOG_START_DISTANCE := 720.0
-const FOG_END_DISTANCE := 1320.0
-const FOG_MAX_ALPHA := 0.82
+const FOG_START_DISTANCE := 560.0
+const FOG_END_DISTANCE := 980.0
+const FOG_MAX_ALPHA := 0.9
+const FOG_PLAYER_CLEAR_RADIUS := 140.0
+const FOG_PLAYER_CLEAR_FADE_RADIUS := 240.0
 const FOG_COLOR := Color(0.03, 0.05, 0.06, 1.0)
+const HUD_PANEL_OVERLAP_MARGIN := 18.0
+const HUD_PANEL_VISIBLE_ALPHA := 1.0
+const HUD_PANEL_FADED_ALPHA := 0.24
+const PHASE_COLORS := {
+	"Day": Color(0.72, 0.9, 0.68, 1.0),
+	"Night": Color(0.96, 0.72, 0.44, 1.0),
+	"Post-Wave": Color(0.62, 0.82, 0.96, 1.0),
+	"Victory": Color(0.97, 0.84, 0.56, 1.0),
+	"Loss": Color(0.92, 0.42, 0.44, 1.0),
+}
+const PHASE_PANEL_COLORS := {
+	"Day": Color(0.16, 0.23, 0.16, 0.94),
+	"Night": Color(0.25, 0.17, 0.1, 0.94),
+	"Post-Wave": Color(0.13, 0.19, 0.25, 0.94),
+	"Victory": Color(0.25, 0.2, 0.1, 0.94),
+	"Loss": Color(0.29, 0.13, 0.14, 0.94),
+}
+const STATUS_COLORS := {
+	"default": Color(0.92, 0.95, 0.97, 0.94),
+	"warning": Color(0.99, 0.86, 0.59, 0.98),
+	"danger": Color(0.98, 0.62, 0.62, 0.98),
+	"success": Color(0.79, 0.93, 0.74, 0.98),
+}
 
 var player
 var _health_current: int = 0
@@ -19,12 +44,17 @@ var _phase_text: String = "Pre-Wave"
 @onready var health_bar: ProgressBar = %HealthBar
 @onready var energy_value_label: Label = %EnergyValueLabel
 @onready var energy_bar: ProgressBar = %EnergyBar
+@onready var _main_panel: PanelContainer = $MainPanel
+@onready var _status_panel: PanelContainer = $StatusPanel
 @onready var wave_label: Label = %WaveLabel
+@onready var _phase_label: Label = %PhaseLabel
+@onready var _phase_chip: PanelContainer = %PhaseChip
 @onready var base_label: Label = %BaseLabel
 @onready var weapon_label: Label = %WeaponLabel
 @onready var weapon_trait_label: Label = %WeaponTraitLabel
 @onready var resources_label: Label = %ResourcesLabel
 @onready var status_label: Label = %StatusLabel
+@onready var _status_title_label: Label = %StatusTitle
 @onready var fog_overlay: ColorRect = %FogOverlay
 @onready var interaction_panel: PanelContainer = %InteractionLabel.get_parent()
 @onready var interaction_label: Label = %InteractionLabel
@@ -45,6 +75,7 @@ signal pause_save_quit_requested
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	set_process(true)
 	_pause_resume_button.pressed.connect(_on_pause_resume_pressed)
 	_pause_save_button.pressed.connect(_on_pause_save_pressed)
 	_pause_save_quit_button.pressed.connect(_on_pause_save_quit_pressed)
@@ -69,29 +100,46 @@ func bind_player(target) -> void:
 	set_interaction_prompt("")
 
 
+func _process(delta: float) -> void:
+	_update_overlay_occlusion(delta)
+
+
 func set_status(text: String) -> void:
 	status_label.text = text
+	var severity := _get_status_severity(text)
+	status_label.add_theme_color_override("font_color", STATUS_COLORS.get(severity, STATUS_COLORS["default"]))
+	match severity:
+		"danger":
+			_status_title_label.text = "ALERT"
+		"warning":
+			_status_title_label.text = "PRESSURE"
+		"success":
+			_status_title_label.text = "READY"
+		_:
+			_status_title_label.text = "FIELD STATUS"
 
 
-func set_home_fog_state(home_world_position: Vector2, camera_world_position: Vector2, camera_zoom: Vector2, viewport_size: Vector2, reveal_texture: Texture2D, reveal_world_min: Vector2, reveal_world_max: Vector2) -> void:
+func set_home_fog_state(home_world_position: Vector2, player_world_position: Vector2, screen_world_top_left: Vector2, screen_world_bottom_right: Vector2, reveal_texture: Texture2D, reveal_world_min: Vector2, reveal_world_max: Vector2) -> void:
 	var material := fog_overlay.material as ShaderMaterial
 	if material == null:
 		return
 	material.set_shader_parameter("home_world_position", home_world_position)
-	material.set_shader_parameter("camera_world_position", camera_world_position)
-	material.set_shader_parameter("camera_zoom", camera_zoom)
-	material.set_shader_parameter("viewport_size", viewport_size)
+	material.set_shader_parameter("player_world_position", player_world_position)
+	material.set_shader_parameter("screen_world_top_left", screen_world_top_left)
+	material.set_shader_parameter("screen_world_bottom_right", screen_world_bottom_right)
 	material.set_shader_parameter("reveal_texture", reveal_texture)
 	material.set_shader_parameter("reveal_world_min", reveal_world_min)
 	material.set_shader_parameter("reveal_world_max", reveal_world_max)
 	material.set_shader_parameter("fog_start_distance", FOG_START_DISTANCE)
 	material.set_shader_parameter("fog_end_distance", FOG_END_DISTANCE)
 	material.set_shader_parameter("fog_max_alpha", FOG_MAX_ALPHA)
+	material.set_shader_parameter("player_clear_radius", FOG_PLAYER_CLEAR_RADIUS)
+	material.set_shader_parameter("player_clear_fade_radius", FOG_PLAYER_CLEAR_FADE_RADIUS)
 	material.set_shader_parameter("fog_color", FOG_COLOR)
 
 
 func set_interaction_prompt(text: String) -> void:
-	interaction_label.text = text
+	interaction_label.text = "Action: %s" % text if not text.is_empty() else ""
 	interaction_panel.visible = not text.is_empty()
 
 
@@ -109,6 +157,7 @@ func hide_end_overlay() -> void:
 func show_pause_menu(status_text: String = "Game paused") -> void:
 	_pause_status_label.text = status_text
 	_pause_overlay.visible = true
+	_pause_resume_button.grab_focus()
 
 
 func hide_pause_menu() -> void:
@@ -190,13 +239,13 @@ func _on_energy_changed(current: int, maximum: int) -> void:
 
 
 func _on_resources_changed(resources: Dictionary) -> void:
-	resources_label.text = "🔩%d  ⚙️%d  🩹%d  ◉%d" % [
+	resources_label.text = "SALV %d  PARTS %d  MED %d  AMMO %d" % [
 		int(resources.get("salvage", 0)),
 		int(resources.get("parts", 0)),
 		int(resources.get("medicine", 0)),
 		int(resources.get("bullets", 0)),
 	]
-	resources_label.text += "  🍗%d" % int(resources.get("food", 0))
+	resources_label.text += "  FOOD %d" % int(resources.get("food", 0))
 
 
 func _refresh_vitals() -> void:
@@ -209,4 +258,51 @@ func _refresh_vitals() -> void:
 
 
 func _refresh_progress() -> void:
-	wave_label.text = "Wave %d / %d   |   %s" % [_wave_current, _wave_final, _phase_text]
+	wave_label.text = "Night %d / %d" % [_wave_current, _wave_final]
+	_phase_label.text = _phase_text.to_upper()
+	var accent: Color = PHASE_COLORS.get(_phase_text, Color(0.95, 0.97, 0.99, 1.0))
+	_phase_label.add_theme_color_override("font_color", accent)
+	wave_label.add_theme_color_override("font_color", accent.lightened(0.16))
+	var stylebox := _phase_chip.get_theme_stylebox("panel")
+	if stylebox is StyleBoxFlat:
+		var chip_style := stylebox.duplicate() as StyleBoxFlat
+		chip_style.bg_color = PHASE_PANEL_COLORS.get(_phase_text, Color(0.19, 0.25, 0.19, 0.94))
+		chip_style.border_color = accent.darkened(0.15)
+		_phase_chip.add_theme_stylebox_override("panel", chip_style)
+
+
+func _get_status_severity(text: String) -> String:
+	var lower := text.to_lower()
+	if lower.contains("died") or lower.contains("failed") or lower.contains("blocked") or lower.contains("breached") or lower.contains("not enough"):
+		return "danger"
+	if lower.contains("need ") or lower.contains("incoming") or lower.contains("too close") or lower.contains("hold the") or lower.contains("night "):
+		return "warning"
+	if lower.contains("cleared") or lower.contains("saved") or lower.contains("ready") or lower.contains("survived"):
+		return "success"
+	return "default"
+
+
+func _update_overlay_occlusion(delta: float) -> void:
+	if player == null or not is_instance_valid(player):
+		_set_panel_alpha(_main_panel, HUD_PANEL_VISIBLE_ALPHA)
+		_set_panel_alpha(_status_panel, HUD_PANEL_VISIBLE_ALPHA)
+		return
+	var canvas_transform: Transform2D = get_viewport().get_canvas_transform()
+	var player_screen_position: Vector2 = canvas_transform * player.global_position
+	_update_panel_occlusion_alpha(_main_panel, player_screen_position, delta)
+	_update_panel_occlusion_alpha(_status_panel, player_screen_position, delta)
+
+
+func _update_panel_occlusion_alpha(panel: Control, player_screen_position: Vector2, delta: float) -> void:
+	if panel == null or not is_instance_valid(panel) or not panel.visible:
+		return
+	var rect := panel.get_global_rect().grow(HUD_PANEL_OVERLAP_MARGIN)
+	var target_alpha := HUD_PANEL_FADED_ALPHA if rect.has_point(player_screen_position) else HUD_PANEL_VISIBLE_ALPHA
+	var current_alpha := panel.modulate.a
+	panel.modulate.a = move_toward(current_alpha, target_alpha, delta * 5.0)
+
+
+func _set_panel_alpha(panel: Control, alpha: float) -> void:
+	if panel == null or not is_instance_valid(panel):
+		return
+	panel.modulate.a = alpha

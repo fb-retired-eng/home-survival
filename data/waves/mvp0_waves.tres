@@ -83,7 +83,6 @@ lanes = Array[Resource]([SubResource("9"), SubResource("3"), SubResource("10")])
 [sub_resource type="Resource" id="12"]
 script = ExtResource("3_lane")
 lane_id = &"east"
-count = 1
 enemy_definition = ExtResource("7_spitter_enemy")
 preferred_socket_ids = PackedStringArray("door_e")
 
@@ -103,7 +102,6 @@ preferred_socket_ids = PackedStringArray("wall_n")
 [sub_resource type="Resource" id="15"]
 script = ExtResource("3_lane")
 lane_id = &"west"
-count = 1
 enemy_definition = ExtResource("5_brute_enemy")
 preferred_socket_ids = PackedStringArray("door_w")
 
@@ -123,7 +121,6 @@ preferred_socket_ids = PackedStringArray("wall_n")
 [sub_resource type="Resource" id="18"]
 script = ExtResource("3_lane")
 lane_id = &"east"
-count = 1
 enemy_definition = ExtResource("5_brute_enemy")
 preferred_socket_ids = PackedStringArray("door_e")
 

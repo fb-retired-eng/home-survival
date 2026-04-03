@@ -22,29 +22,22 @@
 [ext_resource type="Script" uid="uid://dwa7iri2l2fef" path="res://scripts/world/roaming_spawn_zone.gd" id="25_roaming_zone"]
 [ext_resource type="Resource" path="res://data/enemies/zombie_brute.tres" id="26_brute_enemy"]
 [ext_resource type="Resource" path="res://data/enemies/zombie_elite_spitter.tres" id="27_elite_spitter_enemy"]
-[ext_resource type="Resource" path="res://data/enemies/zombie_elite_brute.tres" id="28_elite_brute_enemy"]
 [ext_resource type="PackedScene" path="res://scenes/world/ConstructionGrid.tscn" id="29_construction_grid_scene"]
 [ext_resource type="PackedScene" path="res://scenes/world/Placeable.tscn" id="30_placeable_scene"]
 [ext_resource type="Resource" path="res://data/placeables/barricade.tres" id="31_barricade_profile"]
 [ext_resource type="Resource" path="res://data/placeables/spike_trap.tres" id="32_spike_trap_profile"]
-[ext_resource type="Script" path="res://scripts/main/construction_controller.gd" id="33_construction_controller"]
-[ext_resource type="Script" path="res://scripts/main/fog_controller.gd" id="34_fog_controller"]
+[ext_resource type="Script" uid="uid://be4lu6vqqn2lh" path="res://scripts/main/construction_controller.gd" id="33_construction_controller"]
+[ext_resource type="Script" uid="uid://bohh64mgpcsn1" path="res://scripts/main/fog_controller.gd" id="34_fog_controller"]
 [ext_resource type="PackedScene" path="res://scenes/world/ResourcePickup.tscn" id="35_resource_pickup_scene"]
-[ext_resource type="Script" path="res://scripts/world/micro_loot_spawn.gd" id="36_micro_loot_spawn"]
-[ext_resource type="Script" path="res://scripts/main/poi_controller.gd" id="39_poi_controller"]
-[ext_resource type="Script" path="res://scripts/main/exploration_controller.gd" id="40_exploration_controller"]
+[ext_resource type="Script" uid="uid://ci6myjdqkg1bs" path="res://scripts/world/micro_loot_spawn.gd" id="36_micro_loot_spawn"]
+[ext_resource type="Script" uid="uid://dnj8cse3afaib" path="res://scripts/main/poi_controller.gd" id="39_poi_controller"]
+[ext_resource type="Script" uid="uid://oifrb4s8gwg0" path="res://scripts/main/exploration_controller.gd" id="40_exploration_controller"]
 [ext_resource type="Resource" path="res://data/pois/poi_a_definition.tres" id="41_poi_a_definition"]
 [ext_resource type="Resource" path="res://data/pois/poi_b_definition.tres" id="42_poi_b_definition"]
 [ext_resource type="Resource" path="res://data/pois/poi_c_definition.tres" id="43_poi_c_definition"]
 [ext_resource type="Resource" path="res://data/pois/poi_d_definition.tres" id="44_poi_d_definition"]
 [ext_resource type="Resource" path="res://data/pois/poi_e_definition.tres" id="45_poi_e_definition"]
 [ext_resource type="Resource" path="res://data/pois/poi_f_definition.tres" id="46_poi_f_definition"]
-
-[sub_resource type="RectangleShape2D" id="1_horizontal_wall"]
-size = Vector2(5120, 32)
-
-[sub_resource type="RectangleShape2D" id="2_vertical_wall"]
-size = Vector2(32, 2880)
 
 [sub_resource type="RectangleShape2D" id="3_poi_a_blocker"]
 size = Vector2(84, 72)
@@ -63,6 +56,12 @@ size = Vector2(180, 56)
 
 [sub_resource type="RectangleShape2D" id="8_poi_f_blocker"]
 size = Vector2(178, 70)
+
+[sub_resource type="RectangleShape2D" id="1_horizontal_wall"]
+size = Vector2(5120, 32)
+
+[sub_resource type="RectangleShape2D" id="2_vertical_wall"]
+size = Vector2(32, 2880)
 
 [node name="Game" type="Node2D" unique_id=393065020]
 script = ExtResource("8_game_script")
@@ -89,21 +88,22 @@ script = ExtResource("5_wave_manager")
 zombie_scene = ExtResource("12_zombie_scene")
 wave_set_definition = ExtResource("14_waves")
 
-[node name="ConstructionController" type="Node" parent="."]
+[node name="ConstructionController" type="Node" parent="." unique_id=484513233]
 script = ExtResource("33_construction_controller")
 
-[node name="PoiController" type="Node" parent="."]
+[node name="PoiController" type="Node" parent="." unique_id=2011332462]
 script = ExtResource("39_poi_controller")
 
-[node name="ExplorationController" type="Node" parent="."]
+[node name="ExplorationController" type="Node" parent="." unique_id=571054771]
 script = ExtResource("40_exploration_controller")
 
-[node name="FogController" type="Node" parent="."]
+[node name="FogController" type="Node" parent="." unique_id=1984275659]
 script = ExtResource("34_fog_controller")
 
 [node name="World" type="Node2D" parent="." unique_id=715950200]
 
 [node name="Playfield" type="Polygon2D" parent="World" unique_id=391663097]
+position = Vector2(144, 56)
 color = Color(0.14, 0.18, 0.15, 1)
 polygon = PackedVector2Array(-1280, -720, 3840, -720, 3840, 2160, -1280, 2160)
 
@@ -144,7 +144,6 @@ reserved_cells = PackedVector2Array(1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 1,
 position = Vector2(744, 646)
 script = ExtResource("36_micro_loot_spawn")
 spawn_id = &"micro_nw_route_salvage"
-resource_id = "salvage"
 amount = 2
 
 [node name="NW_YardParts" type="Marker2D" parent="World/MicroLootSpawns" unique_id=982460649]
@@ -173,13 +172,11 @@ position = Vector2(1280, 326)
 script = ExtResource("36_micro_loot_spawn")
 spawn_id = &"micro_n_center_food"
 resource_id = "food"
-amount = 1
 
 [node name="SW_RouteSalvage" type="Marker2D" parent="World/MicroLootSpawns" unique_id=1666726640]
 position = Vector2(770, 932)
 script = ExtResource("36_micro_loot_spawn")
 spawn_id = &"micro_sw_route_salvage"
-resource_id = "salvage"
 amount = 2
 
 [node name="SW_GardenFood" type="Marker2D" parent="World/MicroLootSpawns" unique_id=1675717506]
@@ -201,14 +198,12 @@ position = Vector2(2014, 1294)
 script = ExtResource("36_micro_loot_spawn")
 spawn_id = &"micro_se_clinic_medicine"
 resource_id = "medicine"
-amount = 1
 
 [node name="SouthCenterParts" type="Marker2D" parent="World/MicroLootSpawns" unique_id=1164826170]
 position = Vector2(1288, 1058)
 script = ExtResource("36_micro_loot_spawn")
 spawn_id = &"micro_s_center_parts"
 resource_id = "parts"
-amount = 1
 
 [node name="ToolYardSalvage" type="Marker2D" parent="World/MicroLootSpawns" unique_id=766221228]
 position = Vector2(312, 292)
@@ -555,15 +550,15 @@ reward_food = 2
 position = Vector2(52, -18)
 node_id = &"poi_c_2"
 poi_id = &"poi_c"
-reward_food = 2
 reward_medicine = 1
+reward_food = 2
 
 [node name="Node3" parent="World/POI_C" unique_id=977986020 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(-18, 54)
 node_id = &"poi_c_3"
 poi_id = &"poi_c"
-reward_food = 1
 reward_medicine = 2
+reward_food = 1
 
 [node name="Node4" parent="World/POI_C" unique_id=711954846 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(56, 66)
@@ -802,7 +797,6 @@ script = ExtResource("15_exploration_spawn")
 spawn_id = &"explore_guard_a"
 poi_id = &"poi_a"
 enemy_definition = ExtResource("16_basic_enemy")
-min_count = 1
 max_count = 2
 scatter_radius = 28.0
 
@@ -822,7 +816,6 @@ script = ExtResource("15_exploration_spawn")
 spawn_id = &"explore_guard_c"
 poi_id = &"poi_c"
 enemy_definition = ExtResource("16_basic_enemy")
-min_count = 1
 max_count = 1
 scatter_radius = 24.0
 
@@ -832,7 +825,6 @@ script = ExtResource("15_exploration_spawn")
 spawn_id = &"explore_guard_d"
 poi_id = &"poi_d"
 enemy_definition = ExtResource("24_spitter_enemy")
-min_count = 1
 max_count = 2
 scatter_radius = 30.0
 
@@ -852,7 +844,6 @@ script = ExtResource("15_exploration_spawn")
 spawn_id = &"explore_guard_f"
 poi_id = &"poi_f"
 enemy_definition = ExtResource("26_brute_enemy")
-min_count = 1
 max_count = 2
 scatter_radius = 32.0
 
@@ -939,7 +930,6 @@ spawn_weight = 1.1
 position = Vector2(1284, 1038)
 script = ExtResource("25_roaming_zone")
 zone_id = &"roam_s_scrapyard"
-scatter_radius = 120.0
 spawn_weight = 0.75
 
 [node name="ExplorationEnemies" type="Node2D" parent="World" unique_id=1108712987]

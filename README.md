@@ -24,9 +24,10 @@ The repo currently includes:
 - multiple weapons, including POI-obtained baseball bat, pistol, and shotgun upgrades, bullet pickups, weapon switching, reloadable firearm behavior, simple on-player weapon illustrations, and visible weapon-trait HUD text
 - food as a prep resource, a dinner-at-table transition that starts the night wave, and bed-based sleep that returns the run to the next day with partial HP restore
 - six authored POIs, eight authored waves, roaming prep-stage exploration spawns, and six live enemy definitions including elite spitter and elite brute variants
+- exploration zombies now drop aggro after losing sight and falling beyond a reasonable chase distance, instead of tracking the player indefinitely across open ground
 - fortified wall/door upgrades beyond the original reinforced tier
 - review-driven guardrails around elite-only weapon drops, spitter structure range, reset-state UI consistency, and bat-only attack interrupt behavior
-- HUD for core status display, including the currently equipped weapon
+- a polished authored UI shell across the boot menu, settings/load panels, pause overlay, and HUD, with clearer phase emphasis, cleaner resource/readout labels, stronger status treatment, and more intentional interaction prompts
 - construction-system foundation for a larger authored map with a local buildable band around the home, build-mode placement, tactical cell reservations, selectable multi-cell buildables, and the first barricade placeable with repair/recycle support; this is now an active tactical layer, not just scaffolding
 - home-anchored fog-of-war that starts beyond the local home area and keeps areas the player has already visited revealed, so the enlarged map has clearer nearby readability and persistent exploration memory
 - MVP0.5 boot shell with authored menu and pause scenes, continue/load slots, persistent settings, pause-menu save/quit, and versioned run saves that restore construction and fog memory; manual saves are blocked during active waves, loading a slot no longer rewrites it on entry, and fullscreen now applies through Godot's window mode API

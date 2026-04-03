@@ -5,6 +5,8 @@ func _wait_frames() -> void:
 	await process_frame
 	await physics_frame
 	await process_frame
+	await physics_frame
+	await process_frame
 
 
 func _sample_fog_alpha(material: ShaderMaterial, world_position: Vector2, camera_position: Vector2, viewport_size: Vector2, camera_zoom: Vector2) -> float:
@@ -12,6 +14,9 @@ func _sample_fog_alpha(material: ShaderMaterial, world_position: Vector2, camera
 	var fog_start_variant: Variant = material.get_shader_parameter("fog_start_distance")
 	var fog_end_variant: Variant = material.get_shader_parameter("fog_end_distance")
 	var fog_max_variant: Variant = material.get_shader_parameter("fog_max_alpha")
+	var player_world_position_variant: Variant = material.get_shader_parameter("player_world_position")
+	var player_clear_radius_variant: Variant = material.get_shader_parameter("player_clear_radius")
+	var player_clear_fade_radius_variant: Variant = material.get_shader_parameter("player_clear_fade_radius")
 	var reveal_texture_variant: Variant = material.get_shader_parameter("reveal_texture")
 	var reveal_world_min_variant: Variant = material.get_shader_parameter("reveal_world_min")
 	var reveal_world_max_variant: Variant = material.get_shader_parameter("reveal_world_max")
@@ -21,6 +26,15 @@ func _sample_fog_alpha(material: ShaderMaterial, world_position: Vector2, camera
 	var fog_start_distance: float = fog_start_variant
 	var fog_end_distance: float = fog_end_variant
 	var fog_max_alpha: float = fog_max_variant
+	var player_world_position: Vector2 = Vector2.ZERO
+	if player_world_position_variant != null:
+		player_world_position = player_world_position_variant as Vector2
+	var player_clear_radius: float = 0.0
+	if player_clear_radius_variant != null:
+		player_clear_radius = float(player_clear_radius_variant)
+	var player_clear_fade_radius: float = player_clear_radius
+	if player_clear_fade_radius_variant != null:
+		player_clear_fade_radius = float(player_clear_fade_radius_variant)
 	var revealed := false
 	if reveal_texture_variant != null and reveal_world_min_variant != null and reveal_world_max_variant != null:
 		var reveal_texture := reveal_texture_variant as Texture2D
@@ -43,7 +57,14 @@ func _sample_fog_alpha(material: ShaderMaterial, world_position: Vector2, camera
 	var fog_amount := 0.0
 	if fog_end_distance > fog_start_distance:
 		fog_amount = clamp((distance_from_home - fog_start_distance) / (fog_end_distance - fog_start_distance), 0.0, 1.0)
-	return fog_amount * fog_max_alpha
+	var alpha := fog_amount * fog_max_alpha
+	var distance_from_player := world_position.distance_to(player_world_position)
+	if player_clear_fade_radius > player_clear_radius:
+		var player_clear: float = clamp((distance_from_player - player_clear_radius) / (player_clear_fade_radius - player_clear_radius), 0.0, 1.0)
+		alpha *= player_clear
+	elif distance_from_player <= player_clear_radius:
+		alpha = 0.0
+	return alpha
 
 
 func _init() -> void:
@@ -58,22 +79,30 @@ func _init() -> void:
 	var camera := game.player.get_node("Camera2D") as Camera2D
 	var viewport_size: Vector2 = game.get_viewport().get_visible_rect().size
 	var home_position: Vector2 = game.player.global_position
-	var camera_screen_center: Vector2 = camera.get_screen_center_position()
+	var canvas_to_world: Transform2D = game.get_viewport().get_canvas_transform().affine_inverse()
+	var screen_world_top_left: Vector2 = canvas_to_world * Vector2.ZERO
+	var screen_world_bottom_right: Vector2 = canvas_to_world * viewport_size
 
-	var home_alpha := _sample_fog_alpha(material, home_position, camera_screen_center, viewport_size, camera.zoom)
+	var home_alpha := _sample_fog_alpha(material, home_position, camera.get_screen_center_position(), viewport_size, camera.zoom)
 	var far_position := Vector2(2355.0, 220.0)
-	var far_alpha_before := _sample_fog_alpha(material, far_position, camera_screen_center, viewport_size, camera.zoom)
+	var far_alpha_before := _sample_fog_alpha(material, far_position, camera.get_screen_center_position(), viewport_size, camera.zoom)
 
 	game.player.global_position = far_position
 	await _wait_frames()
-	camera_screen_center = camera.get_screen_center_position()
-	var far_alpha_after_visit := _sample_fog_alpha(material, far_position, camera_screen_center, viewport_size, camera.zoom)
+	canvas_to_world = game.get_viewport().get_canvas_transform().affine_inverse()
+	screen_world_top_left = canvas_to_world * Vector2.ZERO
+	screen_world_bottom_right = canvas_to_world * viewport_size
+	var far_alpha_after_visit := _sample_fog_alpha(material, far_position, camera.get_screen_center_position(), viewport_size, camera.zoom)
+	var player_alpha_after_move := _sample_fog_alpha(material, game.player.global_position, camera.get_screen_center_position(), viewport_size, camera.zoom)
 
 	print("map_fog_probe_home_alpha=%.3f" % home_alpha)
 	print("map_fog_probe_far_alpha_before_visit=%.3f" % far_alpha_before)
 	print("map_fog_probe_far_alpha_after_visit=%.3f" % far_alpha_after_visit)
+	print("map_fog_probe_player_alpha_after_move=%.3f" % player_alpha_after_move)
 	print("map_fog_probe_overlay_visible=%s" % str(fog_overlay.visible))
 	print("map_fog_probe_home_center=%s" % str(material.get_shader_parameter("home_world_position")))
-	print("map_fog_probe_camera_center=%s" % str(material.get_shader_parameter("camera_world_position")))
-	print("map_fog_probe_camera_screen_center=%s" % str(camera_screen_center))
+	print("map_fog_probe_screen_world_top_left=%s" % str(material.get_shader_parameter("screen_world_top_left")))
+	print("map_fog_probe_screen_world_bottom_right=%s" % str(material.get_shader_parameter("screen_world_bottom_right")))
+	print("map_fog_probe_canvas_top_left=%s" % str(screen_world_top_left))
+	print("map_fog_probe_canvas_bottom_right=%s" % str(screen_world_bottom_right))
 	quit()

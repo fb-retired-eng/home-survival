@@ -20,6 +20,13 @@ const DEFAULT_HELD_WEAPON_OFFSET := Vector2(10.0, -10.0)
 const DEFAULT_HELD_WEAPON_COLOR := Color(0.86, 0.86, 0.9, 1.0)
 const DEFAULT_SPREAD_HITSCAN_CONE_DEGREES := 30.0
 const STRUCTURE_ATTACK_BLOCKER_MASK := 2 | 4
+const GAMEPLAY_Z_BASE := 1000
+const VISUAL_BOB_HEIGHT := 2.4
+const VISUAL_LEAN_RADIANS := 0.08
+const VISUAL_BREATHE_SCALE := 0.025
+const STATE_RING_BUILD_COLOR := Color(0.98, 0.84, 0.52, 1.0)
+const STATE_RING_RELOAD_COLOR := Color(0.52, 0.82, 1.0, 1.0)
+const STATE_RING_BUSY_COLOR := Color(0.7, 0.95, 0.72, 1.0)
 
 signal health_changed(current: int, maximum: int)
 signal energy_changed(current: int, maximum: int)
@@ -105,9 +112,14 @@ var _knockback_velocity: Vector2 = Vector2.ZERO
 var _shot_impact_tween: Tween
 var _build_mode_active: bool = false
 var _build_mode_allowed: bool = true
+var _visual_time: float = 0.0
+var _state_ring_alpha: float = 0.0
 
-@onready var body_visual: Polygon2D = $Body
-@onready var facing_marker: Polygon2D = $FacingMarker
+@onready var body_shadow: Polygon2D = $BodyShadow
+@onready var state_ring: Polygon2D = $StateRing
+@onready var visual_root: Node2D = $VisualRoot
+@onready var body_visual: Polygon2D = $VisualRoot/Body
+@onready var facing_marker: Polygon2D = $VisualRoot/FacingMarker
 @onready var attack_pivot: Node2D = $AttackPivot
 @onready var weapon_visual: Polygon2D = $AttackPivot/WeaponVisual
 @onready var attack_area: Area2D = $AttackPivot/AttackArea
@@ -132,6 +144,7 @@ var _spawn_position: Vector2
 func _ready() -> void:
 	add_to_group("player")
 	set_process_input(true)
+	set_process(true)
 	_spawn_position = global_position
 	current_health = max_health
 	current_energy = max_energy
@@ -181,6 +194,10 @@ func _ready() -> void:
 	_emit_full_state()
 	_update_interaction_prompt()
 	_update_render_order()
+
+
+func _process(delta: float) -> void:
+	_update_visual_animation(delta)
 
 
 func _physics_process(delta: float) -> void:
@@ -548,6 +565,7 @@ func reset_for_new_run() -> void:
 	_emit_full_state()
 	_update_interaction_prompt()
 	_update_render_order()
+	_state_ring_alpha = 0.0
 
 
 func _rebuild_collision_mask() -> void:
@@ -686,12 +704,55 @@ func _unregister_interactable(interactable: Node2D) -> void:
 
 
 func _update_render_order() -> void:
-	z_index = int(round(global_position.y))
+	z_as_relative = false
+	z_index = GAMEPLAY_Z_BASE + int(round(global_position.y))
 
 
 func _update_facing_visuals() -> void:
 	attack_pivot.rotation = facing_direction.angle() + PI / 2.0
 	facing_marker.rotation = attack_pivot.rotation
+
+
+func _update_visual_animation(delta: float) -> void:
+	if visual_root == null or body_shadow == null or state_ring == null:
+		return
+
+	var movement_ratio := clampf(velocity.length() / maxf(move_speed, 1.0), 0.0, 1.0)
+	_visual_time += delta * lerpf(2.0, 9.0, movement_ratio)
+	var breathe := sin(_visual_time * 2.2) * VISUAL_BREATHE_SCALE
+	var bob := sin(_visual_time * 10.0) * VISUAL_BOB_HEIGHT * movement_ratio
+	var lean_target := clampf(velocity.x / maxf(move_speed, 1.0), -1.0, 1.0) * VISUAL_LEAN_RADIANS
+
+	visual_root.position = Vector2(0.0, bob)
+	visual_root.rotation = lerpf(visual_root.rotation, lean_target, minf(delta * 10.0, 1.0))
+	var stretch_x := 1.0 + 0.045 * movement_ratio + maxf(breathe, 0.0)
+	var stretch_y := 1.0 - 0.03 * movement_ratio - minf(breathe, 0.0)
+	visual_root.scale = Vector2(stretch_x, stretch_y)
+
+	body_shadow.scale = Vector2(1.0 - 0.14 * movement_ratio, 1.0 + 0.08 * movement_ratio)
+	body_shadow.modulate = Color(1.0, 1.0, 1.0, 0.18 + 0.07 * movement_ratio)
+
+	var target_ring_alpha := 0.0
+	var ring_color := STATE_RING_BUILD_COLOR
+	if is_dead:
+		target_ring_alpha = 0.0
+	elif _build_mode_active:
+		target_ring_alpha = 0.55
+		ring_color = STATE_RING_BUILD_COLOR
+	elif _is_reloading_weapon():
+		target_ring_alpha = 0.5
+		ring_color = STATE_RING_RELOAD_COLOR
+	elif is_busy:
+		target_ring_alpha = 0.42
+		ring_color = STATE_RING_BUSY_COLOR
+	_state_ring_alpha = move_toward(_state_ring_alpha, target_ring_alpha, delta * 4.0)
+	if _state_ring_alpha <= 0.01:
+		state_ring.visible = false
+		return
+	state_ring.visible = true
+	var pulse := 1.0 + 0.08 * sin(_visual_time * 5.0)
+	state_ring.scale = Vector2.ONE * pulse
+	state_ring.color = Color(ring_color.r, ring_color.g, ring_color.b, _state_ring_alpha * (0.82 + 0.12 * sin(_visual_time * 4.0)))
 
 
 func get_equipped_weapon_display_name() -> String:

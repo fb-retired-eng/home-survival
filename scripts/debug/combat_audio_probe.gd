@@ -67,11 +67,13 @@ func _init() -> void:
 	attack_zombie._update_facing_direction(player.global_position - attack_zombie.global_position)
 	attack_zombie._process_attack_prep(player)
 	await process_frame
+	await physics_frame
 	print("combat_audio_probe_zombie_tell=%s" % str(attack_zombie_audio.get_last_sound_id()))
 
 	attack_zombie._update_facing_direction(player.global_position - attack_zombie.global_position)
 	attack_zombie._try_damage_target(player)
 	await process_frame
+	await physics_frame
 	print("combat_audio_probe_zombie_hit=%s" % str(attack_zombie_audio.get_last_sound_id()))
 
 	var socket = game.defense_sockets.get_child(0)

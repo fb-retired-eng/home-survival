@@ -1837,3 +1837,34 @@ Validation:
 - `combat_audio_probe_zombie_tell=zombie_attack_tell`
 - `combat_audio_probe_zombie_hit=zombie_attack_hit`
 - `combat_audio_probe_structure_hit=structure_hit`
+
+## 2026-04-02 UI Polish Pass
+- Reworked the authored boot shell so the main menu, settings panel, and load screen read more like intentional game UI instead of bare debug panels, while keeping the existing boot/save flow unchanged.
+- Polished the HUD hierarchy by separating phase from wave count, switching the resource strip to clearer text labels, upgrading the status card into a titled field-status block, and styling pause/action surfaces more consistently.
+- Added presentation-side severity handling in `hud.gd` so warning, danger, and success messages carry stronger visual feedback without changing gameplay logic.
+
+Validation:
+- `settings_manager_probe_boot_start_button=true`
+- `settings_manager_probe_boot_settings_panel=true`
+- `save_probe_boot_continue_disabled=false`
+- `pause_probe_menu_visible=true`
+- `pause_probe_active_wave_blocked=true`
+- `initial_weapon_label=Weapon: Kitchen Knife`
+- `after_bat_weapon_label=Weapon: Baseball Bat`
+- `reset_phase_probe_wave_label=Night 0 / 8`
+
+## 2026-04-03 Fog, Actor Visual, And Chase Polish
+- Tightened the home fog presentation so it settles from the real viewport transform, thickens faster away from home, and still keeps a live clear pocket around the player.
+- Added lightweight visual polish to the player and zombie actors, including shadows, state rings/indicators, movement bob, and clearer in-world combat/readiness feedback.
+- Forced gameplay actors and structures into a dedicated foreground z band and pushed decorative world art into a background layer to reduce accidental map-art overdraw.
+- Fixed exploration zombie chase persistence so alerted enemies only keep chasing while they still have a valid sighted chase distance or a short blind-pursuit buffer; they now drop aggro once the player breaks sight and gets far enough away.
+
+Validation:
+- `actor_visual_probe_build_ring=true`
+- `actor_visual_probe_reload_ring=true`
+- `actor_visual_probe_zombie_noise_indicator=true`
+- `actor_visual_probe_zombie_health_bar=true`
+- `map_fog_probe_far_alpha_before_visit=0.900`
+- `map_fog_probe_player_alpha_after_move=0.000`
+- `zombie_chase_drop_probe_far_engaged=false`
+- `zombie_chase_drop_probe_far_alerted=false`

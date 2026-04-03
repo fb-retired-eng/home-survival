@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=18 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_hud"]
 [ext_resource type="Shader" path="res://shaders/home_fog.gdshader" id="2_home_fog_shader"]
@@ -59,6 +59,74 @@ content_margin_left = 12.0
 content_margin_top = 10.0
 content_margin_right = 12.0
 content_margin_bottom = 10.0
+
+[sub_resource type="StyleBoxFlat" id="10_phase_chip"]
+bg_color = Color(0.19, 0.25, 0.19, 0.94)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.73, 0.88, 0.7, 0.18)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+content_margin_left = 10.0
+content_margin_top = 6.0
+content_margin_right = 10.0
+content_margin_bottom = 6.0
+
+[sub_resource type="StyleBoxFlat" id="11_warning_panel"]
+bg_color = Color(0.19, 0.11, 0.06, 0.94)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.98, 0.8, 0.35, 0.26)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+content_margin_left = 12.0
+content_margin_top = 10.0
+content_margin_right = 12.0
+content_margin_bottom = 10.0
+
+[sub_resource type="StyleBoxFlat" id="12_pause_action"]
+bg_color = Color(0.15, 0.18, 0.22, 0.96)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.77, 0.87, 0.93, 0.12)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="13_pause_action_hover"]
+bg_color = Color(0.19, 0.24, 0.28, 0.98)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.96, 0.84, 0.58, 0.22)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="14_pause_action_pressed"]
+bg_color = Color(0.23, 0.29, 0.34, 0.98)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.96, 0.84, 0.58, 0.34)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
 
 [sub_resource type="StyleBoxFlat" id="6_interaction_panel"]
 bg_color = Color(0.19, 0.13, 0.06, 0.94)
@@ -125,11 +193,11 @@ color = Color(1, 1, 1, 1)
 material = SubResource("8_home_fog_material")
 
 [node name="MainPanel" type="PanelContainer" parent="."]
-custom_minimum_size = Vector2(300, 0)
+custom_minimum_size = Vector2(362, 0)
 offset_left = 16.0
 offset_top = 16.0
-offset_right = 316.0
-offset_bottom = 154.0
+offset_right = 378.0
+offset_bottom = 184.0
 theme_override_styles/panel = SubResource("1_main_panel")
 
 [node name="MarginContainer" type="MarginContainer" parent="MainPanel"]
@@ -143,12 +211,26 @@ theme_override_constants/separation = 8
 [node name="TopRow" type="HBoxContainer" parent="MainPanel/MarginContainer/VBoxContainer"]
 theme_override_constants/separation = 10
 
-[node name="WaveLabel" type="Label" parent="MainPanel/MarginContainer/VBoxContainer/TopRow"]
-unique_name_in_owner = true
+[node name="HeaderStack" type="VBoxContainer" parent="MainPanel/MarginContainer/VBoxContainer/TopRow"]
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 15
+theme_override_constants/separation = 4
+
+[node name="PhaseChip" type="PanelContainer" parent="MainPanel/MarginContainer/VBoxContainer/TopRow/HeaderStack"]
+unique_name_in_owner = true
+size_flags_horizontal = 0
+theme_override_styles/panel = SubResource("10_phase_chip")
+
+[node name="PhaseLabel" type="Label" parent="MainPanel/MarginContainer/VBoxContainer/TopRow/HeaderStack/PhaseChip"]
+unique_name_in_owner = true
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.91, 0.96, 0.89, 0.98)
+text = "DAY PREP"
+
+[node name="WaveLabel" type="Label" parent="MainPanel/MarginContainer/VBoxContainer/TopRow/HeaderStack"]
+unique_name_in_owner = true
+theme_override_font_sizes/font_size = 18
 theme_override_colors/font_color = Color(0.95, 0.97, 0.99, 1)
-text = "Wave 0 / 3 | Pre-Wave"
+text = "Night 0 / 0"
 
 [node name="ResourcesLabel" type="Label" parent="MainPanel/MarginContainer/VBoxContainer/TopRow"]
 unique_name_in_owner = true
@@ -233,19 +315,25 @@ theme_override_colors/font_color = Color(0.78, 0.86, 0.96, 0.92)
 text = "Fast, isolated"
 
 [node name="StatusPanel" type="PanelContainer" parent="."]
-custom_minimum_size = Vector2(300, 0)
+custom_minimum_size = Vector2(362, 0)
 offset_left = 16.0
-offset_top = 162.0
-offset_right = 316.0
-offset_bottom = 226.0
+offset_top = 192.0
+offset_right = 378.0
+offset_bottom = 280.0
 theme_override_styles/panel = SubResource("5_status_panel")
 
-[node name="StatusLabel" type="Label" parent="StatusPanel"]
+[node name="StatusBox" type="VBoxContainer" parent="StatusPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="StatusTitle" type="Label" parent="StatusPanel/StatusBox"]
 unique_name_in_owner = true
-offset_left = 12.0
-offset_top = 10.0
-offset_right = 288.0
-offset_bottom = 58.0
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.97, 0.84, 0.56, 0.86)
+text = "FIELD STATUS"
+
+[node name="StatusLabel" type="Label" parent="StatusPanel/StatusBox"]
+unique_name_in_owner = true
 theme_override_font_sizes/font_size = 14
 theme_override_colors/font_color = Color(0.92, 0.95, 0.97, 0.94)
 autowrap_mode = 3
@@ -263,7 +351,7 @@ offset_left = -190.0
 offset_top = -63.0
 offset_right = 190.0
 offset_bottom = -15.0
-theme_override_styles/panel = SubResource("6_interaction_panel")
+theme_override_styles/panel = SubResource("11_warning_panel")
 
 [node name="InteractionLabel" type="Label" parent="InteractionPanel"]
 unique_name_in_owner = true
@@ -322,21 +410,30 @@ text = "Game paused."
 
 [node name="PauseResumeButton" type="Button" parent="PauseOverlay/PausePanel/PauseBox"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 38)
+custom_minimum_size = Vector2(0, 42)
 layout_mode = 2
 text = "Resume"
+theme_override_styles/normal = SubResource("12_pause_action")
+theme_override_styles/hover = SubResource("13_pause_action_hover")
+theme_override_styles/pressed = SubResource("14_pause_action_pressed")
 
 [node name="PauseSaveButton" type="Button" parent="PauseOverlay/PausePanel/PauseBox"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 38)
+custom_minimum_size = Vector2(0, 42)
 layout_mode = 2
 text = "Save Game"
+theme_override_styles/normal = SubResource("12_pause_action")
+theme_override_styles/hover = SubResource("13_pause_action_hover")
+theme_override_styles/pressed = SubResource("14_pause_action_pressed")
 
 [node name="PauseSaveQuitButton" type="Button" parent="PauseOverlay/PausePanel/PauseBox"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 38)
+custom_minimum_size = Vector2(0, 42)
 layout_mode = 2
 text = "Save and Quit to Menu"
+theme_override_styles/normal = SubResource("12_pause_action")
+theme_override_styles/hover = SubResource("13_pause_action_hover")
+theme_override_styles/pressed = SubResource("14_pause_action_pressed")
 
 [node name="EndOverlay" type="Control" parent="."]
 visible = false

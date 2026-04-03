@@ -7,6 +7,14 @@ const PERIMETER_SEGMENT_DEFINITION_SCRIPT := preload("res://scripts/data/perimet
 const STRUCTURE_PROFILE_SCRIPT := preload("res://scripts/data/structure_profile.gd")
 const MAP_WORLD_MIN := Vector2(-1280.0, -720.0)
 const MAP_WORLD_MAX := Vector2(3840.0, 2160.0)
+const WORLD_ART_Z_INDEX := -20
+const WORLD_ART_EXCLUDED_ROOTS := [
+	&"ConstructionPlaceables",
+	&"AmbientPickups",
+	&"DefenseSockets",
+	&"ExplorationEnemies",
+	&"WaveEnemies",
+]
 
 signal return_to_menu_requested
 
@@ -38,6 +46,7 @@ signal return_to_menu_requested
 @onready var player = $Player
 @onready var hud = $HUD
 @onready var wave_manager = $WaveManager
+@onready var world_root: Node2D = $World
 @onready var food_table: Area2D = $World/FoodTable
 @onready var sleep_point: Area2D = $World/SleepPoint
 @onready var spawn_markers_root: Node2D = $World/SpawnMarkers
@@ -152,6 +161,7 @@ func _ready() -> void:
 		"fog_world_min": MAP_WORLD_MIN,
 		"fog_world_max": MAP_WORLD_MAX,
 	})
+	_configure_world_art_layers()
 	_configure_camera_bounds()
 	_validate_exploration_spawn_points()
 	_validate_roaming_spawn_zones()
@@ -180,6 +190,27 @@ func _configure_camera_bounds() -> void:
 	player_camera.limit_top = int(MAP_WORLD_MIN.y)
 	player_camera.limit_right = int(MAP_WORLD_MAX.x)
 	player_camera.limit_bottom = int(MAP_WORLD_MAX.y)
+
+
+func _configure_world_art_layers() -> void:
+	if world_root == null or not is_instance_valid(world_root):
+		return
+	_apply_world_art_layer_recursive(world_root, false)
+
+
+func _apply_world_art_layer_recursive(node: Node, under_excluded_root: bool) -> void:
+	var next_under_excluded_root := under_excluded_root
+	if node != world_root and node.name is StringName and WORLD_ART_EXCLUDED_ROOTS.has(node.name):
+		next_under_excluded_root = true
+
+	if node is Polygon2D and not next_under_excluded_root:
+		var polygon := node as Polygon2D
+		if polygon.name != "Marker":
+			polygon.z_as_relative = false
+			polygon.z_index = WORLD_ART_Z_INDEX
+
+	for child in node.get_children():
+		_apply_world_art_layer_recursive(child, next_under_excluded_root)
 
 
 func _sync_exploration_state_aliases() -> void:

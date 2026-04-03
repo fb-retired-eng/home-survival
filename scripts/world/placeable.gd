@@ -4,6 +4,7 @@ class_name Placeable
 const PLACEABLE_PROFILE_SCRIPT := preload("res://scripts/data/placeable_profile.gd")
 const PLAYER_BLOCKING_LAYER := 2
 const ZOMBIE_GROUP := "enemies"
+const GAMEPLAY_Z_BASE := 1000
 
 signal state_changed(placeable: Placeable)
 
@@ -32,6 +33,7 @@ var _trap_tick_remaining: float = 0.0
 
 func _ready() -> void:
 	add_to_group("placeables")
+	_update_render_order()
 	_refresh_from_profile()
 	_configure_trap_nodes()
 	_trap_tick_remaining = 0.0
@@ -245,9 +247,15 @@ func apply_save_state(save_state: Dictionary) -> void:
 		float(position_data.get("x", global_position.x)),
 		float(position_data.get("y", global_position.y))
 	)
+	_update_render_order()
 	_refresh_from_profile()
 	_configure_trap_nodes()
 	state_changed.emit(self)
+
+
+func _update_render_order() -> void:
+	z_as_relative = false
+	z_index = GAMEPLAY_Z_BASE + int(round(global_position.y))
 
 
 func begin_player_collision_grace(player: Node2D, construction_grid: Node, footprint_cells: Array[Vector2i], grace_radius_cells: int = 1) -> void:

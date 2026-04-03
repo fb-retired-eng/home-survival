@@ -4,6 +4,7 @@ class_name DefenseSocket
 const WALL_BLOCKER_LAYER := 2
 const DOOR_BLOCKER_LAYER := 4
 const STRUCTURE_PROFILE_SCRIPT := preload("res://scripts/data/structure_profile.gd")
+const GAMEPLAY_Z_BASE := 1000
 
 signal state_changed(socket: DefenseSocket)
 
@@ -41,7 +42,8 @@ func _ready() -> void:
 	max_hp = _get_max_hp_for_tier(tier)
 	_initial_hp = clamp(current_hp, 0, max_hp)
 	current_hp = clamp(current_hp, 0, max_hp)
-	z_index = int(round(global_position.y))
+	z_as_relative = false
+	z_index = GAMEPLAY_Z_BASE + int(round(global_position.y))
 	_refresh_visuals()
 
 
