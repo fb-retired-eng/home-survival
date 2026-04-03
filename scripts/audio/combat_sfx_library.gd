@@ -51,14 +51,14 @@ static func _build_stream(sound_id: StringName) -> AudioStreamWAV:
 				{"duration": 0.12, "start_freq": 180.0, "end_freq": 120.0, "waveform": "saw", "attack": 0.001, "decay": 0.08, "sustain": 0.0, "release": 0.039, "gain": 0.55},
 				{"duration": 0.08, "start_freq": 760.0, "end_freq": 420.0, "waveform": "noise", "attack": 0.001, "decay": 0.05, "sustain": 0.0, "release": 0.029, "gain": 0.22},
 			])
-		"zombie_hurt":
+		"enemy_hurt":
 			return _create_layered_stream([
 				{"duration": 0.09, "start_freq": 140.0, "end_freq": 90.0, "waveform": "saw", "attack": 0.001, "decay": 0.06, "sustain": 0.0, "release": 0.029, "gain": 0.55},
 				{"duration": 0.05, "start_freq": 420.0, "end_freq": 220.0, "waveform": "noise", "attack": 0.001, "decay": 0.035, "sustain": 0.0, "release": 0.014, "gain": 0.18},
 			])
-		"zombie_attack_tell":
+		"enemy_attack_tell":
 			return _create_wave_stream(0.05, 240.0, 310.0, "saw", 0.001, 0.02, 0.0, 0.029)
-		"zombie_attack_hit":
+		"enemy_attack_hit":
 			return _create_layered_stream([
 				{"duration": 0.075, "start_freq": 120.0, "end_freq": 70.0, "waveform": "saw", "attack": 0.001, "decay": 0.05, "sustain": 0.0, "release": 0.024, "gain": 0.5},
 				{"duration": 0.05, "start_freq": 520.0, "end_freq": 180.0, "waveform": "noise", "attack": 0.001, "decay": 0.04, "sustain": 0.0, "release": 0.009, "gain": 0.25},

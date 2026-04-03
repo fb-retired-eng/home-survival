@@ -14,7 +14,7 @@ func _count_weapon_pickups(root_node: Node) -> int:
 
 
 func _init() -> void:
-	var zombie_scene := load("res://scenes/enemies/Zombie.tscn")
+	var enemy_scene := load("res://scenes/enemies/Enemy.tscn")
 	var pistol := load("res://data/weapons/pistol.tres")
 	var base_definition := load("res://data/enemies/zombie_spitter.tres")
 	var non_elite_definition = base_definition.duplicate(true)
@@ -30,7 +30,7 @@ func _init() -> void:
 	root_node.add_child(world_node)
 	current_scene = root_node
 
-	var zombie = zombie_scene.instantiate()
+	var zombie = enemy_scene.instantiate()
 	root_node.add_child(zombie)
 	zombie.definition = non_elite_definition
 	await process_frame

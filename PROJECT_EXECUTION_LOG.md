@@ -1855,16 +1855,20 @@ Validation:
 
 ## 2026-04-03 Fog, Actor Visual, And Chase Polish
 - Tightened the home fog presentation so it settles from the real viewport transform, thickens faster away from home, and still keeps a live clear pocket around the player.
-- Added lightweight visual polish to the player and zombie actors, including shadows, state rings/indicators, movement bob, and clearer in-world combat/readiness feedback.
+- Added lightweight visual polish to the player and enemy actors, including shadows, state rings/indicators, smoother player movement bob/lean, and clearer in-world combat/readiness feedback.
 - Forced gameplay actors and structures into a dedicated foreground z band and pushed decorative world art into a background layer to reduce accidental map-art overdraw.
-- Fixed exploration zombie chase persistence so alerted enemies only keep chasing while they still have a valid sighted chase distance or a short blind-pursuit buffer; they now drop aggro once the player breaks sight and gets far enough away.
+- Fixed exploration enemy chase persistence so alerted enemies now keep chasing while they are still effectively on the current player view; once sight is broken and they fall off-screen/far enough away, they drop aggro.
+- Renamed the enemy scene/script/controller surface to generic enemy terminology (`Enemy.tscn`, `enemy.gd`, `enemy_scene`, neutral `enemy_*` combat audio ids) so future non-zombie enemy types do not inherit zombie-specific code naming.
 
 Validation:
 - `actor_visual_probe_build_ring=true`
 - `actor_visual_probe_reload_ring=true`
-- `actor_visual_probe_zombie_noise_indicator=true`
-- `actor_visual_probe_zombie_health_bar=true`
+- `actor_visual_probe_enemy_noise_indicator=true`
+- `actor_visual_probe_enemy_health_bar=true`
 - `map_fog_probe_far_alpha_before_visit=0.900`
 - `map_fog_probe_player_alpha_after_move=0.000`
+- `zombie_chase_drop_probe_on_screen_engaged=true`
 - `zombie_chase_drop_probe_far_engaged=false`
 - `zombie_chase_drop_probe_far_alerted=false`
+- `combat_audio_probe_enemy_tell=enemy_attack_tell`
+- `combat_audio_probe_enemy_hit=enemy_attack_hit`

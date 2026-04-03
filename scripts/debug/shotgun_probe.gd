@@ -9,13 +9,13 @@ func _get_enemy_health_or_zero(enemy) -> int:
 
 func _init() -> void:
 	var player_scene := load("res://scenes/player/Player.tscn")
-	var zombie_scene := load("res://scenes/enemies/Zombie.tscn")
+	var enemy_scene := load("res://scenes/enemies/Enemy.tscn")
 	var shotgun := load("res://data/weapons/shotgun.tres")
 
 	var player = player_scene.instantiate()
-	var zombie_a = zombie_scene.instantiate()
-	var zombie_b = zombie_scene.instantiate()
-	var zombie_c = zombie_scene.instantiate()
+	var zombie_a = enemy_scene.instantiate()
+	var zombie_b = enemy_scene.instantiate()
+	var zombie_c = enemy_scene.instantiate()
 	root.add_child(player)
 	root.add_child(zombie_a)
 	root.add_child(zombie_b)

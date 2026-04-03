@@ -9,7 +9,7 @@ const WAVE_DEFINITION_SCRIPT := preload("res://scripts/data/wave_definition.gd")
 const WAVE_LANE_DEFINITION_SCRIPT := preload("res://scripts/data/wave_lane_definition.gd")
 const ENEMY_DEFINITION_SCRIPT := preload("res://scripts/data/enemy_definition.gd")
 
-@export var zombie_scene: PackedScene
+@export var enemy_scene: PackedScene
 @export var wave_set_definition: Resource
 @export_range(0.0, 128.0, 1.0) var spawn_jitter_radius: float = 32.0
 @export_range(1, 12, 1) var spawn_jitter_attempts: int = 6
@@ -138,9 +138,9 @@ func _validate_wave_setup(wave_number: int, emit_warnings: bool) -> bool:
 			push_warning("Missing wave definition for wave %d" % wave_number)
 		return false
 
-	if zombie_scene == null:
+	if enemy_scene == null:
 		if emit_warnings:
-			push_warning("WaveManager is missing zombie_scene")
+			push_warning("WaveManager is missing enemy_scene")
 		return false
 
 	if _enemy_parent == null:
@@ -312,7 +312,7 @@ func _spawn_next_enemy() -> void:
 			clear_wave()
 		return
 
-	if zombie_scene == null or _enemy_parent == null:
+	if enemy_scene == null or _enemy_parent == null:
 		push_warning("WaveManager is missing spawn configuration")
 		_spawn_queue.clear()
 		clear_wave()
@@ -325,22 +325,22 @@ func _spawn_next_enemy() -> void:
 	if marker == null:
 		push_warning("Missing spawn marker for lane %s" % lane_id)
 	else:
-		var zombie = zombie_scene.instantiate()
-		zombie.definition = spawn_entry.get("enemy_definition")
-		_enemy_parent.add_child(zombie)
-		zombie.global_position = _get_spawn_position(marker, preferred_socket_ids)
-		if zombie.has_method("configure_runtime_context"):
+		var enemy = enemy_scene.instantiate()
+		enemy.definition = spawn_entry.get("enemy_definition")
+		_enemy_parent.add_child(enemy)
+		enemy.global_position = _get_spawn_position(marker, preferred_socket_ids)
+		if enemy.has_method("configure_runtime_context"):
 			var world_root := _enemy_parent.get_parent() if _enemy_parent != null else null
 			var placeables_root := world_root.get_node_or_null("ConstructionPlaceables") if world_root != null else null
-			zombie.configure_runtime_context(_player, _enemy_parent, placeables_root)
-		if zombie.has_method("configure_wave_context"):
-			zombie.configure_wave_context(
+			enemy.configure_runtime_context(_player, _enemy_parent, placeables_root)
+		if enemy.has_method("configure_wave_context"):
+			enemy.configure_wave_context(
 				_player,
 				_get_defense_sockets(),
 				preferred_socket_ids
 			)
-		if zombie.has_signal("died"):
-			zombie.died.connect(_on_zombie_died)
+		if enemy.has_signal("died"):
+			enemy.died.connect(_on_enemy_died)
 		active_enemies += 1
 
 	if not _spawn_queue.is_empty():
@@ -443,7 +443,7 @@ func _on_spawn_timer_timeout() -> void:
 	_spawn_next_enemy()
 
 
-func _on_zombie_died(_zombie) -> void:
+func _on_enemy_died(_enemy) -> void:
 	active_enemies = max(active_enemies - 1, 0)
 	if _spawn_queue.is_empty() and active_enemies == 0:
 		clear_wave()

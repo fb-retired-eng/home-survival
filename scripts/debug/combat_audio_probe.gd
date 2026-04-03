@@ -44,41 +44,41 @@ func _init() -> void:
 	await process_frame
 	print("combat_audio_probe_player_hurt=%s" % str(player_audio.get_last_sound_id()))
 
-	var zombie_scene := load("res://scenes/enemies/Zombie.tscn")
-	var hurt_zombie = zombie_scene.instantiate()
-	game.exploration_enemy_layer.add_child(hurt_zombie)
-	hurt_zombie.global_position = player.global_position + Vector2(0.0, 12.0)
-	hurt_zombie.configure_exploration_context(player, Vector2.DOWN, true, hurt_zombie.global_position, true)
+	var enemy_scene := load("res://scenes/enemies/Enemy.tscn")
+	var hurt_enemy = enemy_scene.instantiate()
+	game.exploration_enemy_layer.add_child(hurt_enemy)
+	hurt_enemy.global_position = player.global_position + Vector2(0.0, 12.0)
+	hurt_enemy.configure_exploration_context(player, Vector2.DOWN, true, hurt_enemy.global_position, true)
 	await process_frame
 
-	var zombie_audio = hurt_zombie.get_node("CombatAudio")
-	hurt_zombie.take_damage(1, {"attacker": player})
+	var enemy_audio = hurt_enemy.get_node("CombatAudio")
+	hurt_enemy.take_damage(1, {"attacker": player})
 	await process_frame
-	print("combat_audio_probe_zombie_hurt=%s" % str(zombie_audio.get_last_sound_id()))
+	print("combat_audio_probe_enemy_hurt=%s" % str(enemy_audio.get_last_sound_id()))
 
-	var attack_zombie = zombie_scene.instantiate()
-	game.exploration_enemy_layer.add_child(attack_zombie)
-	attack_zombie.global_position = player.global_position + Vector2(0.0, 12.0)
-	attack_zombie.configure_exploration_context(player, Vector2.DOWN, true, attack_zombie.global_position, true)
-	attack_zombie.attack_range_override = 24.0
+	var attack_enemy = enemy_scene.instantiate()
+	game.exploration_enemy_layer.add_child(attack_enemy)
+	attack_enemy.global_position = player.global_position + Vector2(0.0, 12.0)
+	attack_enemy.configure_exploration_context(player, Vector2.DOWN, true, attack_enemy.global_position, true)
+	attack_enemy.attack_range_override = 24.0
 	await process_frame
 
-	var attack_zombie_audio = attack_zombie.get_node("CombatAudio")
-	attack_zombie._update_facing_direction(player.global_position - attack_zombie.global_position)
-	attack_zombie._process_attack_prep(player)
+	var attack_enemy_audio = attack_enemy.get_node("CombatAudio")
+	attack_enemy._update_facing_direction(player.global_position - attack_enemy.global_position)
+	attack_enemy._process_attack_prep(player)
 	await process_frame
 	await physics_frame
-	print("combat_audio_probe_zombie_tell=%s" % str(attack_zombie_audio.get_last_sound_id()))
+	print("combat_audio_probe_enemy_tell=%s" % str(attack_enemy_audio.get_last_sound_id()))
 
-	attack_zombie._update_facing_direction(player.global_position - attack_zombie.global_position)
-	attack_zombie._try_damage_target(player)
+	attack_enemy._update_facing_direction(player.global_position - attack_enemy.global_position)
+	attack_enemy._try_damage_target(player)
 	await process_frame
 	await physics_frame
-	print("combat_audio_probe_zombie_hit=%s" % str(attack_zombie_audio.get_last_sound_id()))
+	print("combat_audio_probe_enemy_hit=%s" % str(attack_enemy_audio.get_last_sound_id()))
 
 	var socket = game.defense_sockets.get_child(0)
 	var socket_audio = socket.get_node("CombatAudio")
-	socket.take_damage(10, {"attacker": attack_zombie, "damage_type": &"impact"})
+	socket.take_damage(10, {"attacker": attack_enemy, "damage_type": &"impact"})
 	await process_frame
 	print("combat_audio_probe_structure_hit=%s" % str(socket_audio.get_last_sound_id()))
 

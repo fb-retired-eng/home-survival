@@ -32,11 +32,11 @@ func _wait_for_attack_resolution(player) -> void:
 
 func _init() -> void:
 	var player_scene := load("res://scenes/player/Player.tscn")
-	var zombie_scene := load("res://scenes/enemies/Zombie.tscn")
+	var enemy_scene := load("res://scenes/enemies/Enemy.tscn")
 	var knife := load("res://data/weapons/kitchen_knife.tres")
 
 	var player = player_scene.instantiate()
-	var enemy = zombie_scene.instantiate()
+	var enemy = enemy_scene.instantiate()
 	root.add_child(player)
 	root.add_child(enemy)
 	await _wait_frames()

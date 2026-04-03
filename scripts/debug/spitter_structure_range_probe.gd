@@ -3,7 +3,7 @@ extends SceneTree
 
 func _init() -> void:
 	var game_scene := load("res://scenes/main/Game.tscn")
-	var zombie_scene := load("res://scenes/enemies/Zombie.tscn")
+	var enemy_scene := load("res://scenes/enemies/Enemy.tscn")
 	var spitter_definition := load("res://data/enemies/zombie_spitter.tres")
 	var game = game_scene.instantiate()
 	root.add_child(game)
@@ -14,7 +14,7 @@ func _init() -> void:
 	var socket = game.get_tree().get_first_node_in_group("defense_sockets")
 	socket.global_position = Vector2(340.0, 100.0)
 
-	var zombie = zombie_scene.instantiate()
+	var zombie = enemy_scene.instantiate()
 	game.wave_enemy_layer.add_child(zombie)
 	zombie.definition = spitter_definition
 	zombie.global_position = Vector2(100.0, 100.0)

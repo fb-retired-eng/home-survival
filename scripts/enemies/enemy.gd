@@ -1,5 +1,5 @@
 extends CharacterBody2D
-class_name Zombie
+class_name GameEnemy
 
 const EnemyDefinitionResource = preload("res://scripts/data/enemy_definition.gd")
 const ResourcePickupScene = preload("res://scenes/world/ResourcePickup.tscn")
@@ -8,10 +8,11 @@ const HEALTH_BAR_FILL_HALF_HEIGHT := 2.0
 const GAMEPLAY_Z_BASE := 1000
 const CHASE_LOST_SIGHT_DISTANCE_FACTOR := 1.25
 const CHASE_LOST_SIGHT_DISTANCE_PADDING := 20.0
+const CHASE_SCREEN_MARGIN := 48.0
 const VISUAL_BOB_HEIGHT := 1.8
 const VISUAL_BREATHE_SCALE := 0.02
 
-signal died(zombie: Zombie)
+signal died(enemy)
 
 @export var definition: EnemyDefinitionResource
 @export var enemy_id: StringName = &"zombie_basic"
@@ -77,7 +78,7 @@ var _health_bar_alpha: float = 0.0
 @onready var body_touch_area: Area2D = $BodyTouchArea
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
 @onready var combat_audio = $CombatAudio
-@onready var combat_controller: ZombieCombatController = $CombatController
+@onready var combat_controller = $CombatController
 
 
 func _ready() -> void:
@@ -309,7 +310,7 @@ func take_damage(amount: int, _source: Variant = null) -> void:
 	_refresh_health_bar()
 	_flash_body(Color(1.0, 0.55, 0.55, 1.0))
 	_play_damage_feedback(_source)
-	_play_combat_sound(&"zombie_hurt", randf_range(0.94, 1.06), -2.0)
+	_play_combat_sound(&"enemy_hurt", randf_range(0.94, 1.06), -2.0)
 
 	if current_health == 0:
 		_spawn_death_drop()
@@ -671,9 +672,12 @@ func _update_player_chase_state() -> void:
 
 	if _is_alerted_to_player:
 		var blind_pursuit_break_radius := _get_player_lost_sight_break_radius()
+		var is_within_screen_chase_rect := _is_within_player_screen_chase_rect(live_player, CHASE_SCREEN_MARGIN)
 		if can_detect_player:
-			_is_chasing_player = distance_to_player <= _get_player_chase_break_radius()
+			_is_chasing_player = distance_to_player <= _get_player_chase_break_radius() or is_within_screen_chase_rect
 		elif distance_to_player <= _get_player_detection_radius():
+			_is_chasing_player = true
+		elif is_within_screen_chase_rect:
 			_is_chasing_player = true
 		else:
 			_is_chasing_player = distance_to_player <= blind_pursuit_break_radius
@@ -898,6 +902,26 @@ func _get_player_lost_sight_break_radius() -> float:
 		detection_radius + CHASE_LOST_SIGHT_DISTANCE_PADDING
 	)
 	return minf(chase_break_radius, blind_pursuit_radius)
+
+
+func _is_within_player_screen_chase_rect(player_target, margin: float = 0.0) -> bool:
+	if player_target == null or not is_instance_valid(player_target):
+		return false
+
+	var viewport := get_viewport()
+	if viewport == null:
+		return false
+
+	var canvas_to_world: Transform2D = viewport.get_canvas_transform().affine_inverse()
+	var viewport_rect: Rect2 = viewport.get_visible_rect()
+	var screen_world_top_left: Vector2 = canvas_to_world * viewport_rect.position
+	var screen_world_bottom_right: Vector2 = canvas_to_world * viewport_rect.end
+	var visible_world_size := (screen_world_bottom_right - screen_world_top_left).abs()
+	var chase_rect := Rect2(
+		player_target.global_position - (visible_world_size * 0.5) - Vector2.ONE * margin,
+		visible_world_size + Vector2.ONE * margin * 2.0
+	)
+	return chase_rect.has_point(global_position)
 
 
 func _get_attack_prep_time() -> float:
@@ -1215,7 +1239,7 @@ func _alert_nearby_enemies(player_ref) -> void:
 	for enemy in _get_local_enemy_nodes():
 		if enemy == self or not is_instance_valid(enemy):
 			continue
-		if not (enemy is Zombie):
+		if not enemy.is_in_group("enemies") or not enemy.has_method("receive_ally_alert"):
 			continue
 		if enemy.global_position.distance_to(global_position) > alert_radius:
 			continue

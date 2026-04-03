@@ -9,7 +9,7 @@ func _wait_frames() -> void:
 
 func _init() -> void:
 	var game_scene := load("res://scenes/main/Game.tscn")
-	var zombie_scene := load("res://scenes/enemies/Zombie.tscn")
+	var enemy_scene := load("res://scenes/enemies/Enemy.tscn")
 	var pistol := load("res://data/weapons/pistol.tres")
 
 	var game = game_scene.instantiate()
@@ -29,7 +29,7 @@ func _init() -> void:
 	await _wait_frames()
 	print("actor_visual_probe_reload_ring=%s" % str(player.get_node("StateRing").visible))
 
-	var zombie = zombie_scene.instantiate()
+	var zombie = enemy_scene.instantiate()
 	game.exploration_enemy_layer.add_child(zombie)
 	zombie.global_position = player.global_position + Vector2(64.0, 0.0)
 	zombie.configure_runtime_context(player, game.exploration_enemy_layer, game.construction_placeables)
@@ -38,11 +38,11 @@ func _init() -> void:
 
 	zombie.receive_noise_alert(player, player.global_position + Vector2(120.0, 0.0))
 	await _wait_frames()
-	print("actor_visual_probe_zombie_noise_indicator=%s" % str(zombie.get_node("StateIndicator").visible))
+	print("actor_visual_probe_enemy_noise_indicator=%s" % str(zombie.get_node("StateIndicator").visible))
 
 	zombie.take_damage(5, {"attacker": player})
 	await _wait_frames()
-	print("actor_visual_probe_zombie_health_bar=%s" % str(zombie.get_node("VisualRoot/HealthBarBackground").visible))
+	print("actor_visual_probe_enemy_health_bar=%s" % str(zombie.get_node("VisualRoot/HealthBarBackground").visible))
 
 	game.queue_free()
 	await _wait_frames()

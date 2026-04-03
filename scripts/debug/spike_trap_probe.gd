@@ -25,7 +25,7 @@ func _init() -> void:
 	var grid: ConstructionGrid = game.construction_grid
 	var player: Player = game.player
 	var placeables_root: Node2D = game.construction_placeables
-	var zombie_scene := load("res://scenes/enemies/Zombie.tscn")
+	var enemy_scene := load("res://scenes/enemies/Enemy.tscn")
 	var tactical_cell := Vector2i(-2, 3)
 
 	player.global_position = grid.to_global(Vector2(tactical_cell.x * grid.cell_size.x, tactical_cell.y * grid.cell_size.y))
@@ -47,24 +47,24 @@ func _init() -> void:
 	print("spike_trap_probe_trap_second_cell_occupied=%s" % str(grid.is_cell_occupied(Vector2i(-2, 4))))
 	print("spike_trap_probe_trap_active=%s" % str(trap.is_trap_active() if trap != null and trap.has_method("is_trap_active") else false))
 
-	var zombie: Zombie = zombie_scene.instantiate()
-	zombie.definition = load("res://data/enemies/zombie_basic.tres")
-	game.exploration_enemy_layer.add_child(zombie)
-	zombie.global_position = trap.global_position if trap != null else grid.to_global(Vector2(tactical_cell.x * grid.cell_size.x, tactical_cell.y * grid.cell_size.y))
-	zombie.set_physics_process(false)
+	var enemy = enemy_scene.instantiate()
+	enemy.definition = load("res://data/enemies/zombie_basic.tres")
+	game.exploration_enemy_layer.add_child(enemy)
+	enemy.global_position = trap.global_position if trap != null else grid.to_global(Vector2(tactical_cell.x * grid.cell_size.x, tactical_cell.y * grid.cell_size.y))
+	enemy.set_physics_process(false)
 	await _wait_frames()
-	print("spike_trap_probe_zombie_in_group=%s" % str(zombie.is_in_group("enemies")))
+	print("spike_trap_probe_enemy_in_group=%s" % str(enemy.is_in_group("enemies")))
 	print("spike_trap_probe_trap_position=%s" % str(trap.global_position if trap != null else Vector2.ZERO))
-	print("spike_trap_probe_zombie_position=%s" % str(zombie.global_position))
+	print("spike_trap_probe_enemy_position=%s" % str(enemy.global_position))
 
 	var player_health_before := int(player.current_health)
-	var health_before := int(zombie.current_health)
-	var slow_before := float(zombie.get_slow_effect_multiplier())
+	var health_before := int(enemy.current_health)
+	var slow_before := float(enemy.get_slow_effect_multiplier())
 	for _step in range(30):
 		await _wait_frames()
-	var health_after := int(zombie.current_health)
+	var health_after := int(enemy.current_health)
 	var player_health_after := int(player.current_health)
-	var slow_after := float(zombie.get_slow_effect_multiplier())
+	var slow_after := float(enemy.get_slow_effect_multiplier())
 	print("spike_trap_probe_overlap_count=%d" % int(trap.get_trap_overlap_count() if trap != null and trap.has_method("get_trap_overlap_count") else -1))
 	print("spike_trap_probe_player_health_before=%d" % player_health_before)
 	print("spike_trap_probe_player_health_after=%d" % player_health_after)

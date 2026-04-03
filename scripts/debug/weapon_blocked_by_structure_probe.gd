@@ -30,8 +30,8 @@ func _get_enemy_health_or_zero(enemy) -> int:
 
 
 func _spawn_enemy(root_node: Node, definition_path: String, position: Vector2, player) -> Node:
-	var zombie_scene = load("res://scenes/enemies/Zombie.tscn")
-	var enemy = zombie_scene.instantiate()
+	var enemy_scene = load("res://scenes/enemies/Enemy.tscn")
+	var enemy = enemy_scene.instantiate()
 	enemy.definition = load(definition_path)
 	root_node.add_child(enemy)
 	enemy.global_position = position

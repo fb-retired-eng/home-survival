@@ -24,19 +24,20 @@ The repo currently includes:
 - multiple weapons, including POI-obtained baseball bat, pistol, and shotgun upgrades, bullet pickups, weapon switching, reloadable firearm behavior, simple on-player weapon illustrations, and visible weapon-trait HUD text
 - food as a prep resource, a dinner-at-table transition that starts the night wave, and bed-based sleep that returns the run to the next day with partial HP restore
 - six authored POIs, eight authored waves, roaming prep-stage exploration spawns, and six live enemy definitions including elite spitter and elite brute variants
-- exploration zombies now drop aggro after losing sight and falling beyond a reasonable chase distance, instead of tracking the player indefinitely across open ground
+- exploration enemies now keep chasing while they remain effectively on the current player view, then drop aggro once sight is broken and they fall off-screen/far enough away
 - fortified wall/door upgrades beyond the original reinforced tier
 - review-driven guardrails around elite-only weapon drops, spitter structure range, reset-state UI consistency, and bat-only attack interrupt behavior
 - a polished authored UI shell across the boot menu, settings/load panels, pause overlay, and HUD, with clearer phase emphasis, cleaner resource/readout labels, stronger status treatment, and more intentional interaction prompts
+- smoothed player/enemy presentation polish, including lighter player bob/lean motion, clearer enemy state indicators, and generic enemy scene/class naming for future non-zombie enemy types
 - construction-system foundation for a larger authored map with a local buildable band around the home, build-mode placement, tactical cell reservations, selectable multi-cell buildables, and the first barricade placeable with repair/recycle support; this is now an active tactical layer, not just scaffolding
 - home-anchored fog-of-war that starts beyond the local home area and keeps areas the player has already visited revealed, so the enlarged map has clearer nearby readability and persistent exploration memory
 - MVP0.5 boot shell with authored menu and pause scenes, continue/load slots, persistent settings, pause-menu save/quit, and versioned run saves that restore construction and fog memory; manual saves are blocked during active waves, loading a slot no longer rewrites it on entry, and fullscreen now applies through Godot's window mode API
 - enriched outer-map structure with authored district landmarks, route islands, micro-loot between POIs, and a broader ambient roaming-threat layer so the enlarged map has actual travel value instead of empty margins
 - data-driven POI identity through `PoiDefinition` resources, with role-driven bonus tables, POI-tied micro-loot defaults, explicit `poi_id` wiring, and probe-visible role labels for debugging and UI
 - authored POI guard tuning and softer mid/late-wave pacing, plus an economy balance probe that reports POI yield, support loot, construction costs, and wave pressure totals for future tuning passes
-- generated positional combat and interaction SFX, including weapon-specific attack sounds, hit-vs-miss feedback, zombie attack tell/impact, structure hits, trap triggers, pickup sounds, and construction feedback routed through a dedicated `SFX` bus
+- generated positional combat and interaction SFX, including weapon-specific attack sounds, hit-vs-miss feedback, enemy attack tell/impact, structure hits, trap triggers, pickup sounds, and construction feedback routed through a dedicated `SFX` bus
 - shared app-service access through `AppServices`, so boot/game code resolve autoloaded settings/save services through one helper instead of ad hoc `/root/...` lookups
-- placeholder world scenes for sockets, scavenging nodes, bed/table interactions, pickups, and zombie enemy
+- placeholder world scenes for sockets, scavenging nodes, bed/table interactions, pickups, and enemy actor
 - consolidated MVP0 design/spec documentation
 
 This is still an early prototype scaffold, not a feature-complete vertical slice.

@@ -21,9 +21,9 @@ const DEFAULT_HELD_WEAPON_COLOR := Color(0.86, 0.86, 0.9, 1.0)
 const DEFAULT_SPREAD_HITSCAN_CONE_DEGREES := 30.0
 const STRUCTURE_ATTACK_BLOCKER_MASK := 2 | 4
 const GAMEPLAY_Z_BASE := 1000
-const VISUAL_BOB_HEIGHT := 2.4
-const VISUAL_LEAN_RADIANS := 0.08
-const VISUAL_BREATHE_SCALE := 0.025
+const VISUAL_BOB_HEIGHT := 0.9
+const VISUAL_LEAN_RADIANS := 0.045
+const VISUAL_BREATHE_SCALE := 0.018
 const STATE_RING_BUILD_COLOR := Color(0.98, 0.84, 0.52, 1.0)
 const STATE_RING_RELOAD_COLOR := Color(0.52, 0.82, 1.0, 1.0)
 const STATE_RING_BUSY_COLOR := Color(0.7, 0.95, 0.72, 1.0)
@@ -114,6 +114,8 @@ var _build_mode_active: bool = false
 var _build_mode_allowed: bool = true
 var _visual_time: float = 0.0
 var _state_ring_alpha: float = 0.0
+var _visual_movement_ratio: float = 0.0
+var _visual_bob_offset_y: float = 0.0
 
 @onready var body_shadow: Polygon2D = $BodyShadow
 @onready var state_ring: Polygon2D = $StateRing
@@ -718,19 +720,21 @@ func _update_visual_animation(delta: float) -> void:
 		return
 
 	var movement_ratio := clampf(velocity.length() / maxf(move_speed, 1.0), 0.0, 1.0)
-	_visual_time += delta * lerpf(2.0, 9.0, movement_ratio)
+	_visual_movement_ratio = move_toward(_visual_movement_ratio, movement_ratio, delta * 6.0)
+	_visual_time += delta * lerpf(2.0, 7.0, _visual_movement_ratio)
 	var breathe := sin(_visual_time * 2.2) * VISUAL_BREATHE_SCALE
-	var bob := sin(_visual_time * 10.0) * VISUAL_BOB_HEIGHT * movement_ratio
+	var bob_target := sin(_visual_time * 8.0) * VISUAL_BOB_HEIGHT * _visual_movement_ratio
 	var lean_target := clampf(velocity.x / maxf(move_speed, 1.0), -1.0, 1.0) * VISUAL_LEAN_RADIANS
+	_visual_bob_offset_y = lerpf(_visual_bob_offset_y, bob_target, minf(delta * 8.0, 1.0))
 
-	visual_root.position = Vector2(0.0, bob)
+	visual_root.position = Vector2(0.0, _visual_bob_offset_y)
 	visual_root.rotation = lerpf(visual_root.rotation, lean_target, minf(delta * 10.0, 1.0))
-	var stretch_x := 1.0 + 0.045 * movement_ratio + maxf(breathe, 0.0)
-	var stretch_y := 1.0 - 0.03 * movement_ratio - minf(breathe, 0.0)
+	var stretch_x := 1.0 + 0.025 * _visual_movement_ratio + maxf(breathe, 0.0)
+	var stretch_y := 1.0 - 0.018 * _visual_movement_ratio - minf(breathe, 0.0)
 	visual_root.scale = Vector2(stretch_x, stretch_y)
 
-	body_shadow.scale = Vector2(1.0 - 0.14 * movement_ratio, 1.0 + 0.08 * movement_ratio)
-	body_shadow.modulate = Color(1.0, 1.0, 1.0, 0.18 + 0.07 * movement_ratio)
+	body_shadow.scale = Vector2(1.0 - 0.08 * _visual_movement_ratio, 1.0 + 0.05 * _visual_movement_ratio)
+	body_shadow.modulate = Color(1.0, 1.0, 1.0, 0.18 + 0.05 * _visual_movement_ratio)
 
 	var target_ring_alpha := 0.0
 	var ring_color := STATE_RING_BUILD_COLOR

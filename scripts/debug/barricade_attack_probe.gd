@@ -45,8 +45,8 @@ func _init() -> void:
 		quit()
 		return
 
-	var zombie_scene := load("res://scenes/enemies/Zombie.tscn")
-	var zombie = zombie_scene.instantiate()
+	var enemy_scene := load("res://scenes/enemies/Enemy.tscn")
+	var zombie = enemy_scene.instantiate()
 	zombie.definition = load("res://data/enemies/zombie_basic.tres")
 	game.wave_enemy_layer.add_child(zombie)
 	zombie.global_position = barricade.global_position + Vector2(0.0, 14.0)
@@ -55,6 +55,6 @@ func _init() -> void:
 
 	print("barricade_attack_probe_placed=true")
 	print("barricade_attack_probe_barricade_hp=%d" % int(barricade.current_hp))
-	print("barricade_attack_probe_zombie_prep=%s" % str(zombie.is_attack_prep_armed()))
-	print("barricade_attack_probe_zombie_target=%s" % str(zombie._get_current_target().get_placeable_id() if zombie._get_current_target() != null and zombie._get_current_target().has_method("get_placeable_id") else StringName()))
+	print("barricade_attack_probe_enemy_prep=%s" % str(zombie.is_attack_prep_armed()))
+	print("barricade_attack_probe_enemy_target=%s" % str(zombie._get_current_target().get_placeable_id() if zombie._get_current_target() != null and zombie._get_current_target().has_method("get_placeable_id") else StringName()))
 	quit()

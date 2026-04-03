@@ -8,7 +8,7 @@
 [ext_resource type="PackedScene" path="res://scenes/world/ScavengeNode.tscn" id="6_scavenge_scene"]
 [ext_resource type="Script" uid="uid://co0o4tek73bhg" path="res://scripts/main/game.gd" id="8_game_script"]
 [ext_resource type="PackedScene" path="res://scenes/world/DefenseSocket.tscn" id="11_socket_scene"]
-[ext_resource type="PackedScene" path="res://scenes/enemies/Zombie.tscn" id="12_zombie_scene"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/Enemy.tscn" id="12_enemy_scene"]
 [ext_resource type="Resource" uid="uid://dsae4bgh4ljxr" path="res://data/resources/mvp0_perimeter.tres" id="13_perimeter"]
 [ext_resource type="Resource" uid="uid://bvy1bxxcyjm41" path="res://data/waves/mvp0_waves.tres" id="14_waves"]
 [ext_resource type="Script" uid="uid://dk3o4gu05t36" path="res://scripts/world/exploration_spawn_point.gd" id="15_exploration_spawn"]
@@ -24,8 +24,8 @@
 [ext_resource type="Resource" path="res://data/enemies/zombie_elite_spitter.tres" id="27_elite_spitter_enemy"]
 [ext_resource type="PackedScene" path="res://scenes/world/ConstructionGrid.tscn" id="29_construction_grid_scene"]
 [ext_resource type="PackedScene" path="res://scenes/world/Placeable.tscn" id="30_placeable_scene"]
-[ext_resource type="Resource" path="res://data/placeables/barricade.tres" id="31_barricade_profile"]
-[ext_resource type="Resource" path="res://data/placeables/spike_trap.tres" id="32_spike_trap_profile"]
+[ext_resource type="Resource" uid="uid://6g3utd6j8slr" path="res://data/placeables/barricade.tres" id="31_barricade_profile"]
+[ext_resource type="Resource" uid="uid://d1yavch4hf3wi" path="res://data/placeables/spike_trap.tres" id="32_spike_trap_profile"]
 [ext_resource type="Script" uid="uid://be4lu6vqqn2lh" path="res://scripts/main/construction_controller.gd" id="33_construction_controller"]
 [ext_resource type="Script" uid="uid://bohh64mgpcsn1" path="res://scripts/main/fog_controller.gd" id="34_fog_controller"]
 [ext_resource type="PackedScene" path="res://scenes/world/ResourcePickup.tscn" id="35_resource_pickup_scene"]
@@ -66,7 +66,7 @@ size = Vector2(32, 2880)
 [node name="Game" type="Node2D" unique_id=393065020]
 script = ExtResource("8_game_script")
 defense_socket_scene = ExtResource("11_socket_scene")
-exploration_enemy_scene = ExtResource("12_zombie_scene")
+exploration_enemy_scene = ExtResource("12_enemy_scene")
 perimeter_definition = ExtResource("13_perimeter")
 default_daily_elite_enemy = ExtResource("27_elite_spitter_enemy")
 poi_definitions = Array[Resource]([ExtResource("41_poi_a_definition"), ExtResource("42_poi_b_definition"), ExtResource("43_poi_c_definition"), ExtResource("44_poi_d_definition"), ExtResource("45_poi_e_definition"), ExtResource("46_poi_f_definition")])
@@ -85,7 +85,7 @@ script = ExtResource("4_game_manager")
 
 [node name="WaveManager" type="Node" parent="." unique_id=1067083666]
 script = ExtResource("5_wave_manager")
-zombie_scene = ExtResource("12_zombie_scene")
+enemy_scene = ExtResource("12_enemy_scene")
 wave_set_definition = ExtResource("14_waves")
 
 [node name="ConstructionController" type="Node" parent="." unique_id=484513233]

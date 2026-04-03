@@ -3,11 +3,11 @@ extends SceneTree
 
 func _init() -> void:
 	var player_scene := load("res://scenes/player/Player.tscn")
-	var zombie_scene := load("res://scenes/enemies/Zombie.tscn")
+	var enemy_scene := load("res://scenes/enemies/Enemy.tscn")
 	var pistol := load("res://data/weapons/pistol.tres")
 
 	var player = player_scene.instantiate()
-	var zombie = zombie_scene.instantiate()
+	var zombie = enemy_scene.instantiate()
 	var wall := StaticBody2D.new()
 	var wall_shape := CollisionShape2D.new()
 	var rect := RectangleShape2D.new()

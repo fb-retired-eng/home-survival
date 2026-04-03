@@ -3,11 +3,11 @@ extends SceneTree
 
 func _init() -> void:
 	var player_scene := load("res://scenes/player/Player.tscn")
-	var zombie_scene := load("res://scenes/enemies/Zombie.tscn")
+	var enemy_scene := load("res://scenes/enemies/Enemy.tscn")
 	var pistol = load("res://data/weapons/pistol.tres").duplicate(true)
 
 	var player = player_scene.instantiate()
-	var zombie = zombie_scene.instantiate()
+	var zombie = enemy_scene.instantiate()
 	root.add_child(player)
 	root.add_child(zombie)
 	await process_frame
