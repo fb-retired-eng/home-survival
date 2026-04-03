@@ -56,6 +56,11 @@ position = Vector2(0, -28)
 color = Color(0.3, 0.92, 0.38, 0.96)
 polygon = PackedVector2Array(-14, -2, 14, -2, 14, 2, -14, 2)
 
+[node name="AttackTell" type="Polygon2D" parent="VisualRoot"]
+visible = false
+color = Color(1, 0.82, 0.42, 0.45)
+polygon = PackedVector2Array(-8, -22, 8, -22, 12, -8, 0, 4, -12, -8)
+
 [node name="AttackFlash" type="Polygon2D" parent="VisualRoot"]
 visible = false
 color = Color(1, 0.45, 0.3, 0.75)

@@ -112,6 +112,15 @@ func reset_attack_prep() -> void:
 	enemy._attack_prep_target_id = 0
 	enemy._attack_prep_lost_target_grace_remaining = 0.0
 	if enemy._damage_cooldown_remaining <= 0.0:
+		enemy.attack_tell.visible = false
+		enemy.attack_tell.position = Vector2.ZERO
+		enemy.attack_tell.scale = Vector2.ONE
+		enemy.attack_tell.modulate = Color(
+			enemy._get_attack_tell_color().r,
+			enemy._get_attack_tell_color().g,
+			enemy._get_attack_tell_color().b,
+			enemy._get_attack_tell_start_alpha()
+		)
 		enemy.attack_flash.visible = false
 		enemy.attack_flash.scale = Vector2.ONE
 		enemy.attack_flash.modulate = Color(
@@ -127,6 +136,15 @@ func update_attack_prep_visual() -> void:
 		return
 
 	if not enemy._attack_prep_armed:
+		enemy.attack_tell.visible = false
+		enemy.attack_tell.position = Vector2.ZERO
+		enemy.attack_tell.scale = Vector2.ONE
+		enemy.attack_tell.modulate = Color(
+			enemy._get_attack_tell_color().r,
+			enemy._get_attack_tell_color().g,
+			enemy._get_attack_tell_color().b,
+			enemy._get_attack_tell_start_alpha()
+		)
 		enemy.attack_flash.visible = false
 		enemy.attack_flash.scale = Vector2.ONE
 		enemy.attack_flash.modulate = Color(
@@ -139,24 +157,30 @@ func update_attack_prep_visual() -> void:
 
 	var tell_lead_time: float = enemy._get_attack_tell_lead_time()
 	if tell_lead_time <= 0.0 or enemy._attack_prep_remaining > tell_lead_time:
+		enemy.attack_tell.visible = false
 		enemy.attack_flash.visible = false
 		return
 
 	var progress: float = clamp(1.0 - (enemy._attack_prep_remaining / tell_lead_time), 0.0, 1.0)
-	enemy.attack_flash.visible = true
+	var pulse: float = 1.0 + sin(enemy._visual_time * enemy._get_attack_tell_pulse_speed()) * enemy._get_attack_tell_pulse_scale()
 	var tell_color: Color = enemy._get_attack_tell_color()
 	var start_scale: Vector2 = enemy._get_attack_tell_start_scale()
 	var ready_scale: Vector2 = enemy._get_attack_tell_ready_scale()
-	enemy.attack_flash.scale = start_scale.lerp(ready_scale, progress)
-	enemy.attack_flash.modulate = Color(
+	enemy.attack_tell.visible = true
+	enemy.attack_tell.scale = start_scale.lerp(ready_scale, progress) * pulse
+	enemy.attack_tell.modulate = Color(
 		tell_color.r,
 		tell_color.g,
 		tell_color.b,
 		lerpf(enemy._get_attack_tell_start_alpha(), enemy._get_attack_tell_ready_alpha(), progress)
 	)
+	enemy.attack_flash.visible = false
 
 
 func play_attack_flash() -> void:
+	enemy.attack_tell.visible = false
+	enemy.attack_tell.position = Vector2.ZERO
+	enemy.attack_tell.scale = Vector2.ONE
 	enemy.attack_flash.visible = true
 	enemy.attack_flash.scale = enemy._get_attack_flash_start_scale()
 	var strike_color: Color = enemy._get_attack_strike_color()
@@ -167,6 +191,7 @@ func play_attack_flash() -> void:
 	tween.finished.connect(func() -> void:
 		enemy.attack_flash.visible = false
 		enemy.attack_flash.scale = Vector2.ONE
+		enemy.attack_tell.position = Vector2.ZERO
 		enemy.attack_flash.modulate = Color(
 			enemy._get_attack_tell_color().r,
 			enemy._get_attack_tell_color().g,

@@ -88,6 +88,7 @@ var _damage_feedback_duration: float = 0.12
 @onready var facing_marker: Polygon2D = $VisualRoot/FacingMarker
 @onready var health_bar_background: Polygon2D = $VisualRoot/HealthBarBackground
 @onready var health_bar_fill: Polygon2D = $VisualRoot/HealthBarFill
+@onready var attack_tell: Polygon2D = $VisualRoot/AttackTell
 @onready var attack_flash: Polygon2D = $VisualRoot/AttackFlash
 @onready var damage_area: Area2D = $DamageArea
 @onready var body_touch_area: Area2D = $BodyTouchArea
@@ -523,6 +524,7 @@ func _apply_definition() -> void:
 	body_shadow.polygon = definition.shadow_polygon
 	body_visual.polygon = definition.body_polygon
 	facing_marker.polygon = definition.facing_marker_polygon
+	attack_tell.polygon = definition.attack_tell_polygon
 	attack_flash.polygon = definition.attack_flash_polygon
 	max_health = definition.max_health
 	defense_flat_reduction = definition.defense_flat_reduction
@@ -1053,6 +1055,24 @@ func _get_attack_tell_ready_alpha() -> float:
 	return definition.attack_tell_ready_alpha
 
 
+func _get_attack_tell_pulse_speed() -> float:
+	if definition == null:
+		return 6.0
+	return definition.attack_tell_pulse_speed
+
+
+func _get_attack_tell_pulse_scale() -> float:
+	if definition == null:
+		return 0.08
+	return definition.attack_tell_pulse_scale
+
+
+func _get_attack_tell_offset() -> Vector2:
+	if definition == null:
+		return Vector2.ZERO
+	return definition.attack_tell_offset
+
+
 func _get_attack_tell_lead_time() -> float:
 	var prep_time := _get_attack_prep_time()
 	if definition == null:
@@ -1423,7 +1443,9 @@ func _update_visual_animation(delta: float) -> void:
 	_visual_body_rotation = lerp_angle(_visual_body_rotation, target_body_rotation, minf(delta * _visual_turn_speed, 1.0))
 	body_visual.rotation = _visual_body_rotation
 	facing_marker.rotation = _visual_body_rotation + PI
+	attack_tell.rotation = facing_marker.rotation
 	attack_flash.rotation = facing_marker.rotation
+	attack_tell.position = _get_attack_tell_offset() * prep_progress
 
 	body_shadow.scale = Vector2(1.0 - 0.09 * _visual_movement_ratio, 1.0 + 0.06 * _visual_movement_ratio)
 	body_shadow.modulate = Color(1.0, 1.0, 1.0, 0.18 + 0.05 * _visual_movement_ratio)

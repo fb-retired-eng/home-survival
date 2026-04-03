@@ -1913,3 +1913,20 @@ Validation:
 - `brute_initial_detection_probe_detected_engaged=true`
 - `elite_detection_probe_brute_engaged=false`
 - `elite_detection_probe_elite_brute_engaged=true`
+
+## 2026-04-03 Enemy Attack Readability Pass
+- Added a dedicated `AttackTell` visual layer to `Enemy.tscn` so enemy prep telegraphs no longer have to reuse the strike flash itself.
+- Extended `EnemyDefinition` with data-driven attack-tell shape, offset, and pulse tuning, then authored distinct tell profiles for basic, runner, spitter, and brute.
+- Kept the runtime implementation scene-owned and definition-driven by routing the telegraph through `enemy.gd` and `enemy_combat_controller.gd`, then cleaned the enemy script so attack-tell visuals read from one definition-backed getter path instead of duplicated cached state.
+- Added `enemy_attack_readability_probe.gd` to validate that the telegraph window is live and archetype tell differences stay visible under headless validation.
+
+Validation:
+- `enemy_attack_readability_probe_basic_tell_visible=true`
+- `enemy_attack_readability_probe_runner_tell_faster=true`
+- `enemy_attack_readability_probe_spitter_tell_offset_higher=true`
+- `enemy_attack_readability_probe_brute_tell_larger=true`
+- `enemy_attack_readability_probe_runner_tell_narrower=true`
+- `enemy_attack_readability_probe_spitter_flash_larger=true`
+- `combat_audio_probe_enemy_tell=enemy_attack_tell`
+- `combat_audio_probe_enemy_hit=enemy_attack_hit`
+- `save_probe_continue_did_not_rewrite=true`

@@ -33,6 +33,13 @@ enum WaveTargetMode {
 	Vector2(6.0, -6.0),
 	Vector2(-6.0, -6.0),
 ])
+@export var attack_tell_polygon: PackedVector2Array = PackedVector2Array([
+	Vector2(-8.0, -22.0),
+	Vector2(8.0, -22.0),
+	Vector2(12.0, -8.0),
+	Vector2(0.0, 4.0),
+	Vector2(-12.0, -8.0),
+])
 @export var attack_flash_polygon: PackedVector2Array = PackedVector2Array([
 	Vector2(-10.0, -26.0),
 	Vector2(10.0, -26.0),
@@ -83,6 +90,9 @@ enum WaveTargetMode {
 @export var prep_pose_offset: Vector2 = Vector2.ZERO
 @export var prep_pose_scale: Vector2 = Vector2.ONE
 @export_range(-45.0, 45.0, 0.5) var prep_pose_tilt_degrees: float = 0.0
+@export var attack_tell_offset: Vector2 = Vector2.ZERO
+@export_range(0.0, 20.0, 0.1) var attack_tell_pulse_speed: float = 6.0
+@export_range(0.0, 0.5, 0.01) var attack_tell_pulse_scale: float = 0.08
 @export var attack_tell_color: Color = Color(1.0, 0.82, 0.42, 0.72)
 @export var attack_tell_start_scale: Vector2 = Vector2(0.62, 0.62)
 @export var attack_tell_ready_scale: Vector2 = Vector2(0.98, 0.98)
@@ -115,6 +125,8 @@ func is_valid_definition() -> bool:
 	if body_polygon.size() < 3:
 		return false
 	if facing_marker_polygon.size() < 3:
+		return false
+	if attack_tell_polygon.size() < 3:
 		return false
 	if attack_flash_polygon.size() < 3:
 		return false
@@ -173,6 +185,10 @@ func is_valid_definition() -> bool:
 	if prep_pose_scale.x <= 0.0 or prep_pose_scale.y <= 0.0:
 		return false
 	if prep_pose_tilt_degrees < -45.0 or prep_pose_tilt_degrees > 45.0:
+		return false
+	if attack_tell_pulse_speed < 0.0:
+		return false
+	if attack_tell_pulse_scale < 0.0:
 		return false
 	if attack_tell_start_scale.x <= 0.0 or attack_tell_start_scale.y <= 0.0:
 		return false
