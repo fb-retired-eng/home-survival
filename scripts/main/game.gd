@@ -7,9 +7,6 @@ const STRUCTURE_PROFILE_SCRIPT := preload("res://scripts/data/structure_profile.
 const EXPLORATION_SPAWN_POINT_SCRIPT := preload("res://scripts/world/exploration_spawn_point.gd")
 const ENEMY_DEFINITION_SCRIPT := preload("res://scripts/data/enemy_definition.gd")
 const ROAMING_SPAWN_ZONE_SCRIPT := preload("res://scripts/world/roaming_spawn_zone.gd")
-const PLACEABLE_PROFILE_SCRIPT := preload("res://scripts/data/placeable_profile.gd")
-const FOG_MEMORY_CELL_SIZE := 80.0
-const FOG_VISIT_RADIUS_CELLS := 1
 const POSITIVE_POI_MODIFIERS: Array[StringName] = [&"bountiful_food", &"extra_parts"]
 const NEGATIVE_POI_MODIFIERS: Array[StringName] = [&"disturbed", &"elite_present"]
 const ELITE_MODIFIER_POIS := {
@@ -57,6 +54,8 @@ signal return_to_menu_requested
 @onready var construction_placeables: Node2D = $World/ConstructionPlaceables
 @onready var exploration_enemy_layer: Node2D = $World/ExplorationEnemies
 @onready var wave_enemy_layer: Node2D = $World/WaveEnemies
+@onready var construction_controller = $ConstructionController
+@onready var fog_controller = $FogController
 
 var _defeated_exploration_spawn_ids: Dictionary = {}
 var _exploration_spawn_counts: Dictionary = {}
@@ -67,22 +66,11 @@ var _daily_poi_modifiers: Dictionary = {}
 var _poi_visuals_by_id: Dictionary = {}
 var _debug_forced_next_daily_poi_modifiers: Dictionary = {}
 var _last_daily_refilled_pois: Array[StringName] = []
-var _selected_buildable_profile_index: int = 0
-var _selected_buildable_rotation: int = 0
-var _fog_home_world_position: Vector2 = Vector2.ZERO
-var _fog_world_min: Vector2 = Vector2(-1280.0, -720.0)
-var _fog_world_max: Vector2 = Vector2(3840.0, 2160.0)
-var _fog_memory_image: Image
-var _fog_memory_texture: ImageTexture
-var _fog_memory_cells_x: int = 0
-var _fog_memory_cells_y: int = 0
-var _fog_last_revealed_cell: Vector2i = Vector2i(2147483647, 2147483647)
 
 
 func _ready() -> void:
 	randomize()
 	_build_defense_sockets()
-	_register_fixed_grid_footprints()
 	_validate_exploration_spawn_points()
 	_validate_roaming_spawn_zones()
 	_cache_poi_visuals()
@@ -114,9 +102,30 @@ func _ready() -> void:
 	hud.pause_save_requested.connect(_on_pause_save_requested)
 	hud.pause_save_quit_requested.connect(_on_pause_save_quit_requested)
 	game_manager.run_state_changed.connect(_on_run_state_changed)
+	construction_controller.configure({
+		"game_manager": game_manager,
+		"player": player,
+		"hud": hud,
+		"construction_grid": construction_grid,
+		"construction_placeables": construction_placeables,
+		"sleep_point": sleep_point,
+		"food_table": food_table,
+		"defense_sockets": defense_sockets,
+		"construction_placeable_scene": construction_placeable_scene,
+		"barricade_placeable_profile": barricade_placeable_profile,
+		"buildable_placeable_profiles": buildable_placeable_profiles,
+	})
+	if not construction_controller.autosave_requested.is_connected(_request_autosave):
+		construction_controller.autosave_requested.connect(_request_autosave)
+	fog_controller.configure({
+		"player": player,
+		"hud": hud,
+		"player_camera": player_camera,
+		"fog_world_min": Vector2(-1280.0, -720.0),
+		"fog_world_max": Vector2(3840.0, 2160.0),
+	})
 	_configure_scavenge_nodes()
-	_fog_home_world_position = player.global_position
-	_initialize_fog_memory()
+	_register_fixed_grid_footprints()
 	player.set_build_mode_allowed(true)
 	_on_wave_changed(game_manager.current_wave)
 	_on_run_state_changed(game_manager.run_state)
@@ -128,19 +137,6 @@ func _physics_process(_delta: float) -> void:
 		pass
 	elif construction_grid.is_build_mode_active() and player != null and is_instance_valid(player):
 		construction_grid.set_preview_world_position(player.global_position)
-
-	_update_fog_memory()
-	if hud != null and is_instance_valid(hud) and player != null and is_instance_valid(player) and player_camera != null and is_instance_valid(player_camera):
-		var camera_screen_center := player_camera.get_screen_center_position()
-		hud.set_home_fog_state(
-			_fog_home_world_position,
-			camera_screen_center,
-			player_camera.zoom,
-			get_viewport_rect().size,
-			_fog_memory_texture,
-			_fog_world_min,
-			_fog_world_max
-		)
 
 
 func _build_defense_sockets() -> void:
@@ -266,7 +262,7 @@ func _on_run_state_changed(new_state: int) -> void:
 		_set_exploration_enemies_suspended(true)
 		hud.set_phase("Phase: Night")
 		if player.is_build_mode_active():
-			_refresh_build_mode_status()
+			construction_controller.refresh_build_mode_status()
 		else:
 			hud.set_status("Night %d in progress. Hold the base." % game_manager.current_wave)
 		player.refresh_interaction_prompt()
@@ -275,7 +271,7 @@ func _on_run_state_changed(new_state: int) -> void:
 	if new_state == game_manager.RunState.POST_WAVE:
 		hud.set_phase("Phase: Post-Wave")
 		if player.is_build_mode_active():
-			_refresh_build_mode_status()
+			construction_controller.refresh_build_mode_status()
 		else:
 			hud.set_status("Night %d cleared. Sleep on the bed to start the next day." % game_manager.current_wave)
 		player.refresh_interaction_prompt()
@@ -290,14 +286,9 @@ func _on_run_state_changed(new_state: int) -> void:
 
 
 func _on_player_build_mode_toggled(active: bool) -> void:
-	if construction_grid == null:
-		return
-	construction_grid.set_build_mode_active(active)
-	if active:
-		_refresh_build_mode_preview()
-		_refresh_build_mode_status()
-		return
-	_refresh_phase_status()
+	construction_controller.on_player_build_mode_toggled(active)
+	if not active:
+		_refresh_phase_status()
 
 
 func _on_player_build_selection_prev_requested() -> void:
@@ -343,7 +334,7 @@ func _on_wave_changed(new_wave: int) -> void:
 
 func _refresh_phase_status() -> void:
 	if player != null and is_instance_valid(player) and player.is_build_mode_active():
-		_refresh_build_mode_status()
+		construction_controller.refresh_build_mode_status()
 		return
 	var base_status := ""
 	match game_manager.run_state:
@@ -474,7 +465,7 @@ func _on_run_reset() -> void:
 	_defeated_exploration_enemy_counts.clear()
 	_current_exploration_target_counts.clear()
 	_daily_poi_modifiers.clear()
-	_selected_buildable_profile_index = 0
+	construction_controller.reset_selection()
 	for pickup in _get_local_group_members(&"pickups"):
 		pickup.queue_free()
 	player.reset_for_new_run()
@@ -511,191 +502,51 @@ func _apply_test_mode_loadout() -> void:
 		player.add_resource("food", test_mode_food, false)
 
 
-func _get_buildable_placeable_profiles() -> Array[PlaceableProfile]:
-	var profiles: Array[PlaceableProfile] = []
-	for raw_profile in buildable_placeable_profiles:
-		var profile: PlaceableProfile = raw_profile as PlaceableProfile
-		if profile == null or profile.get_script() != PLACEABLE_PROFILE_SCRIPT:
-			continue
-		profiles.append(profile)
-
-	if profiles.is_empty():
-		var fallback_profile: PlaceableProfile = barricade_placeable_profile as PlaceableProfile
-		if fallback_profile != null and fallback_profile.get_script() == PLACEABLE_PROFILE_SCRIPT:
-			profiles.append(fallback_profile)
-	return profiles
-
-
 func get_selected_buildable_profile() -> PlaceableProfile:
-	var profiles := _get_buildable_placeable_profiles()
-	if profiles.is_empty():
-		return null
-	_selected_buildable_profile_index = clampi(_selected_buildable_profile_index, 0, profiles.size() - 1)
-	return profiles[_selected_buildable_profile_index]
+	return construction_controller.get_selected_buildable_profile()
 
 
 func get_selected_buildable_rotation() -> int:
-	return posmod(_selected_buildable_rotation, 4)
+	return construction_controller.get_selected_buildable_rotation()
 
 
 func _cycle_selected_buildable_profile(step: int) -> void:
-	var profiles := _get_buildable_placeable_profiles()
-	if profiles.is_empty():
-		return
-	if step == 0:
-		return
-	_selected_buildable_profile_index = posmod(_selected_buildable_profile_index + step, profiles.size())
-	_selected_buildable_rotation = 0
-	_refresh_build_mode_preview()
-	_refresh_build_mode_status()
-	player.refresh_interaction_prompt()
+	if step < 0:
+		construction_controller.on_player_build_selection_prev_requested()
+	elif step > 0:
+		construction_controller.on_player_build_selection_next_requested()
 
 
 func _cycle_selected_buildable_rotation(step: int) -> void:
-	var profile := get_selected_buildable_profile()
-	if profile == null:
-		return
 	if step == 0:
 		return
-	_selected_buildable_rotation = posmod(_selected_buildable_rotation + step, 4)
-	_refresh_build_mode_preview()
-	_refresh_build_mode_status()
-	player.refresh_interaction_prompt()
+	for _index in range(abs(step)):
+		construction_controller.on_player_build_rotation_requested()
 
 
 func _refresh_build_mode_preview() -> void:
-	if construction_grid == null or not construction_grid.is_build_mode_active():
-		return
-	var profile := get_selected_buildable_profile()
-	if profile == null:
-		return
-	construction_grid.set_preview_footprint_offsets(profile.get_rotated_footprint_offsets(_selected_buildable_rotation))
-	construction_grid.set_preview_world_position(player.global_position)
+	construction_controller.refresh_build_mode_preview()
 
 
 func _refresh_build_mode_status() -> void:
-	if game_manager.run_state == game_manager.RunState.LOSS or game_manager.run_state == game_manager.RunState.WIN:
-		return
-	var profile := get_selected_buildable_profile()
-	if profile == null:
-		hud.set_status("Build mode active")
-		return
-	var footprint := profile.get_rotated_footprint_dimensions(_selected_buildable_rotation)
-	hud.set_status("Build: %s (%dx%d, rot %d) | E place | Q prev | Tab next | R rotate | C recycle" % [
-		profile.display_name,
-		footprint.x,
-		footprint.y,
-		get_selected_buildable_rotation()
-	])
+	construction_controller.refresh_build_mode_status()
 
 
 func _register_fixed_grid_footprints() -> void:
-	if construction_grid == null:
-		return
-
-	construction_grid.clear_runtime_occupancy()
-	construction_grid.clear_runtime_reserved_cells()
-	_register_fixed_grid_rect(sleep_point, _get_area_shape_size(sleep_point), &"sleep_point")
-	_register_fixed_grid_rect(food_table, _get_area_shape_size(food_table), &"food_table")
-
-	for socket in defense_sockets.get_children():
-		if socket == null or not is_instance_valid(socket):
-			continue
-		if socket.has_method("is_breached") and socket.is_breached():
-			continue
-		_register_fixed_grid_rect(socket, socket.socket_size, StringName(socket.socket_id))
-
-	for placeable in construction_placeables.get_children():
-		if placeable == null or not is_instance_valid(placeable):
-			continue
-		if not placeable.has_method("get_footprint_cells"):
-			continue
-		if placeable.has_method("is_breached") and placeable.is_breached():
-			continue
-		var footprint: PackedVector2Array = placeable.get_footprint_cells()
-		if footprint.is_empty():
-			continue
-		var anchor_cell: Vector2i = construction_grid.get_cell_for_world_position(placeable.global_position)
-		if placeable.has_method("get_footprint_anchor_cell"):
-			anchor_cell = placeable.get_footprint_anchor_cell()
-		construction_grid.register_occupied_footprint(
-			anchor_cell,
-			footprint,
-			StringName(placeable.get_placeable_id())
-		)
-
-
-func _register_fixed_grid_rect(node: Node2D, rect_size: Vector2, occupant_id: StringName) -> void:
-	if node == null or not is_instance_valid(node):
-		return
-	if rect_size.x <= 0.0 or rect_size.y <= 0.0:
-		return
-	construction_grid.register_occupied_cells(
-		construction_grid.get_cells_for_world_rect(node.global_position, rect_size),
-		occupant_id
-	)
+	construction_controller.refresh_runtime_occupancy({
+		"sleep_point": sleep_point,
+		"food_table": food_table,
+		"defense_sockets": defense_sockets,
+	})
 
 
 func _on_player_build_placement_requested() -> void:
-	if game_manager.run_state == game_manager.RunState.LOSS or game_manager.run_state == game_manager.RunState.WIN:
-		return
-	if construction_grid == null or construction_placeables == null:
-		return
-	if construction_placeable_scene == null:
-		hud.set_status("Placeable scene missing")
-		return
-
-	var profile := get_selected_buildable_profile()
-	if profile == null:
-		hud.set_status("Build profile missing")
-		return
-	var preview_cell: Vector2i = construction_grid.get_preview_cell()
-	var footprint_offsets := profile.get_rotated_footprint_offsets(_selected_buildable_rotation)
-	var footprint_cells: Array[Vector2i] = construction_grid.get_footprint_cells(preview_cell, footprint_offsets)
-	if not construction_grid.is_footprint_valid_for_basic_placeable(preview_cell, footprint_offsets):
-		hud.set_status(construction_grid.get_preview_reason())
-		return
-	if profile.blocks_movement and _would_block_all_door_routes(footprint_cells):
-		hud.set_status("Would seal both doors")
-		return
-	if not player.has_resources(profile.build_cost):
-		hud.set_status("Need %s" % _format_cost(profile.build_cost))
-		return
-	if not player.spend_resources(profile.build_cost):
-		hud.set_status("Need %s" % _format_cost(profile.build_cost))
-		return
-
-	var placeable = construction_placeable_scene.instantiate()
-	placeable.profile = profile
-	placeable.footprint_anchor_cell = preview_cell
-	placeable.placement_rotation_steps = get_selected_buildable_rotation()
-	placeable.global_position = construction_grid.get_preview_world_position() + profile.get_rotated_footprint_center_offset(_selected_buildable_rotation) * construction_grid.cell_size
-	var footprint_dimensions := profile.get_rotated_footprint_dimensions(_selected_buildable_rotation)
-	placeable.scale = Vector2(maxf(float(footprint_dimensions.x), 1.0), maxf(float(footprint_dimensions.y), 1.0))
-	placeable.state_changed.connect(_on_construction_placeable_state_changed)
-	construction_placeables.add_child(placeable)
-	if placeable.has_method("begin_player_collision_grace"):
-		placeable.begin_player_collision_grace(player, construction_grid, footprint_cells, 1)
-	_register_fixed_grid_footprints()
-	_refresh_build_mode_preview()
-	_refresh_build_mode_status()
-	player.refresh_interaction_prompt()
-	_request_autosave()
+	construction_controller.on_player_build_placement_requested()
 
 
 func _on_construction_placeable_state_changed(_placeable) -> void:
 	_register_fixed_grid_footprints()
 	_request_autosave()
-
-
-func _format_cost(cost: Dictionary) -> String:
-	var parts: Array[String] = []
-	for resource_id in ["salvage", "parts", "medicine", "food", "bullets"]:
-		var amount := int(cost.get(resource_id, 0))
-		if amount <= 0:
-			continue
-		parts.append("%d %s" % [amount, resource_id.capitalize()])
-	return ", ".join(parts)
 
 
 func _get_area_shape_size(area: Area2D) -> Vector2:
@@ -711,32 +562,7 @@ func _get_area_shape_size(area: Area2D) -> Vector2:
 
 
 func _would_block_all_door_routes(footprint_cells: Array) -> bool:
-	var west_zone: Array[Vector2i] = [Vector2i(-1, 2), Vector2i(-1, 3), Vector2i(-1, 4)]
-	var east_zone: Array[Vector2i] = [Vector2i(9, 2), Vector2i(9, 3), Vector2i(9, 4)]
-	var footprint_blocks_west := _cell_list_intersects(footprint_cells, west_zone)
-	var footprint_blocks_east := _cell_list_intersects(footprint_cells, east_zone)
-	if not footprint_blocks_west and not footprint_blocks_east:
-		return false
-	if footprint_blocks_west and _has_any_occupied_cell(east_zone):
-		return true
-	if footprint_blocks_east and _has_any_occupied_cell(west_zone):
-		return true
-	return false
-
-
-func _cell_list_intersects(cells_a: Array, cells_b: Array) -> bool:
-	for cell_a in cells_a:
-		for cell_b in cells_b:
-			if cell_a == cell_b:
-				return true
-	return false
-
-
-func _has_any_occupied_cell(cells: Array) -> bool:
-	for cell in cells:
-		if construction_grid.is_cell_occupied(cell):
-			return true
-	return false
+	return construction_controller._would_block_all_door_routes(footprint_cells)
 
 
 func _on_player_weapon_noise_emitted(source_position: Vector2, noise_radius: float, noise_alert_budget: float, _weapon_id: StringName) -> void:
@@ -1613,58 +1439,8 @@ func _refresh_base_status() -> void:
 	hud.set_base_status(intact_count, breached_count, hp_percent)
 
 
-func _initialize_fog_memory() -> void:
-	_fog_memory_cells_x = int((_fog_world_max.x - _fog_world_min.x) / FOG_MEMORY_CELL_SIZE)
-	_fog_memory_cells_y = int((_fog_world_max.y - _fog_world_min.y) / FOG_MEMORY_CELL_SIZE)
-	_fog_memory_image = Image.create(_fog_memory_cells_x, _fog_memory_cells_y, false, Image.FORMAT_RGBA8)
-	_fog_memory_image.fill(Color(0.0, 0.0, 0.0, 1.0))
-	_fog_memory_texture = ImageTexture.create_from_image(_fog_memory_image)
-	_reveal_fog_at_world_position(_fog_home_world_position)
-
-
-func _update_fog_memory() -> void:
-	if player == null or not is_instance_valid(player):
-		return
-	_reveal_fog_at_world_position(player.global_position)
-
-
-func _reveal_fog_at_world_position(world_position: Vector2) -> void:
-	if _fog_memory_image == null:
-		return
-	var cell := _fog_world_position_to_cell(world_position)
-	if cell == _fog_last_revealed_cell:
-		return
-	_fog_last_revealed_cell = cell
-
-	for dx in range(-FOG_VISIT_RADIUS_CELLS, FOG_VISIT_RADIUS_CELLS + 1):
-		for dy in range(-FOG_VISIT_RADIUS_CELLS, FOG_VISIT_RADIUS_CELLS + 1):
-			var reveal_cell := Vector2i(cell.x + dx, cell.y + dy)
-			if not _is_fog_cell_in_bounds(reveal_cell):
-				continue
-			_fog_memory_image.set_pixel(reveal_cell.x, reveal_cell.y, Color(1.0, 1.0, 1.0, 1.0))
-
-	_fog_memory_texture = ImageTexture.create_from_image(_fog_memory_image)
-
-
-func _fog_world_position_to_cell(world_position: Vector2) -> Vector2i:
-	var local := world_position - _fog_world_min
-	return Vector2i(
-		floori(local.x / FOG_MEMORY_CELL_SIZE),
-		floori(local.y / FOG_MEMORY_CELL_SIZE)
-	)
-
-
-func _is_fog_cell_in_bounds(cell: Vector2i) -> bool:
-	return (
-		cell.x >= 0
-		and cell.y >= 0
-		and cell.x < _fog_memory_cells_x
-		and cell.y < _fog_memory_cells_y
-	)
-
-
 func get_save_state() -> Dictionary:
-	var selected_profile := get_selected_buildable_profile()
+	var construction_selection: Dictionary = construction_controller.get_selection_save_state()
 	var saved_defeated_spawns: Array[String] = []
 	for spawn_id_variant in _defeated_exploration_spawn_ids.keys():
 		saved_defeated_spawns.append(String(spawn_id_variant))
@@ -1676,15 +1452,13 @@ func get_save_state() -> Dictionary:
 	var saved_refilled_pois: Array[String] = []
 	for poi_id in _last_daily_refilled_pois:
 		saved_refilled_pois.append(String(poi_id))
-
-	var fog_payload := _get_fog_save_payload()
 	return {
 		"game": {
 			"wave": int(game_manager.current_wave),
 			"run_state": int(game_manager.run_state),
 			"phase": _get_run_state_label(game_manager.run_state),
-			"selected_buildable_profile_id": String(selected_profile.placeable_id) if selected_profile != null else "",
-			"selected_buildable_rotation": get_selected_buildable_rotation(),
+			"selected_buildable_profile_id": String(construction_selection.get("selected_buildable_profile_id", "")),
+			"selected_buildable_rotation": int(construction_selection.get("selected_buildable_rotation", 0)),
 			"defeated_exploration_spawn_ids": saved_defeated_spawns,
 			"exploration_spawn_counts": _exploration_spawn_counts.duplicate(true),
 			"defeated_exploration_enemy_counts": _defeated_exploration_enemy_counts.duplicate(true),
@@ -1695,8 +1469,8 @@ func get_save_state() -> Dictionary:
 		"player": player.get_save_state() if player != null and is_instance_valid(player) else {},
 		"defense_sockets": _get_defense_socket_save_states(),
 		"scavenge_nodes": _get_scavenge_node_save_states(),
-		"placeables": _get_construction_placeable_save_states(),
-		"fog": fog_payload,
+		"placeables": construction_controller.get_construction_placeable_save_states(),
+		"fog": fog_controller.get_save_state(),
 	}
 
 
@@ -1713,8 +1487,7 @@ func apply_save_state(save_state: Dictionary) -> void:
 	_current_exploration_target_counts.clear()
 	_daily_poi_modifiers.clear()
 	_last_daily_refilled_pois.clear()
-	_selected_buildable_profile_index = 0
-	_selected_buildable_rotation = 0
+	construction_controller.reset_selection()
 
 	var game_state: Dictionary = save_state.get("game", {})
 	var player_state: Dictionary = save_state.get("player", {})
@@ -1723,7 +1496,7 @@ func apply_save_state(save_state: Dictionary) -> void:
 	game_manager.set_wave(saved_wave)
 	game_manager.set_run_state(saved_run_state)
 
-	_restore_buildable_selection_from_state(game_state)
+	construction_controller.restore_selection_from_state(game_state)
 	_restore_daily_run_state(game_state)
 
 	if player != null and is_instance_valid(player):
@@ -1731,8 +1504,8 @@ func apply_save_state(save_state: Dictionary) -> void:
 
 	_apply_defense_socket_save_states(save_state.get("defense_sockets", []))
 	_apply_scavenge_node_save_states(save_state.get("scavenge_nodes", []))
-	_apply_construction_placeable_save_states(save_state.get("placeables", []))
-	_apply_fog_save_state(save_state.get("fog", {}))
+	construction_controller.apply_construction_placeable_save_states(save_state.get("placeables", []))
+	fog_controller.apply_save_state(save_state.get("fog", {}))
 
 	_register_fixed_grid_footprints()
 	_configure_scavenge_nodes()
@@ -1886,77 +1659,6 @@ func _collect_local_group_members(node: Node, group_name: StringName, members: A
 		_collect_local_group_members(child, group_name, members)
 
 
-func _get_construction_placeable_save_states() -> Array[Dictionary]:
-	var save_states: Array[Dictionary] = []
-	for placeable in construction_placeables.get_children():
-		if placeable == null or not is_instance_valid(placeable):
-			continue
-		if not placeable.has_method("get_save_state"):
-			continue
-		save_states.append(placeable.get_save_state())
-	return save_states
-
-
-func _apply_construction_placeable_save_states(save_states: Array) -> void:
-	for child in construction_placeables.get_children():
-		if is_instance_valid(child):
-			child.free()
-
-	if construction_placeable_scene == null:
-		return
-
-	for raw_state in save_states:
-		var state: Dictionary = raw_state
-		var profile := _lookup_placeable_profile(StringName(state.get("placeable_id", "")))
-		if profile == null:
-			continue
-		var placeable = construction_placeable_scene.instantiate()
-		placeable.profile = profile
-		placeable.placement_rotation_steps = int(state.get("rotation_steps", 0))
-		var anchor_data: Dictionary = state.get("anchor_cell", {})
-		placeable.footprint_anchor_cell = Vector2i(
-			int(anchor_data.get("x", 0)),
-			int(anchor_data.get("y", 0))
-		)
-		var position_data: Dictionary = state.get("position", {})
-		if position_data.is_empty():
-			placeable.global_position = construction_grid.get_world_position_for_cell(placeable.footprint_anchor_cell)
-		else:
-			placeable.global_position = Vector2(
-				float(position_data.get("x", 0.0)),
-				float(position_data.get("y", 0.0))
-			)
-		placeable.state_changed.connect(_on_construction_placeable_state_changed)
-		construction_placeables.add_child(placeable)
-		if placeable.has_method("apply_save_state"):
-			placeable.apply_save_state(state)
-
-
-func _lookup_placeable_profile(placeable_id: StringName) -> PlaceableProfile:
-	var profiles := _get_buildable_placeable_profiles()
-	for profile in profiles:
-		if profile != null and StringName(profile.placeable_id) == placeable_id:
-			return profile
-	if barricade_placeable_profile != null:
-		var fallback_profile: PlaceableProfile = barricade_placeable_profile as PlaceableProfile
-		if fallback_profile != null and StringName(fallback_profile.placeable_id) == placeable_id:
-			return fallback_profile
-	return null
-
-
-func _restore_buildable_selection_from_state(game_state: Dictionary) -> void:
-	var saved_profile_id := StringName(game_state.get("selected_buildable_profile_id", ""))
-	var saved_rotation := int(game_state.get("selected_buildable_rotation", 0))
-	if saved_profile_id != StringName():
-		var profiles := _get_buildable_placeable_profiles()
-		for index in range(profiles.size()):
-			var profile := profiles[index]
-			if profile != null and StringName(profile.placeable_id) == saved_profile_id:
-				_selected_buildable_profile_index = index
-				break
-	_selected_buildable_rotation = posmod(saved_rotation, 4)
-
-
 func _restore_daily_run_state(game_state: Dictionary) -> void:
 	_defeated_exploration_spawn_ids.clear()
 	for raw_spawn_id in game_state.get("defeated_exploration_spawn_ids", []):
@@ -1968,47 +1670,6 @@ func _restore_daily_run_state(game_state: Dictionary) -> void:
 	_last_daily_refilled_pois.clear()
 	for raw_poi_id in game_state.get("last_daily_refilled_pois", []):
 		_last_daily_refilled_pois.append(StringName(raw_poi_id))
-
-
-func _apply_fog_save_state(fog_state: Dictionary) -> void:
-	if fog_state.is_empty():
-		_initialize_fog_memory()
-		return
-
-	var encoded_image := String(fog_state.get("image_base64", ""))
-	if encoded_image.is_empty():
-		_initialize_fog_memory()
-		return
-
-	var image_bytes := Marshalls.base64_to_raw(encoded_image)
-	var fog_image := Image.new()
-	var error := fog_image.load_png_from_buffer(image_bytes)
-	if error != OK:
-		_initialize_fog_memory()
-		return
-
-	_fog_memory_cells_x = fog_image.get_width()
-	_fog_memory_cells_y = fog_image.get_height()
-	_fog_memory_image = fog_image
-	_fog_memory_texture = ImageTexture.create_from_image(_fog_memory_image)
-	var last_revealed: Dictionary = fog_state.get("last_revealed_cell", {})
-	_fog_last_revealed_cell = Vector2i(
-		int(last_revealed.get("x", 2147483647)),
-		int(last_revealed.get("y", 2147483647))
-	)
-
-
-func _get_fog_save_payload() -> Dictionary:
-	if _fog_memory_image == null:
-		return {}
-	var png_bytes := _fog_memory_image.save_png_to_buffer()
-	return {
-		"image_base64": Marshalls.raw_to_base64(png_bytes),
-		"last_revealed_cell": {
-			"x": int(_fog_last_revealed_cell.x),
-			"y": int(_fog_last_revealed_cell.y),
-		},
-	}
 
 
 func _get_run_state_label(run_state: int) -> String:

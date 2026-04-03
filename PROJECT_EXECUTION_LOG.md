@@ -152,6 +152,32 @@ Validation:
   - `construction_expanded_probe_build_mode=true`
   - `construction_expanded_probe_placeables=1`
   - `construction_expanded_probe_cell_occupied=true`
+
+### Godot-Native UI Refactor
+- Replaced the procedurally constructed Boot menu with an authored `Boot.tscn` scene and onready node bindings in `boot.gd`.
+- Replaced the procedurally constructed HUD pause overlay with authored nodes in `HUD.tscn` and simplified `hud.gd` back to controller logic.
+- Kept the existing probe paths and behavior stable so the refactor stayed architectural instead of user-facing.
+
+Validation:
+- `settings_manager_probe` still passed against the authored Boot scene.
+- `save_system_probe` still passed against the authored Boot scene and slot flow.
+- `pause_menu_probe` still passed against the authored HUD pause overlay.
+
+### Godot-Native Controller Extraction
+- Added a scene-owned `ConstructionController` under `Game` to own build selection, placement, occupancy refresh, and placeable save/load.
+- Added a scene-owned `FogController` under `Game` to own fog-of-war memory, shader updates, and fog save/load.
+- Reduced `game.gd` back toward orchestration by delegating construction and fog responsibilities to those child nodes instead of keeping them in one large script.
+- Fixed a controller regression where recycled placeables were not clearing grid occupancy until a later refresh.
+- Fixed the authored Boot scene so the full-screen menu backdrop is hidden while the game is running instead of darkening gameplay underneath.
+- Corrected fullscreen settings to apply through Godot's active window mode API rather than relying only on a lower-level display call.
+
+Validation:
+- `settings_manager_probe` still passed after the extraction.
+- `save_system_probe` still passed, including `save_probe_continue_did_not_rewrite=true`.
+- `pause_menu_probe` still passed, including active-wave save blocking.
+- `construction_grid_probe` still passed.
+- `map_fog_probe` still passed, including matched camera center / screen center.
+- `barricade_placement_probe` confirmed `barricade_probe_cell_occupied_after_recycle=false`.
   - `construction_expanded_probe_salvage_before=72`
   - `construction_expanded_probe_salvage_after=62`
   - `construction_expanded_probe_placeable_id=barricade`

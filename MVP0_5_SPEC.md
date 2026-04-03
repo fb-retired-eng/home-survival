@@ -19,6 +19,8 @@ The MVP0.5 foundation is now in place:
 - construction, socket, POI, and fog-memory persistence
 - autosave hooks at safe points
 - pause-menu save, resume, and quit-to-menu flow
+- authored Boot and HUD front-end scenes instead of procedural menu construction
+- fullscreen/windowed settings applied through the active Godot window
 - active-wave manual saves blocked by policy
 - loading or continuing a slot no longer rewrites it on entry
 

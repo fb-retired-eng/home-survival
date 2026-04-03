@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_hud"]
 [ext_resource type="Shader" path="res://shaders/home_fog.gdshader" id="2_home_fog_shader"]
@@ -94,6 +94,22 @@ content_margin_bottom = 24.0
 
 [sub_resource type="ShaderMaterial" id="8_home_fog_material"]
 shader = ExtResource("2_home_fog_shader")
+
+[sub_resource type="StyleBoxFlat" id="9_pause_panel"]
+bg_color = Color(0.06, 0.08, 0.1, 0.96)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.78, 0.88, 0.96, 0.18)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
+content_margin_left = 24.0
+content_margin_top = 18.0
+content_margin_right = 24.0
+content_margin_bottom = 18.0
 
 [node name="HUD" type="CanvasLayer"]
 script = ExtResource("1_hud")
@@ -260,6 +276,67 @@ theme_override_colors/font_color = Color(1, 0.9, 0.5, 1)
 horizontal_alignment = 1
 autowrap_mode = 3
 text = ""
+
+[node name="PauseOverlay" type="Control" parent="."]
+visible = false
+unique_name_in_owner = true
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 0
+
+[node name="Dimmer" type="ColorRect" parent="PauseOverlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 1
+color = Color(0.02, 0.03, 0.04, 0.82)
+
+[node name="PausePanel" type="PanelContainer" parent="PauseOverlay"]
+offset_left = 430.0
+offset_top = 210.0
+offset_right = 850.0
+offset_bottom = 510.0
+theme_override_styles/panel = SubResource("9_pause_panel")
+
+[node name="PauseBox" type="VBoxContainer" parent="PauseOverlay/PausePanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="PauseTitle" type="Label" parent="PauseOverlay/PausePanel/PauseBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+horizontal_alignment = 1
+text = "Paused"
+
+[node name="PauseStatus" type="Label" parent="PauseOverlay/PausePanel/PauseBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+theme_override_colors/font_color = Color(0.9, 0.94, 0.97, 0.9)
+autowrap_mode = 3
+horizontal_alignment = 1
+text = "Game paused."
+
+[node name="PauseResumeButton" type="Button" parent="PauseOverlay/PausePanel/PauseBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+text = "Resume"
+
+[node name="PauseSaveButton" type="Button" parent="PauseOverlay/PausePanel/PauseBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+text = "Save Game"
+
+[node name="PauseSaveQuitButton" type="Button" parent="PauseOverlay/PausePanel/PauseBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+text = "Save and Quit to Menu"
 
 [node name="EndOverlay" type="Control" parent="."]
 visible = false

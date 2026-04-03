@@ -14,12 +14,6 @@ var _energy_maximum: int = 0
 var _wave_current: int = 0
 var _wave_final: int = 0
 var _phase_text: String = "Pre-Wave"
-var _pause_overlay: Control
-var _pause_panel: PanelContainer
-var _pause_status_label: Label
-var _pause_resume_button: Button
-var _pause_save_button: Button
-var _pause_save_quit_button: Button
 
 @onready var health_value_label: Label = %HealthValueLabel
 @onready var health_bar: ProgressBar = %HealthBar
@@ -37,6 +31,11 @@ var _pause_save_quit_button: Button
 @onready var end_overlay: Control = %EndOverlay
 @onready var end_title_label: Label = %EndTitleLabel
 @onready var end_message_label: Label = %EndMessageLabel
+@onready var _pause_overlay: Control = %PauseOverlay
+@onready var _pause_status_label: Label = %PauseStatus
+@onready var _pause_resume_button: Button = %PauseResumeButton
+@onready var _pause_save_button: Button = %PauseSaveButton
+@onready var _pause_save_quit_button: Button = %PauseSaveQuitButton
 
 signal pause_toggle_requested
 signal pause_resume_requested
@@ -46,7 +45,9 @@ signal pause_save_quit_requested
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	_build_pause_menu()
+	_pause_resume_button.pressed.connect(_on_pause_resume_pressed)
+	_pause_save_button.pressed.connect(_on_pause_save_pressed)
+	_pause_save_quit_button.pressed.connect(_on_pause_save_quit_pressed)
 	hide_pause_menu()
 
 
@@ -66,89 +67,6 @@ func bind_player(target) -> void:
 	_on_weapon_status_changed(player.get_weapon_status_text())
 	_on_weapon_trait_changed(player.get_weapon_trait_text())
 	set_interaction_prompt("")
-
-
-func _build_pause_menu() -> void:
-	if _pause_overlay != null:
-		return
-
-	_pause_overlay = Control.new()
-	_pause_overlay.name = "PauseOverlay"
-	_pause_overlay.anchor_right = 1.0
-	_pause_overlay.anchor_bottom = 1.0
-	_pause_overlay.offset_left = 0.0
-	_pause_overlay.offset_top = 0.0
-	_pause_overlay.offset_right = 0.0
-	_pause_overlay.offset_bottom = 0.0
-	_pause_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	_pause_overlay.process_mode = Node.PROCESS_MODE_ALWAYS
-	add_child(_pause_overlay)
-
-	var dimmer := ColorRect.new()
-	dimmer.name = "Dimmer"
-	dimmer.anchor_right = 1.0
-	dimmer.anchor_bottom = 1.0
-	dimmer.offset_left = 0.0
-	dimmer.offset_top = 0.0
-	dimmer.offset_right = 0.0
-	dimmer.offset_bottom = 0.0
-	dimmer.color = Color(0.02, 0.03, 0.04, 0.82)
-	dimmer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_pause_overlay.add_child(dimmer)
-
-	_pause_panel = PanelContainer.new()
-	_pause_panel.name = "PausePanel"
-	_pause_panel.anchor_left = 0.5
-	_pause_panel.anchor_top = 0.5
-	_pause_panel.anchor_right = 0.5
-	_pause_panel.anchor_bottom = 0.5
-	_pause_panel.offset_left = -210.0
-	_pause_panel.offset_top = -150.0
-	_pause_panel.offset_right = 210.0
-	_pause_panel.offset_bottom = 150.0
-	_pause_overlay.add_child(_pause_panel)
-
-	var pause_box := VBoxContainer.new()
-	pause_box.name = "PauseBox"
-	pause_box.anchor_right = 1.0
-	pause_box.anchor_bottom = 1.0
-	pause_box.offset_left = 24.0
-	pause_box.offset_top = 18.0
-	pause_box.offset_right = -24.0
-	pause_box.offset_bottom = -18.0
-	pause_box.add_theme_constant_override("separation", 10)
-	_pause_panel.add_child(pause_box)
-
-	var pause_title := Label.new()
-	pause_title.name = "PauseTitle"
-	pause_title.text = "Paused"
-	pause_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	pause_title.add_theme_font_size_override("font_size", 26)
-	pause_box.add_child(pause_title)
-
-	_pause_status_label = Label.new()
-	_pause_status_label.name = "PauseStatus"
-	_pause_status_label.text = "Game is paused."
-	_pause_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_pause_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_pause_status_label.add_theme_font_size_override("font_size", 13)
-	_pause_status_label.add_theme_color_override("font_color", Color(0.9, 0.94, 0.97, 0.9))
-	pause_box.add_child(_pause_status_label)
-
-	_pause_resume_button = Button.new()
-	_pause_resume_button.text = "Resume"
-	_pause_resume_button.pressed.connect(_on_pause_resume_pressed)
-	pause_box.add_child(_pause_resume_button)
-
-	_pause_save_button = Button.new()
-	_pause_save_button.text = "Save Game"
-	_pause_save_button.pressed.connect(_on_pause_save_pressed)
-	pause_box.add_child(_pause_save_button)
-
-	_pause_save_quit_button = Button.new()
-	_pause_save_quit_button.text = "Save and Quit to Menu"
-	_pause_save_quit_button.pressed.connect(_on_pause_save_quit_pressed)
-	pause_box.add_child(_pause_save_quit_button)
 
 
 func set_status(text: String) -> void:
@@ -189,7 +107,6 @@ func hide_end_overlay() -> void:
 
 
 func show_pause_menu(status_text: String = "Game paused") -> void:
-	_build_pause_menu()
 	_pause_status_label.text = status_text
 	_pause_overlay.visible = true
 

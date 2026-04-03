@@ -60,8 +60,16 @@ func _apply_settings() -> void:
 	if bus_index >= 0:
 		AudioServer.set_bus_volume_db(bus_index, linear_to_db(max(master_volume, 0.0001)))
 
-	if not OS.has_feature("headless"):
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if fullscreen else DisplayServer.WINDOW_MODE_WINDOWED)
+	if not _is_headless_display():
+		var window := get_window()
+		if window != null:
+			window.mode = Window.MODE_FULLSCREEN if fullscreen else Window.MODE_WINDOWED
+		else:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if fullscreen else DisplayServer.WINDOW_MODE_WINDOWED)
+
+
+func _is_headless_display() -> bool:
+	return DisplayServer.get_name() == "headless"
 
 
 func _ensure_storage_directory() -> void:

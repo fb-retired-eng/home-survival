@@ -31,6 +31,8 @@
 [ext_resource type="PackedScene" path="res://scenes/world/Placeable.tscn" id="30_placeable_scene"]
 [ext_resource type="Resource" path="res://data/placeables/barricade.tres" id="31_barricade_profile"]
 [ext_resource type="Resource" path="res://data/placeables/spike_trap.tres" id="32_spike_trap_profile"]
+[ext_resource type="Script" path="res://scripts/main/construction_controller.gd" id="33_construction_controller"]
+[ext_resource type="Script" path="res://scripts/main/fog_controller.gd" id="34_fog_controller"]
 
 [sub_resource type="RectangleShape2D" id="1_horizontal_wall"]
 size = Vector2(5120, 32)
@@ -60,6 +62,12 @@ script = ExtResource("4_game_manager")
 script = ExtResource("5_wave_manager")
 zombie_scene = ExtResource("12_zombie_scene")
 wave_set_definition = ExtResource("14_waves")
+
+[node name="ConstructionController" type="Node" parent="."]
+script = ExtResource("33_construction_controller")
+
+[node name="FogController" type="Node" parent="."]
+script = ExtResource("34_fog_controller")
 
 [node name="World" type="Node2D" parent="." unique_id=715950200]
 
