@@ -30,6 +30,8 @@ var _damage_cooldown_remaining: float = 0.0
 var _base_color: Color
 var _behavior_context: StringName = &"exploration"
 var _player_ref
+var _enemy_layer_ref: Node
+var _placeables_root: Node
 var _wave_sockets: Array = []
 var _player_obstructing_this_frame: bool = false
 var _preferred_socket_ids: PackedStringArray = []
@@ -65,6 +67,7 @@ var _base_elite_aura_color: Color
 @onready var body_touch_area: Area2D = $BodyTouchArea
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
 @onready var combat_audio = $CombatAudio
+@onready var combat_controller: ZombieCombatController = $CombatController
 
 
 func _ready() -> void:
@@ -72,11 +75,23 @@ func _ready() -> void:
 	_base_color = body_visual.color
 	_base_facing_marker_color = facing_marker.color
 	_base_elite_aura_color = elite_aura.color
+	combat_controller.configure(self)
 	_apply_definition()
 	current_health = max_health
+	_cache_runtime_context()
 	_refresh_player_reference()
 	_update_facing_direction(_facing_direction)
 	_refresh_health_bar()
+
+
+func configure_runtime_context(player_ref = null, enemy_layer: Node = null, placeables_root: Node = null) -> void:
+	if player_ref != null and is_instance_valid(player_ref):
+		_player_ref = player_ref
+	if enemy_layer != null and is_instance_valid(enemy_layer):
+		_enemy_layer_ref = enemy_layer
+	if placeables_root != null and is_instance_valid(placeables_root):
+		_placeables_root = placeables_root
+	_cache_runtime_context()
 
 
 func configure_wave_context(player_ref, defense_sockets: Array, preferred_socket_ids: PackedStringArray = PackedStringArray()) -> void:
@@ -85,6 +100,7 @@ func configure_wave_context(player_ref, defense_sockets: Array, preferred_socket
 	_wave_sockets = defense_sockets.duplicate()
 	_preferred_socket_ids = preferred_socket_ids
 	_clear_noise_investigation()
+	_cache_runtime_context()
 	_refresh_spawn_facing()
 
 
@@ -98,6 +114,7 @@ func configure_exploration_context(player_ref, initial_facing_direction: Vector2
 		_exploration_anchor_position = anchor_position
 		_exploration_anchor_facing = initial_facing_direction
 		_has_exploration_anchor = true
+	_cache_runtime_context()
 	set_exploration_suspended(false)
 	if refresh_facing:
 		_refresh_spawn_facing(initial_facing_direction)
@@ -358,7 +375,7 @@ func _get_intact_preferred_structures() -> Array:
 
 		preferred_structures.append(socket)
 
-	for placeable in get_tree().get_nodes_in_group("placeables"):
+	for placeable in _get_runtime_placeables():
 		if not is_instance_valid(placeable):
 			continue
 		if not placeable.has_method("get_placeable_id"):
@@ -375,7 +392,7 @@ func _get_all_structure_targets() -> Array:
 	for socket in _wave_sockets:
 		if is_instance_valid(socket) and _is_structure_target(socket) and not (socket.has_method("is_breached") and socket.is_breached()):
 			structures.append(socket)
-	for placeable in get_tree().get_nodes_in_group("placeables"):
+	for placeable in _get_runtime_placeables():
 		if not is_instance_valid(placeable):
 			continue
 		if not placeable.has_method("get_placeable_id"):
@@ -428,69 +445,7 @@ func _is_target_in_damage_range(target) -> bool:
 
 
 func _try_damage_target(target) -> bool:
-	if not _can_execute_attack(target):
-		return false
-
-	var damage_amount := _get_damage_amount_for_target(target)
-	if _is_structure_target(target):
-		target.take_damage(damage_amount, {
-			"attacker": self,
-			"damage_type": structure_damage_type,
-		})
-	else:
-		target.take_damage(damage_amount, {
-			"attacker": self,
-			"damage_type": structure_damage_type,
-			"knockback_force": player_knockback_force,
-			"knockback_direction": _facing_direction,
-		})
-	_play_attack_flash()
-	_play_combat_sound(&"zombie_attack_hit", randf_range(0.96, 1.05), -1.5)
-	return true
-
-
-func _can_execute_attack(target) -> bool:
-	if target == null or not is_instance_valid(target):
-		return false
-
-	if not target.has_method("take_damage"):
-		return false
-
-	if not _is_target_in_damage_range(target):
-		return false
-
-	if _is_structure_target(target):
-		return true
-
-	if not _has_clear_attack_path(target):
-		return false
-
-	if not _is_facing_target_for_attack(target):
-		return false
-
-	return true
-
-
-func _can_begin_attack_prep(target) -> bool:
-	if target == null or not is_instance_valid(target):
-		return false
-
-	if not target.has_method("take_damage"):
-		return false
-
-	if not _is_target_in_damage_range(target):
-		return false
-
-	if _is_structure_target(target):
-		return true
-
-	if not _is_facing_target_for_attack(target):
-		return false
-
-	if target.is_in_group("player") and _is_player_body_touching(target):
-		return true
-
-	return _has_clear_attack_path(target)
+	return combat_controller.try_damage_target(target)
 
 
 func _is_player_obstructing(primary_target) -> bool:
@@ -613,13 +568,7 @@ func _apply_knockback_from_source(source: Variant) -> void:
 
 
 func _apply_attack_interrupt_from_source(source: Variant) -> void:
-	if source == null or typeof(source) != TYPE_DICTIONARY:
-		return
-	if not bool(source.get("interrupt_attack_prep", false)):
-		return
-	if not _attack_prep_armed:
-		return
-	_reset_attack_prep()
+	combat_controller.apply_attack_interrupt_from_source(source)
 
 
 func _apply_slow_effect_from_source(source: Variant) -> void:
@@ -761,75 +710,15 @@ func receive_noise_alert(player_ref, source_position: Vector2) -> void:
 
 
 func _process_attack_prep(attack_target) -> bool:
-	if _damage_cooldown_remaining > 0.0:
-		_reset_attack_prep()
-		return false
-
-	if not _can_begin_attack_prep(attack_target):
-		if _attack_prep_armed and _attack_prep_lost_target_grace_remaining > 0.0:
-			return _attack_prep_remaining > 0.0
-		_reset_attack_prep()
-		return false
-
-	var target_id: int = attack_target.get_instance_id()
-	if not _attack_prep_armed or _attack_prep_target_id != target_id:
-		_attack_prep_armed = true
-		_attack_prep_target_id = target_id
-		_attack_prep_remaining = _get_attack_prep_time()
-		_play_combat_sound(&"zombie_attack_tell", randf_range(0.94, 1.03), -5.0)
-
-	_attack_prep_lost_target_grace_remaining = 0.08
-	return _attack_prep_remaining > 0.0
+	return combat_controller.process_attack_prep(attack_target)
 
 
 func _reset_attack_prep() -> void:
-	_attack_prep_armed = false
-	_attack_prep_remaining = 0.0
-	_attack_prep_target_id = 0
-	_attack_prep_lost_target_grace_remaining = 0.0
-	if _damage_cooldown_remaining <= 0.0:
-		attack_flash.visible = false
-		attack_flash.scale = Vector2.ONE
-		attack_flash.modulate = Color(
-			_get_attack_tell_color().r,
-			_get_attack_tell_color().g,
-			_get_attack_tell_color().b,
-			_get_attack_tell_start_alpha()
-		)
+	combat_controller.reset_attack_prep()
 
 
 func _update_attack_prep_visual() -> void:
-	if _damage_cooldown_remaining > 0.0:
-		return
-
-	if not _attack_prep_armed:
-		attack_flash.visible = false
-		attack_flash.scale = Vector2.ONE
-		attack_flash.modulate = Color(
-			_get_attack_tell_color().r,
-			_get_attack_tell_color().g,
-			_get_attack_tell_color().b,
-			_get_attack_tell_start_alpha()
-		)
-		return
-
-	var tell_lead_time := _get_attack_tell_lead_time()
-	if tell_lead_time <= 0.0 or _attack_prep_remaining > tell_lead_time:
-		attack_flash.visible = false
-		return
-
-	var progress: float = clamp(1.0 - (_attack_prep_remaining / tell_lead_time), 0.0, 1.0)
-	attack_flash.visible = true
-	var tell_color := _get_attack_tell_color()
-	var start_scale := _get_attack_tell_start_scale()
-	var ready_scale := _get_attack_tell_ready_scale()
-	attack_flash.scale = start_scale.lerp(ready_scale, progress)
-	attack_flash.modulate = Color(
-		tell_color.r,
-		tell_color.g,
-		tell_color.b,
-		lerpf(_get_attack_tell_start_alpha(), _get_attack_tell_ready_alpha(), progress)
-	)
+	combat_controller.update_attack_prep_visual()
 
 
 func _alert_to_player_from_source(source: Variant) -> void:
@@ -860,6 +749,37 @@ func _refresh_player_reference() -> void:
 	var candidate = get_tree().get_first_node_in_group("player")
 	if candidate != null and is_instance_valid(candidate):
 		_player_ref = candidate
+
+
+func _cache_runtime_context() -> void:
+	if (_enemy_layer_ref == null or not is_instance_valid(_enemy_layer_ref)) and get_parent() != null and is_instance_valid(get_parent()):
+		_enemy_layer_ref = get_parent()
+	if (_placeables_root == null or not is_instance_valid(_placeables_root)) and _enemy_layer_ref != null and is_instance_valid(_enemy_layer_ref):
+		var world_root := _enemy_layer_ref.get_parent()
+		if world_root != null and is_instance_valid(world_root):
+			_placeables_root = world_root.get_node_or_null("ConstructionPlaceables")
+
+
+func _get_runtime_placeables() -> Array:
+	var placeables: Array = []
+	if _placeables_root == null or not is_instance_valid(_placeables_root):
+		return placeables
+	for placeable in _placeables_root.get_children():
+		if placeable == null or not is_instance_valid(placeable):
+			continue
+		placeables.append(placeable)
+	return placeables
+
+
+func _get_local_enemy_nodes() -> Array:
+	var enemies: Array = []
+	if _enemy_layer_ref == null or not is_instance_valid(_enemy_layer_ref):
+		return enemies
+	for enemy in _enemy_layer_ref.get_children():
+		if enemy == null or not is_instance_valid(enemy):
+			continue
+		enemies.append(enemy)
+	return enemies
 
 
 func _decay_knockback(delta: float) -> void:
@@ -1107,7 +1027,7 @@ func _has_clear_line_to_point(target, target_point: Vector2, ignore_other_enemie
 	var query := PhysicsRayQueryParameters2D.create(global_position, target_point)
 	query.exclude = [self]
 	if ignore_other_enemies:
-		for enemy in get_tree().get_nodes_in_group("enemies"):
+		for enemy in _get_local_enemy_nodes():
 			if enemy == self or enemy == target or not is_instance_valid(enemy):
 				continue
 			query.exclude.append(enemy)
@@ -1124,7 +1044,7 @@ func _get_enemy_separation_vector() -> Vector2:
 		return Vector2.ZERO
 
 	var push := Vector2.ZERO
-	for enemy in get_tree().get_nodes_in_group("enemies"):
+	for enemy in _get_local_enemy_nodes():
 		if enemy == self or not is_instance_valid(enemy):
 			continue
 		if not (enemy is Node2D):
@@ -1256,7 +1176,7 @@ func _alert_nearby_enemies(player_ref) -> void:
 	if alert_radius <= 0.0:
 		return
 
-	for enemy in get_tree().get_nodes_in_group("enemies"):
+	for enemy in _get_local_enemy_nodes():
 		if enemy == self or not is_instance_valid(enemy):
 			continue
 		if not (enemy is Zombie):
@@ -1351,26 +1271,6 @@ func _get_damage_knock_direction(source: Variant) -> Vector2:
 	if knock_direction.is_zero_approx():
 		return Vector2(0.0, 1.0)
 	return knock_direction.normalized()
-
-
-func _play_attack_flash() -> void:
-	attack_flash.visible = true
-	attack_flash.scale = _get_attack_flash_start_scale()
-	var strike_color := _get_attack_strike_color()
-	attack_flash.modulate = Color(strike_color.r, strike_color.g, strike_color.b, 1.0)
-	var tween := create_tween()
-	tween.parallel().tween_property(attack_flash, "scale", _get_attack_flash_peak_scale(), _get_attack_flash_duration())
-	tween.parallel().tween_property(attack_flash, "modulate:a", 0.0, _get_attack_flash_duration())
-	tween.finished.connect(func() -> void:
-		attack_flash.visible = false
-		attack_flash.scale = Vector2.ONE
-		attack_flash.modulate = Color(
-			_get_attack_tell_color().r,
-			_get_attack_tell_color().g,
-			_get_attack_tell_color().b,
-			_get_attack_tell_start_alpha()
-		)
-	)
 
 
 func _play_combat_sound(sound_id: StringName, pitch_scale: float = 1.0, volume_db: float = 0.0) -> void:

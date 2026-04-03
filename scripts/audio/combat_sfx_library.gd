@@ -16,6 +16,10 @@ static func get_stream(sound_id: StringName) -> AudioStreamWAV:
 	return stream
 
 
+static func clear_cache() -> void:
+	_cache.clear()
+
+
 static func _build_stream(sound_id: StringName) -> AudioStreamWAV:
 	match String(sound_id):
 		"knife_swing":

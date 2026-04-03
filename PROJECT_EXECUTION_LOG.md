@@ -209,6 +209,44 @@ Validation:
 Validation:
 - Docs reviewed for terminology drift and implementation-scope consistency.
 
+## 2026-04-02
+
+### POI Data-Driven Role Pass
+- Added `PoiDefinition` resources for the six live POIs and moved display names, bonus-table ownership, elite eligibility, and daily-elite resolution into POI data.
+- Replaced name-derived POI lookup with explicit `poi_id` wiring for exploration guard markers and POI-linked scene content.
+- Made `reward_role` live data instead of descriptive-only:
+  - POI labels now expose role text through tooltips and debug helpers.
+  - POI-tied micro-loot markers can resolve their resource and amount from the POI role instead of hardcoded scene values.
+  - POI definition caching now warns if a POI bonus table drifts away from the declared reward role.
+
+Validation:
+- `map_layout_probe` confirmed stable POI labels plus role output:
+  - `map_layout_probe_poi_a_role=Salvage / Parts`
+  - `map_layout_probe_poi_d_role=Ammo`
+- `micro_loot_probe` confirmed role-driven support loot:
+  - `micro_loot_probe_tool_yard_resource=salvage`
+  - `micro_loot_probe_tool_yard_amount=2`
+- `daily_poi_modifier_probe` still passed through disturbed and elite cases.
+
+### App-Service Access Cleanup
+- Stopped `Boot` from creating settings/save managers at runtime and treated `SettingsStore` / `SaveStore` as required autoload-owned app services.
+- Added `AppServices` as the shared lookup path so Boot and Game stop scattering raw `/root/...` access.
+- Tightened the save/settings probes to verify the autoload-backed path instead of silently constructing replacement services.
+
+Validation:
+- `settings_manager_probe` confirmed `settings_manager_probe_boot_settings_autoload=true`.
+- `save_system_probe` still passed with `save_probe_continue_did_not_rewrite=true`.
+- `pause_menu_probe` still passed with active-wave save blocking intact.
+
+### Headless Probe Audio Cleanup
+- Adjusted `CombatAudio2D` so headless probes record sound ids without instantiating or playing real 2D audio streams.
+- Added cache clearing to the generated combat SFX library and improved probe teardown so temporary test scenes are freed before exit.
+- Removed the repeatable headless `AudioStreamWAV` / `AudioStreamPlaybackWAV` leak warning from focused non-combat probes like micro-loot and save/load.
+
+Validation:
+- `micro_loot_probe` no longer emitted the prior combat-audio leak at shutdown in verbose headless runs.
+- `save_system_probe` and `combat_audio_probe` still preserved probe-visible sound ids and save/load assertions.
+
 ### Construction Stage 2 Barricade Slice
 - Added the first tactical placeable barricade through the shared construction grid, including placement, salvage spending, repair, dismantle, and occupancy refresh.
 - Tightened the placement guard so barricades cannot trap the player in or permanently seal the base routes, while still allowing valid door-side placement.

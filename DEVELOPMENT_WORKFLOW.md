@@ -141,3 +141,15 @@ For runtime-safe checks, use:
 ```bash
 godot --headless --path . --quit
 ```
+
+## Godot Rules
+
+This repo should follow the rules in [`GODOT_BEST_PRACTICES.md`](GODOT_BEST_PRACTICES.md).
+
+The most important enforcement points are:
+- author static structure in scenes first
+- attach behavior to the node that owns it
+- prefer signals over broad polling
+- keep tuning in resources or exported fields
+- save reconstructable state instead of transient runtime detail
+- avoid growing `Game.gd` when a subsystem node or controller should own the behavior

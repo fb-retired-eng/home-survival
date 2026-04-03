@@ -13,9 +13,13 @@ var _voice_index: int = 0
 var _last_sound_id: StringName = StringName()
 var _recent_sound_ids: PackedStringArray = PackedStringArray()
 var _library := CombatSfxLibraryClass.new()
+var _headless: bool = false
 
 
 func _ready() -> void:
+	_headless = DisplayServer.get_name() == "headless"
+	if _headless:
+		return
 	_ensure_audio_bus()
 	if not _players.is_empty():
 		return
@@ -29,8 +33,24 @@ func _ready() -> void:
 		_players.append(player)
 
 
+func _exit_tree() -> void:
+	for player in _players:
+		if player == null or not is_instance_valid(player):
+			continue
+		player.stop()
+		player.stream = null
+	_players.clear()
+	CombatSfxLibraryClass.clear_cache()
+
+
 func play_sound(sound_id: StringName, pitch_scale: float = 1.0, volume_db: float = 0.0) -> void:
 	if sound_id == StringName():
+		return
+	_last_sound_id = sound_id
+	_recent_sound_ids.append(String(sound_id))
+	while _recent_sound_ids.size() > 8:
+		_recent_sound_ids.remove_at(0)
+	if _headless:
 		return
 	if _players.is_empty():
 		_ready()
@@ -46,10 +66,6 @@ func play_sound(sound_id: StringName, pitch_scale: float = 1.0, volume_db: float
 	player.pitch_scale = pitch_scale
 	player.volume_db = volume_db
 	player.play()
-	_last_sound_id = sound_id
-	_recent_sound_ids.append(String(sound_id))
-	while _recent_sound_ids.size() > 8:
-		_recent_sound_ids.remove_at(0)
 
 
 func get_last_sound_id() -> StringName:

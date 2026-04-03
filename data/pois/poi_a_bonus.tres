@@ -4,9 +4,11 @@
 
 [resource]
 script = ExtResource("1_bonus_table")
-empty_weight = 30.0
-salvage_weight = 50.0
-parts_weight = 15.0
-medicine_weight = 5.0
-food_weight = 10.0
+empty_weight = 20.0
+salvage_weight = 54.0
+parts_weight = 22.0
+medicine_weight = 2.0
+food_weight = 6.0
+salvage_amount = 2
+parts_amount = 1
 food_amount = 1

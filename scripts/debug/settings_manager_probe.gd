@@ -1,5 +1,7 @@
 extends SceneTree
 
+const APP_SERVICES := preload("res://scripts/main/app_services.gd")
+
 
 func _wait_frames() -> void:
 	await process_frame
@@ -38,8 +40,10 @@ func _init() -> void:
 	print("settings_manager_probe_boot_start_button=%s" % str(boot.get_node("MenuLayer/RootControl/MainMenuPanel/MenuBox/StartButton") != null))
 	print("settings_manager_probe_boot_settings_button=%s" % str(boot.get_node("MenuLayer/RootControl/MainMenuPanel/MenuBox/SettingsButton") != null))
 	print("settings_manager_probe_boot_settings_panel=%s" % str(boot.get_node("MenuLayer/RootControl/SettingsPanel") != null))
+	var boot_settings := APP_SERVICES.get_settings_store(boot.get_tree())
+	print("settings_manager_probe_boot_settings_autoload=%s" % str(boot_settings != null))
 	if DisplayServer.get_name() != "headless":
-		var live_settings := boot.get_node_or_null("/root/SettingsStore")
+		var live_settings := APP_SERVICES.get_settings_store(boot.get_tree())
 		if live_settings != null:
 			live_settings.call("set_fullscreen", true, false)
 			await _wait_frames()

@@ -36,11 +36,12 @@ func _find_scavenge_node(root_node: Node, node_id: StringName) -> Node:
 
 
 func _init() -> void:
+	await _wait_frames()
 	var save_store := root.get_node_or_null("SaveStore")
 	if save_store == null:
-		save_store = load("res://scripts/managers/save_manager.gd").new()
-		save_store.name = "SaveStore"
-		root.add_child(save_store)
+		push_error("SaveStore autoload missing")
+		quit(1)
+		return
 
 	var slot_id := &"slot_3"
 	save_store.set_active_slot(slot_id)
@@ -138,7 +139,8 @@ func _init() -> void:
 	await _wait_frames()
 	print("save_probe_boot_continue_disabled=%s" % str(boot._continue_button.disabled))
 
-	boot.free()
-	loaded_game.free()
-	game.free()
+	boot.queue_free()
+	loaded_game.queue_free()
+	game.queue_free()
+	await _wait_frames()
 	quit()

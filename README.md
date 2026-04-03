@@ -31,7 +31,9 @@ The repo currently includes:
 - home-anchored fog-of-war that starts beyond the local home area and keeps areas the player has already visited revealed, so the enlarged map has clearer nearby readability and persistent exploration memory
 - MVP0.5 boot shell with authored menu and pause scenes, continue/load slots, persistent settings, pause-menu save/quit, and versioned run saves that restore construction and fog memory; manual saves are blocked during active waves, loading a slot no longer rewrites it on entry, and fullscreen now applies through Godot's window mode API
 - enriched outer-map structure with authored district landmarks, route islands, micro-loot between POIs, and a broader ambient roaming-threat layer so the enlarged map has actual travel value instead of empty margins
+- data-driven POI identity through `PoiDefinition` resources, with role-driven bonus tables, POI-tied micro-loot defaults, explicit `poi_id` wiring, and probe-visible role labels for debugging and UI
 - generated positional combat and interaction SFX, including weapon-specific attack sounds, hit-vs-miss feedback, zombie attack tell/impact, structure hits, trap triggers, pickup sounds, and construction feedback routed through a dedicated `SFX` bus
+- shared app-service access through `AppServices`, so boot/game code resolve autoloaded settings/save services through one helper instead of ad hoc `/root/...` lookups
 - placeholder world scenes for sockets, scavenging nodes, bed/table interactions, pickups, and zombie enemy
 - consolidated MVP0 design/spec documentation
 
@@ -79,6 +81,7 @@ godot --headless --path . --quit
 - [`MVP0_ONE_PAGER.md`](MVP0_ONE_PAGER.md): product framing
 - [`TASK_BREAKDOWN.md`](TASK_BREAKDOWN.md): milestone plan
 - [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md): coding and review workflow, including the picky post-change review rule
+- [`GODOT_BEST_PRACTICES.md`](GODOT_BEST_PRACTICES.md): repo-specific rules for scene ownership, resource-driven tuning, controller boundaries, and save-friendly Godot architecture
 - [`PROJECT_EXECUTION_LOG.md`](PROJECT_EXECUTION_LOG.md): append-only project execution log
 - [`CONSTRUCTION_SYSTEM_PLAN.md`](CONSTRUCTION_SYSTEM_PLAN.md): staged plan for controlled free-grid construction, barricades, and future turrets
 - [`MVP0_DESIGN.md`](MVP0_DESIGN.md): archive pointer for the old design doc path
@@ -105,5 +108,6 @@ godot --headless --path . --quit
 - decide whether the next content step is enemy patrols, reserve-ammo scarcity, or the fifth weapon pickup
 - tune the selectable buildable catalog and add the next construction-placeable type after barricades and spike traps
 - tune the enlarged-map enrichment pass so landmark density, micro-loot, and ambient roaming pressure feel worthwhile without crowding prep-time scavenging
+- keep pushing POI tuning through `PoiDefinition` data instead of scene-only overrides now that role-driven reward defaults and validation are in place
 - keep improving combat and interaction audio feel now that the basic SFX layer is in place
 - continue UI and readability polish from playtest feedback

@@ -59,7 +59,10 @@ func _init() -> void:
 	await _wait_frames()
 	game._on_pause_save_quit_requested()
 	await _wait_frames()
+	await _wait_frames()
 	print("pause_probe_back_to_menu=%s" % str(boot._menu_panel.visible))
 	print("pause_probe_game_host_children=%d" % boot._game_host.get_child_count())
 
+	boot.queue_free()
+	await _wait_frames()
 	quit()

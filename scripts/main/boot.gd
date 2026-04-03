@@ -2,8 +2,7 @@ extends Node
 class_name Boot
 
 const GAME_SCENE := preload("res://scenes/main/Game.tscn")
-const SETTINGS_MANAGER_SCRIPT := preload("res://scripts/managers/settings_manager.gd")
-const SAVE_MANAGER_SCRIPT := preload("res://scripts/managers/save_manager.gd")
+const APP_SERVICES := preload("res://scripts/main/app_services.gd")
 
 var _settings_manager
 var _save_manager
@@ -33,35 +32,21 @@ var _save_manager
 
 
 func _ready() -> void:
-	_settings_manager = _ensure_settings_manager()
-	_save_manager = _ensure_save_manager()
-	_settings_manager.load_settings()
+	_resolve_app_services()
+	if _settings_manager != null:
+		_settings_manager.load_settings()
 	_bind_controls()
 	_sync_settings_controls()
 	_refresh_save_menu_state()
 	_show_main_menu()
 
-
-func _ensure_settings_manager():
-	var existing := get_node_or_null("/root/SettingsStore")
-	if existing != null:
-		return existing
-
-	var manager := SETTINGS_MANAGER_SCRIPT.new()
-	manager.name = "SettingsStore"
-	get_tree().root.add_child(manager)
-	return manager
-
-
-func _ensure_save_manager():
-	var existing := get_node_or_null("/root/SaveStore")
-	if existing != null:
-		return existing
-
-	var manager := SAVE_MANAGER_SCRIPT.new()
-	manager.name = "SaveStore"
-	get_tree().root.add_child(manager)
-	return manager
+func _resolve_app_services() -> void:
+	_settings_manager = APP_SERVICES.get_settings_store(get_tree())
+	_save_manager = APP_SERVICES.get_save_store(get_tree())
+	if _settings_manager == null:
+		push_warning("SettingsStore autoload is missing.")
+	if _save_manager == null:
+		push_warning("SaveStore autoload is missing.")
 
 
 func _bind_controls() -> void:

@@ -329,6 +329,10 @@ func _spawn_next_enemy() -> void:
 		zombie.definition = spawn_entry.get("enemy_definition")
 		_enemy_parent.add_child(zombie)
 		zombie.global_position = _get_spawn_position(marker, preferred_socket_ids)
+		if zombie.has_method("configure_runtime_context"):
+			var world_root := _enemy_parent.get_parent() if _enemy_parent != null else null
+			var placeables_root := world_root.get_node_or_null("ConstructionPlaceables") if world_root != null else null
+			zombie.configure_runtime_context(_player, _enemy_parent, placeables_root)
 		if zombie.has_method("configure_wave_context"):
 			zombie.configure_wave_context(
 				_player,

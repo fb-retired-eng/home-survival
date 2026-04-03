@@ -20,10 +20,6 @@ const DEFAULT_HELD_WEAPON_OFFSET := Vector2(10.0, -10.0)
 const DEFAULT_HELD_WEAPON_COLOR := Color(0.86, 0.86, 0.9, 1.0)
 const DEFAULT_SPREAD_HITSCAN_CONE_DEGREES := 30.0
 const STRUCTURE_ATTACK_BLOCKER_MASK := 2 | 4
-const RECYCLE_SEARCH_RADIUS := 72.0
-const PLACEABLE_PROFILE_SCRIPT := preload("res://scripts/data/placeable_profile.gd")
-const WEAPON_DEFINITION_SCRIPT := preload("res://scripts/data/weapon_definition.gd")
-const DEFAULT_WEAPON_RESOURCE := preload("res://data/weapons/kitchen_knife.tres")
 
 signal health_changed(current: int, maximum: int)
 signal energy_changed(current: int, maximum: int)
@@ -71,10 +67,8 @@ var is_busy: bool = false
 var facing_direction: Vector2 = Vector2.UP
 var attack_cooldown_remaining: float = 0.0
 var _base_body_color: Color
-var _nearby_interactables: Array[Node2D] = []
 var _busy_label: String = ""
 var _action_complete_callback: Callable
-var _interaction_gate_callback: Callable
 var _attack_windup_pending: bool = false
 var _attack_windup_weapon: Resource
 var _attack_windup_visual_only: bool = false
@@ -105,14 +99,9 @@ var _impact_block_color: Color = Color(0.95, 0.94, 0.88, 0.88)
 var _impact_flash_scale: float = 1.0
 var _impact_flash_duration: float = 0.07
 var _attack_indicator_tween: Tween
-var _invalid_weapon_warning_emitted: bool = false
 var _damage_feedback_tween: Tween
 var _starting_weapon: Resource
 var _knockback_velocity: Vector2 = Vector2.ZERO
-var _obtained_weapons: Array[Resource] = []
-var _magazine_ammo_by_weapon_id: Dictionary = {}
-var _reload_time_remaining: float = 0.0
-var _reload_weapon_id: StringName = StringName()
 var _shot_impact_tween: Tween
 var _build_mode_active: bool = false
 var _build_mode_allowed: bool = true
@@ -133,6 +122,9 @@ var _build_mode_allowed: bool = true
 @onready var action_timer: Timer = $ActionTimer
 @onready var attack_windup_timer: Timer = $AttackWindupTimer
 @onready var combat_audio = $CombatAudio
+@onready var interaction_controller = $InteractionController
+@onready var loadout_controller = $LoadoutController
+@onready var combat_controller = $CombatController
 
 var _spawn_position: Vector2
 
@@ -147,11 +139,37 @@ func _ready() -> void:
 	_base_body_color = body_visual.color
 	if attack_area_shape.shape != null:
 		attack_area_shape.shape = attack_area_shape.shape.duplicate()
-	_starting_weapon = _resolve_valid_weapon_resource(equipped_weapon)
-	_equipped_weapon = _starting_weapon
-	if _starting_weapon != null:
-		_obtained_weapons = [_starting_weapon]
+	_starting_weapon = equipped_weapon
+	loadout_controller.configure(_starting_weapon)
+	loadout_controller.message_requested.connect(func(text: String) -> void:
+		message_requested.emit(text)
+	)
+	loadout_controller.resources_changed.connect(func(updated_resources: Dictionary) -> void:
+		resources = updated_resources
+		resources_changed.emit(updated_resources.duplicate(true))
+	)
+	loadout_controller.equipped_weapon_resource_changed.connect(func(weapon: Resource) -> void:
+		_equipped_weapon = weapon
+		resources = loadout_controller.resources
+		_cancel_attack_windup()
+		_apply_equipped_weapon()
+	)
+	loadout_controller.weapon_changed.connect(func(display_name: String, weapon_id: StringName) -> void:
+		weapon_changed.emit(display_name, weapon_id)
+	)
+	loadout_controller.weapon_status_changed.connect(func(text: String) -> void:
+		weapon_status_changed.emit(text)
+	)
+	loadout_controller.weapon_trait_changed.connect(func(text: String) -> void:
+		weapon_trait_changed.emit(text)
+	)
+	resources = loadout_controller.resources
+	combat_controller.configure(self)
 	_apply_equipped_weapon()
+	interaction_controller.configure(self)
+	interaction_controller.prompt_changed.connect(func(text: String) -> void:
+		interaction_prompt_changed.emit(text)
+	)
 	_update_facing_visuals()
 	pickup_detector.area_entered.connect(_on_pickup_detector_area_entered)
 	interaction_detector.area_entered.connect(_on_interaction_detector_area_entered)
@@ -221,72 +239,26 @@ func _physics_process(delta: float) -> void:
 	if Input.is_action_just_pressed("reload_weapon"):
 		_attempt_reload(false)
 
-
-func _input(event: InputEvent) -> void:
-	pass
-
-
 func add_resource(resource_id: String, amount: int, show_message: bool = true) -> bool:
-	if amount == 0:
-		return false
-
-	if not RESOURCE_IDS.has(resource_id):
-		message_requested.emit("Invalid resource id: %s" % resource_id)
-		return false
-
-	var current_amount: int = int(resources.get(resource_id, 0))
-	resources[resource_id] = max(current_amount + amount, 0)
-	resources_changed.emit(resources.duplicate(true))
-	if show_message:
-		message_requested.emit("%s +%d" % [resource_id.capitalize(), amount])
-	return true
+	return loadout_controller.add_resource(resource_id, amount, show_message)
 
 
 func spend_resource(resource_id: String, amount: int) -> bool:
-	if amount <= 0:
-		return true
-
-	if not RESOURCE_IDS.has(resource_id):
-		message_requested.emit("Invalid resource id: %s" % resource_id)
-		return false
-
-	var current_amount: int = int(resources.get(resource_id, 0))
-	if current_amount < amount:
-		return false
-
-	resources[resource_id] = current_amount - amount
-	resources_changed.emit(resources.duplicate(true))
-	_update_interaction_prompt()
-	return true
+	var spent: bool = loadout_controller.spend_resource(resource_id, amount)
+	if spent:
+		_update_interaction_prompt()
+	return spent
 
 
 func has_resources(costs: Dictionary) -> bool:
-	for resource_id in costs.keys():
-		var amount := int(costs[resource_id])
-		if amount <= 0:
-			continue
-
-		if not RESOURCE_IDS.has(String(resource_id)):
-			return false
-
-		if int(resources.get(String(resource_id), 0)) < amount:
-			return false
-
-	return true
+	return loadout_controller.has_resources(costs)
 
 
 func spend_resources(costs: Dictionary) -> bool:
-	if not has_resources(costs):
-		return false
-
-	for resource_id in costs.keys():
-		var amount := int(costs[resource_id])
-		if amount <= 0:
-			continue
-		spend_resource(String(resource_id), amount)
-
-	_update_interaction_prompt()
-	return true
+	var spent: bool = loadout_controller.spend_resources(costs)
+	if spent:
+		_update_interaction_prompt()
+	return spent
 
 
 func can_spend_energy(amount: int) -> bool:
@@ -345,12 +317,11 @@ func cancel_timed_action() -> void:
 
 
 func set_interaction_gate(callback: Callable) -> void:
-	_interaction_gate_callback = callback
-	_update_interaction_prompt()
+	interaction_controller.set_interaction_gate(callback)
 
 
 func refresh_interaction_prompt() -> void:
-	_update_interaction_prompt()
+	interaction_controller.refresh_prompt()
 
 
 func set_build_mode_allowed(allowed: bool) -> void:
@@ -424,54 +395,11 @@ func heal(amount: int) -> void:
 
 
 func equip_weapon(weapon: Resource, show_message: bool = true) -> bool:
-	var resolved_weapon := _resolve_strict_weapon_resource(weapon)
-	if resolved_weapon == null:
-		if show_message:
-			message_requested.emit("Invalid weapon")
-		return false
-
-	if not _has_obtained_weapon_id(resolved_weapon.weapon_id):
-		_obtained_weapons.append(resolved_weapon)
-	_ensure_weapon_runtime_state(resolved_weapon)
-
-	var current_weapon := _get_equipped_weapon()
-	if current_weapon != null and current_weapon.weapon_id == resolved_weapon.weapon_id:
-		if show_message:
-			message_requested.emit("%s ready" % resolved_weapon.display_name)
-		return false
-
-	equipped_weapon = resolved_weapon
-	if show_message:
-		message_requested.emit("Equipped %s" % resolved_weapon.display_name)
-	return true
+	return loadout_controller.equip_weapon(weapon, show_message)
 
 
 func obtain_weapon(weapon: Resource, auto_equip: bool = true, show_message: bool = true) -> bool:
-	var resolved_weapon := _resolve_strict_weapon_resource(weapon)
-	if resolved_weapon == null:
-		if show_message:
-			message_requested.emit("Invalid weapon")
-		return false
-
-	var already_owned := _has_obtained_weapon_id(resolved_weapon.weapon_id)
-	if not already_owned:
-		_obtained_weapons.append(resolved_weapon)
-	_ensure_weapon_runtime_state(resolved_weapon)
-
-	if auto_equip:
-		var equipped := equip_weapon(resolved_weapon, false)
-		if show_message:
-			if not already_owned:
-				message_requested.emit("Found %s" % resolved_weapon.display_name)
-			elif equipped:
-				message_requested.emit("Switched to %s" % resolved_weapon.display_name)
-			else:
-				message_requested.emit("%s ready" % resolved_weapon.display_name)
-		return equipped or not already_owned
-
-	if show_message and not already_owned:
-		message_requested.emit("Found %s" % resolved_weapon.display_name)
-	return not already_owned
+	return loadout_controller.obtain_weapon(weapon, auto_equip, show_message)
 
 
 func _handle_movement() -> void:
@@ -486,124 +414,27 @@ func _handle_movement() -> void:
 
 
 func _attempt_attack() -> void:
-	if attack_cooldown_remaining > 0.0 or _attack_windup_pending or _is_reloading_weapon():
-		return
-
-	var weapon: Resource = _get_equipped_weapon()
-	if weapon == null:
-		return
-
-	if _uses_weapon_magazine(weapon):
-		if _get_weapon_magazine_ammo(weapon) <= 0:
-			if _get_bullet_reserve_amount() <= 0:
-				message_requested.emit("Out of bullets")
-			else:
-				_attempt_reload(true)
-			return
-
-		if current_energy < weapon.energy_cost:
-			message_requested.emit("Too tired")
-			return
-
-		if not spend_energy(weapon.energy_cost):
-			message_requested.emit("Too tired")
-			return
-		_start_attack_sequence(weapon, false)
-		return
-
-	var hit_targets := _get_attack_targets_for_weapon(weapon)
-
-	if hit_targets.is_empty():
-		_start_attack_sequence(weapon, true)
-		return
-
-	if current_energy < weapon.energy_cost:
-		message_requested.emit("Too tired")
-		return
-
-	if not spend_energy(weapon.energy_cost):
-		message_requested.emit("Too tired")
-		return
-	_start_attack_sequence(weapon, false)
+	combat_controller.attempt_attack()
 
 
 func _play_attack_flash() -> void:
-	attack_flash.visible = true
-	attack_flash.scale = _attack_flash_start_scale
-	attack_flash.modulate = Color(_attack_flash_color.r, _attack_flash_color.g, _attack_flash_color.b, 1.0)
-	var tween := create_tween()
-	tween.parallel().tween_property(attack_flash, "scale", _attack_flash_peak_scale, _attack_flash_duration)
-	tween.parallel().tween_property(attack_flash, "modulate:a", 0.0, _attack_flash_duration)
-	tween.finished.connect(func() -> void:
-		attack_flash.visible = false
-		attack_flash.scale = Vector2.ONE
-		attack_flash.modulate = Color(_attack_flash_color.r, _attack_flash_color.g, _attack_flash_color.b, 1.0)
-	)
-	_show_attack_indicator_strike()
+	combat_controller._play_attack_flash()
 
 
 func _play_hitscan_effect(end_point: Vector2, impact_kind: String) -> void:
-	_show_attack_indicator_strike()
-	_play_muzzle_flash()
-	_play_shot_tracer(end_point)
-	_play_shot_impact(end_point, impact_kind)
+	combat_controller._play_hitscan_effect(end_point, impact_kind)
 
 
 func _play_muzzle_flash() -> void:
-	muzzle_flash.visible = true
-	muzzle_flash.position = _get_muzzle_local_position()
-	muzzle_flash.scale = _muzzle_flash_scale * 0.72
-	muzzle_flash.modulate = Color(_muzzle_flash_color.r, _muzzle_flash_color.g, _muzzle_flash_color.b, 1.0)
-	var tween := create_tween()
-	tween.parallel().tween_property(muzzle_flash, "scale", _muzzle_flash_scale, _muzzle_flash_duration)
-	tween.parallel().tween_property(muzzle_flash, "modulate:a", 0.0, _muzzle_flash_duration)
-	tween.finished.connect(func() -> void:
-		muzzle_flash.visible = false
-		muzzle_flash.scale = Vector2.ONE
-		muzzle_flash.modulate = Color(_muzzle_flash_color.r, _muzzle_flash_color.g, _muzzle_flash_color.b, 1.0)
-	)
+	combat_controller._play_muzzle_flash()
 
 
 func _play_shot_tracer(end_point: Vector2) -> void:
-	var muzzle_global := attack_pivot.to_global(_get_muzzle_local_position())
-	shot_tracer.visible = true
-	shot_tracer.width = _tracer_width
-	shot_tracer.default_color = _tracer_color
-	shot_tracer.points = PackedVector2Array([
-		to_local(muzzle_global),
-		to_local(end_point),
-	])
-	shot_tracer.modulate = Color(1.0, 1.0, 1.0, 1.0)
-	var tween := create_tween()
-	tween.tween_property(shot_tracer, "modulate:a", 0.0, _tracer_duration)
-	tween.finished.connect(func() -> void:
-		shot_tracer.visible = false
-		shot_tracer.points = PackedVector2Array()
-		shot_tracer.modulate = Color(1.0, 1.0, 1.0, 1.0)
-	)
+	combat_controller._play_shot_tracer(end_point)
 
 
 func _play_shot_impact(end_point: Vector2, impact_kind: String) -> void:
-	if shot_impact == null:
-		return
-	if _shot_impact_tween != null and is_instance_valid(_shot_impact_tween):
-		_shot_impact_tween.kill()
-
-	var impact_color := _impact_hit_color if impact_kind == "enemy" else _impact_block_color
-	shot_impact.position = to_local(end_point)
-	shot_impact.visible = true
-	shot_impact.scale = Vector2.ONE * (_impact_flash_scale * 0.7)
-	shot_impact.color = impact_color
-	shot_impact.modulate = Color(impact_color.r, impact_color.g, impact_color.b, 1.0)
-
-	_shot_impact_tween = create_tween()
-	_shot_impact_tween.parallel().tween_property(shot_impact, "scale", Vector2.ONE * _impact_flash_scale, _impact_flash_duration)
-	_shot_impact_tween.parallel().tween_property(shot_impact, "modulate:a", 0.0, _impact_flash_duration)
-	_shot_impact_tween.finished.connect(func() -> void:
-		shot_impact.visible = false
-		shot_impact.scale = Vector2.ONE
-		shot_impact.modulate = Color(1.0, 1.0, 1.0, 1.0)
-	)
+	combat_controller._play_shot_impact(end_point, impact_kind)
 
 
 func _attempt_use_medicine() -> void:
@@ -660,87 +491,31 @@ func _attempt_switch_weapon() -> void:
 	if current_weapon == null:
 		return
 
-	if attack_cooldown_remaining > 0.0 and not was_reloading:
+	var current_weapon_empty: bool = _uses_weapon_magazine(current_weapon) and _get_weapon_magazine_ammo(current_weapon) <= 0
+	if attack_cooldown_remaining > 0.0 and not was_reloading and not current_weapon_empty:
 		return
 
-	if _obtained_weapons.size() <= 1:
+	var obtained_weapons: Array[Resource] = loadout_controller.get_obtained_weapons()
+	if obtained_weapons.size() <= 1:
 		message_requested.emit("Only %s available" % current_weapon.display_name)
 		return
 
-	var current_index := _get_obtained_weapon_index(current_weapon.weapon_id)
+	var current_index: int = _get_obtained_weapon_index(current_weapon.weapon_id)
 	if current_index < 0:
 		current_index = 0
 
-	var next_index := (current_index + 1) % _obtained_weapons.size()
-	equip_weapon(_obtained_weapons[next_index], true)
+	var next_index: int = (current_index + 1) % obtained_weapons.size()
+	equip_weapon(obtained_weapons[next_index], true)
 
 
 func _attempt_interact() -> void:
-	var interactable := _get_active_interactable()
-	if interactable == null:
-		return
-
-	if interactable.has_method("interact"):
-		interactable.interact(self)
+	interaction_controller.attempt_interact()
 
 
 func _attempt_recycle() -> void:
 	if is_dead or is_busy or not _build_mode_active or _has_active_combat_action():
 		return
-	var recyclable := _get_active_interactable()
-	if recyclable == null or not _can_recycle_placeable(recyclable):
-		recyclable = _get_nearest_recyclable_placeable()
-	if recyclable == null:
-		return
-	if recyclable.has_method("recycle"):
-		recyclable.recycle(self)
-
-
-func _get_nearest_recyclable_placeable() -> Node2D:
-	var best_placeable: Node2D = null
-	var best_distance := INF
-	for placeable in _get_placeables_in_scope():
-		if placeable == null or not is_instance_valid(placeable):
-			continue
-		if not placeable.has_method("recycle"):
-			continue
-		if not placeable.has_method("can_interact") or not placeable.can_interact(self):
-			continue
-		var profile: PlaceableProfile = placeable.get("profile") as PlaceableProfile
-		if profile == null or profile.get_script() != PLACEABLE_PROFILE_SCRIPT:
-			continue
-		if int(placeable.get("current_hp")) < int(profile.max_hp):
-			continue
-		var distance := global_position.distance_to(placeable.global_position)
-		if distance > RECYCLE_SEARCH_RADIUS:
-			continue
-		if distance < best_distance:
-			best_distance = distance
-			best_placeable = placeable
-	return best_placeable
-
-
-func _get_placeables_in_scope() -> Array:
-	var game_root := get_parent()
-	if game_root == null or not is_instance_valid(game_root):
-		return []
-	var placeables_root := game_root.get_node_or_null("World/ConstructionPlaceables")
-	if placeables_root == null or not is_instance_valid(placeables_root):
-		return []
-	return placeables_root.get_children()
-
-
-func _can_recycle_placeable(placeable: Node2D) -> bool:
-	if placeable == null or not is_instance_valid(placeable):
-		return false
-	if not placeable.has_method("recycle"):
-		return false
-	if not placeable.has_method("can_interact") or not placeable.can_interact(self):
-		return false
-	var profile: PlaceableProfile = placeable.get("profile") as PlaceableProfile
-	if profile == null or profile.get_script() != PLACEABLE_PROFILE_SCRIPT:
-		return false
-	return int(placeable.get("current_hp")) >= int(profile.max_hp)
+	interaction_controller.attempt_recycle()
 
 
 func _die() -> void:
@@ -761,27 +536,14 @@ func reset_for_new_run() -> void:
 	clear_collision_mask_exemptions()
 	current_health = max_health
 	current_energy = max_energy
-	resources = {
-		"salvage": 0,
-		"parts": 0,
-		"medicine": 0,
-		"bullets": 0,
-		"food": 0,
-	}
 	_cancel_attack_windup()
 	attack_cooldown_remaining = 0.0
-	_reload_time_remaining = 0.0
-	_reload_weapon_id = StringName()
 	_knockback_velocity = Vector2.ZERO
 	_recycle_action_was_down = false
 	velocity = Vector2.ZERO
-	_nearby_interactables.clear()
-	_obtained_weapons.clear()
-	_magazine_ammo_by_weapon_id.clear()
-	if _starting_weapon != null:
-		_obtained_weapons.append(_starting_weapon)
-		_ensure_weapon_runtime_state(_starting_weapon)
-		equipped_weapon = _starting_weapon
+	interaction_controller.clear_interactables()
+	loadout_controller.reset_for_new_run()
+	resources = loadout_controller.resources
 	global_position = _spawn_position
 	_emit_full_state()
 	_update_interaction_prompt()
@@ -801,8 +563,7 @@ func _rebuild_collision_mask() -> void:
 func _emit_full_state() -> void:
 	health_changed.emit(current_health, max_health)
 	energy_changed.emit(current_energy, max_energy)
-	resources_changed.emit(resources.duplicate(true))
-	_emit_weapon_state()
+	loadout_controller.emit_full_state()
 
 
 func _flash_body(flash_color: Color) -> void:
@@ -909,90 +670,19 @@ func _on_action_timer_timeout() -> void:
 
 
 func _on_attack_windup_timer_timeout() -> void:
-	if is_dead:
-		_cancel_attack_windup()
-		return
-
-	_attack_windup_pending = false
-	if _attack_windup_visual_only:
-		var windup_weapon := _attack_windup_weapon
-		var attack_result := _get_visual_only_attack_result_for_weapon(windup_weapon)
-		_attack_windup_weapon = null
-		_attack_windup_visual_only = false
-		_play_attack_effect(windup_weapon, attack_result)
-		_flash_body(Color(1.0, 0.82, 0.54, 1.0))
-		_apply_miss_recovery(windup_weapon)
-		return
-
-	_commit_attack(_attack_windup_weapon)
-
-
-func _get_active_interactable() -> Node2D:
-	var best_interactable: Node2D = null
-	var best_priority := -INF
-	var best_distance := INF
-
-	for interactable in _nearby_interactables:
-		if not is_instance_valid(interactable):
-			continue
-
-		if _interaction_gate_callback.is_valid() and not _interaction_gate_callback.call(interactable):
-			continue
-
-		if interactable.has_method("can_interact") and not interactable.can_interact(self):
-			continue
-
-		var priority := 0.0
-		if interactable.has_method("get_interaction_priority"):
-			priority = float(interactable.get_interaction_priority(self))
-
-		var distance := global_position.distance_squared_to(interactable.global_position)
-		if priority > best_priority or (is_equal_approx(priority, best_priority) and distance < best_distance):
-			best_priority = priority
-			best_distance = distance
-			best_interactable = interactable
-
-	return best_interactable
+	combat_controller.on_attack_windup_timer_timeout()
 
 
 func _update_interaction_prompt() -> void:
-	if is_dead:
-		interaction_prompt_changed.emit("")
-		return
-
-	if is_busy:
-		interaction_prompt_changed.emit(_busy_label)
-		return
-
-	if _build_mode_active:
-		interaction_prompt_changed.emit("Build: E place | Q prev | Tab next | R rotate | C recycle")
-		return
-
-	var interactable := _get_active_interactable()
-	if interactable != null and interactable.has_method("get_interaction_label"):
-		interaction_prompt_changed.emit(str(interactable.get_interaction_label(self)))
-		return
-
-	interaction_prompt_changed.emit("")
+	interaction_controller.refresh_prompt()
 
 
 func _register_interactable(interactable: Node2D) -> void:
-	if interactable == null or not interactable.has_method("get_interaction_label"):
-		return
-
-	if interactable.has_method("is_direct_interactable") and not interactable.is_direct_interactable():
-		return
-	
-	if _nearby_interactables.has(interactable):
-		return
-
-	_nearby_interactables.append(interactable)
-	_update_interaction_prompt()
+	interaction_controller.register_interactable(interactable)
 
 
 func _unregister_interactable(interactable: Node2D) -> void:
-	_nearby_interactables.erase(interactable)
-	_update_interaction_prompt()
+	interaction_controller.unregister_interactable(interactable)
 
 
 func _update_render_order() -> void:
@@ -1005,22 +695,15 @@ func _update_facing_visuals() -> void:
 
 
 func get_equipped_weapon_display_name() -> String:
-	var weapon: Resource = _get_equipped_weapon()
-	if weapon == null:
-		return ""
-	return weapon.display_name
+	return loadout_controller.get_equipped_weapon_display_name()
 
 
 func get_obtained_weapon_ids() -> PackedStringArray:
-	var weapon_ids := PackedStringArray()
-	for weapon in _obtained_weapons:
-		if weapon == null:
-			continue
-		weapon_ids.append(String(weapon.weapon_id))
-	return weapon_ids
+	return loadout_controller.get_obtained_weapon_ids()
 
 
 func get_save_state() -> Dictionary:
+	var loadout_state: Dictionary = loadout_controller.get_save_state()
 	return {
 		"position": {
 			"x": global_position.x,
@@ -1028,9 +711,9 @@ func get_save_state() -> Dictionary:
 		},
 		"health": current_health,
 		"energy": current_energy,
-		"resources": resources.duplicate(true),
-		"equipped_weapon_id": String(_get_equipped_weapon().weapon_id) if _get_equipped_weapon() != null else "",
-		"obtained_weapon_ids": get_obtained_weapon_ids(),
+		"resources": loadout_state.get("resources", {}).duplicate(true),
+		"equipped_weapon_id": String(loadout_state.get("equipped_weapon_id", "")),
+		"obtained_weapon_ids": loadout_state.get("obtained_weapon_ids", PackedStringArray()),
 		"build_mode_active": _build_mode_active,
 	}
 
@@ -1044,37 +727,8 @@ func apply_save_state(save_state: Dictionary, weapon_lookup: Callable) -> void:
 	current_health = clampi(int(save_state.get("health", max_health)), 0, max_health)
 	current_energy = clampi(int(save_state.get("energy", max_energy)), 0, max_energy)
 
-	var restored_resources := {
-		"salvage": 0,
-		"parts": 0,
-		"medicine": 0,
-		"bullets": 0,
-		"food": 0,
-	}
-	var saved_resources: Dictionary = save_state.get("resources", {})
-	for resource_id in RESOURCE_IDS:
-		restored_resources[resource_id] = int(saved_resources.get(resource_id, 0))
-	resources = restored_resources
-
-	_obtained_weapons.clear()
-	var saved_weapon_ids: Array = save_state.get("obtained_weapon_ids", [])
-	for raw_weapon_id in saved_weapon_ids:
-		var weapon := _resolve_weapon_from_lookup(weapon_lookup, StringName(raw_weapon_id))
-		if weapon != null and not _has_obtained_weapon_id(weapon.weapon_id):
-			_obtained_weapons.append(weapon)
-	if _starting_weapon != null and not _has_obtained_weapon_id(_starting_weapon.weapon_id):
-		_obtained_weapons.append(_starting_weapon)
-
-	var equipped_weapon_id := StringName(save_state.get("equipped_weapon_id", ""))
-	var equipped_weapon := _resolve_weapon_from_lookup(weapon_lookup, equipped_weapon_id)
-	if equipped_weapon == null:
-		equipped_weapon = _starting_weapon
-	if equipped_weapon != null:
-		equipped_weapon = _resolve_strict_weapon_resource(equipped_weapon)
-		if equipped_weapon != null:
-			equipped_weapon = equipped_weapon
-			_equipped_weapon = equipped_weapon
-			_apply_equipped_weapon()
+	loadout_controller.apply_save_state(save_state, weapon_lookup)
+	resources = loadout_controller.resources
 
 	set_build_mode_active(bool(save_state.get("build_mode_active", false)), false)
 	_emit_full_state()
@@ -1083,38 +737,13 @@ func apply_save_state(save_state: Dictionary, weapon_lookup: Callable) -> void:
 
 
 func _get_equipped_weapon() -> Resource:
-	if _is_valid_weapon_resource(equipped_weapon):
-		_invalid_weapon_warning_emitted = false
-		return equipped_weapon
-	if _is_valid_weapon_resource(DEFAULT_WEAPON_RESOURCE):
-		if not _invalid_weapon_warning_emitted:
-			push_warning("Player equipped_weapon is invalid; falling back to kitchen_knife.")
-			_invalid_weapon_warning_emitted = true
-		return DEFAULT_WEAPON_RESOURCE
-	return null
-
-
-func _resolve_valid_weapon_resource(resource: Resource) -> Resource:
-	if _is_valid_weapon_resource(resource):
-		return resource
-	if _is_valid_weapon_resource(DEFAULT_WEAPON_RESOURCE):
-		return DEFAULT_WEAPON_RESOURCE
-	return null
-
-
-func _resolve_strict_weapon_resource(resource: Resource) -> Resource:
-	if _is_valid_weapon_resource(resource):
-		return resource
-	return null
-
-
-func _has_obtained_weapon_id(weapon_id: StringName) -> bool:
-	return _get_obtained_weapon_index(weapon_id) >= 0
+	return loadout_controller.get_equipped_weapon()
 
 
 func _get_obtained_weapon_index(weapon_id: StringName) -> int:
-	for index in _obtained_weapons.size():
-		var weapon: Resource = _obtained_weapons[index]
+	var obtained_weapons: Array[Resource] = loadout_controller.get_obtained_weapons()
+	for index in obtained_weapons.size():
+		var weapon: Resource = obtained_weapons[index]
 		if weapon != null and weapon.weapon_id == weapon_id:
 			return index
 	return -1
@@ -1124,466 +753,99 @@ func _apply_equipped_weapon() -> void:
 	var weapon: Resource = _get_equipped_weapon()
 	if weapon == null:
 		return
-	_ensure_weapon_runtime_state(weapon)
-
-	var applied_attack_area_position: Vector2 = weapon.attack_area_offset
-	var applied_attack_area_size: Vector2 = weapon.attack_area_size
-	if weapon.attack_mode == "hitscan":
-		applied_attack_area_position = Vector2(weapon.attack_area_offset.x, -weapon.attack_range * 0.5)
-		applied_attack_area_size = Vector2(weapon.attack_area_size.x, weapon.attack_range)
-	elif weapon.attack_mode == "spread_hitscan":
-		var half_angle_radians := deg_to_rad(maxf(weapon.attack_cone_degrees, DEFAULT_SPREAD_HITSCAN_CONE_DEGREES) * 0.5)
-		var derived_width := maxf(tan(half_angle_radians) * weapon.attack_range * 2.0, weapon.attack_area_size.x)
-		applied_attack_area_position = Vector2(weapon.attack_area_offset.x, -weapon.attack_range * 0.5)
-		applied_attack_area_size = Vector2(derived_width, weapon.attack_range)
-
-	weapon_visual.position = weapon.held_visual_offset if weapon.held_visual_polygon.size() >= 3 else DEFAULT_HELD_WEAPON_OFFSET
-	weapon_visual.polygon = weapon.held_visual_polygon if weapon.held_visual_polygon.size() >= 3 else _get_default_held_weapon_polygon()
-	weapon_visual.color = weapon.held_visual_color if weapon.held_visual_polygon.size() >= 3 else DEFAULT_HELD_WEAPON_COLOR
-	attack_area.position = applied_attack_area_position
-	attack_indicator.position = applied_attack_area_position
-	if attack_area_shape.shape is RectangleShape2D:
-		var shape := attack_area_shape.shape as RectangleShape2D
-		shape.size = applied_attack_area_size
-		attack_indicator.polygon = PackedVector2Array([
-			Vector2(-applied_attack_area_size.x * 0.5, -applied_attack_area_size.y * 0.5),
-			Vector2(applied_attack_area_size.x * 0.5, -applied_attack_area_size.y * 0.5),
-			Vector2(applied_attack_area_size.x * 0.5, applied_attack_area_size.y * 0.5),
-			Vector2(-applied_attack_area_size.x * 0.5, applied_attack_area_size.y * 0.5)
-		])
-	_attack_flash_color = weapon.attack_flash_color
-	_attack_flash_start_scale = weapon.attack_flash_start_scale
-	_attack_indicator_windup_color = weapon.attack_indicator_windup_color
-	_attack_indicator_strike_color = weapon.attack_indicator_strike_color
-	_attack_indicator_windup_start_scale = weapon.attack_indicator_windup_start_scale
-	_attack_indicator_strike_peak_scale = weapon.attack_indicator_strike_peak_scale
-	_attack_indicator_lead_time = min(weapon.attack_indicator_lead_time, weapon.attack_windup)
-	_attack_indicator_windup_start_alpha = weapon.attack_indicator_windup_start_alpha
-	_attack_indicator_windup_end_alpha = weapon.attack_indicator_windup_end_alpha
-	_attack_indicator_strike_alpha = weapon.attack_indicator_strike_alpha
-	_attack_indicator_strike_fade_duration = weapon.attack_indicator_strike_fade_duration
-	attack_indicator.color = weapon.attack_indicator_windup_color
-	attack_indicator.modulate = Color(1.0, 1.0, 1.0, 1.0)
-	attack_indicator.scale = Vector2.ONE
-	attack_flash.color = weapon.attack_flash_color
-	attack_flash.modulate = Color(weapon.attack_flash_color.r, weapon.attack_flash_color.g, weapon.attack_flash_color.b, 1.0)
-	_attack_flash_peak_scale = weapon.attack_flash_peak_scale
-	_attack_flash_duration = weapon.attack_flash_duration
-	_muzzle_flash_color = weapon.muzzle_flash_color
-	_muzzle_flash_scale = weapon.muzzle_flash_scale
-	_muzzle_flash_duration = weapon.muzzle_flash_duration
-	_tracer_color = weapon.tracer_color
-	_tracer_width = weapon.tracer_width
-	_tracer_duration = weapon.tracer_duration
-	_impact_hit_color = weapon.impact_hit_color
-	_impact_block_color = weapon.impact_block_color
-	_impact_flash_scale = weapon.impact_flash_scale
-	_impact_flash_duration = weapon.impact_flash_duration
-	muzzle_flash.color = weapon.muzzle_flash_color
-	muzzle_flash.modulate = Color(weapon.muzzle_flash_color.r, weapon.muzzle_flash_color.g, weapon.muzzle_flash_color.b, 1.0)
-	shot_tracer.default_color = weapon.tracer_color
-	shot_tracer.width = weapon.tracer_width
-	_emit_weapon_state()
+	combat_controller.apply_weapon_visuals(weapon)
 
 
 func _get_attack_result_for_weapon(weapon: Resource) -> Dictionary:
-	if weapon == null:
-		return {
-			"targets": [],
-			"end_point": global_position,
-			"impact_kind": "none",
-		}
-
-	if weapon.attack_mode == "hitscan":
-		return _get_hitscan_attack_result(weapon)
-	if weapon.attack_mode == "spread_hitscan":
-		return _get_spread_hitscan_attack_result(weapon)
-	var melee_targets := _get_melee_attack_targets()
-	return {
-		"targets": melee_targets,
-		"end_point": attack_pivot.to_global(weapon.attack_area_offset),
-		"impact_kind": "enemy" if not melee_targets.is_empty() else "miss",
-	}
+	return combat_controller.get_attack_result_for_weapon(weapon)
 
 
 func _get_visual_only_attack_result_for_weapon(weapon: Resource) -> Dictionary:
-	if weapon == null:
-		return {
-			"targets": [],
-			"end_point": global_position,
-			"impact_kind": "none",
-		}
-
-	if weapon.attack_mode == "hitscan" or weapon.attack_mode == "spread_hitscan":
-		var ray_start := attack_pivot.to_global(_get_muzzle_local_position())
-		return {
-			"targets": [],
-			"end_point": ray_start + facing_direction * float(weapon.attack_range),
-			"impact_kind": "miss",
-		}
-
-	return {
-		"targets": [],
-		"end_point": attack_pivot.to_global(weapon.attack_area_offset),
-		"impact_kind": "miss",
-	}
+	return combat_controller.get_visual_only_attack_result_for_weapon(weapon)
 
 
 func _get_attack_targets_for_weapon(weapon: Resource) -> Array:
-	return Array(_get_attack_result_for_weapon(weapon).get("targets", []))
+	return combat_controller.get_attack_targets_for_weapon(weapon)
 
 
 func _get_melee_attack_targets() -> Array:
-	return _get_enemy_targets_in_attack_shape()
+	return combat_controller._get_melee_attack_targets()
 
 
 func _get_enemy_targets_in_attack_shape() -> Array:
-	var hit_targets: Array = []
-	if attack_area_shape == null or attack_area_shape.shape == null:
-		return hit_targets
-
-	var shape_query := PhysicsShapeQueryParameters2D.new()
-	shape_query.shape = attack_area_shape.shape
-	shape_query.transform = attack_area.global_transform
-	shape_query.collision_mask = attack_area.collision_mask
-	shape_query.exclude = [self]
-
-	for result in get_world_2d().direct_space_state.intersect_shape(shape_query):
-		var body = result.get("collider")
-		if body == null or body == self:
-			continue
-		if not body.is_in_group("enemies"):
-			continue
-		if not body.has_method("take_damage"):
-			continue
-		if _is_enemy_blocked_by_structure(body):
-			continue
-		hit_targets.append(body)
-	return hit_targets
+	return combat_controller._get_enemy_targets_in_attack_shape()
 
 
 func _is_enemy_blocked_by_structure(enemy) -> bool:
-	if enemy == null or not is_instance_valid(enemy):
-		return false
-	var ray_query := PhysicsRayQueryParameters2D.create(attack_pivot.global_position, enemy.global_position)
-	ray_query.exclude = [self]
-	ray_query.collision_mask = STRUCTURE_ATTACK_BLOCKER_MASK
-	var hit := get_world_2d().direct_space_state.intersect_ray(ray_query)
-	return not hit.is_empty()
+	return combat_controller._is_enemy_blocked_by_structure(enemy)
 
 
 func _get_hitscan_attack_result(weapon: Resource) -> Dictionary:
-	var candidates := _get_enemy_targets_in_attack_shape()
-
-	var direct_space_state := get_world_2d().direct_space_state
-	var ray_start := attack_pivot.to_global(_get_muzzle_local_position())
-	var max_end := ray_start + facing_direction * float(weapon.attack_range)
-	var miss_query := PhysicsRayQueryParameters2D.create(ray_start, max_end)
-	miss_query.exclude = [self]
-	var miss_hit := direct_space_state.intersect_ray(miss_query)
-	var end_point: Vector2 = max_end
-	var impact_kind := "miss"
-	if not miss_hit.is_empty():
-		end_point = miss_hit.get("position", max_end)
-		var miss_collider = miss_hit.get("collider")
-		if miss_collider != null and miss_collider.is_in_group("defense_sockets"):
-			impact_kind = "structure"
-
-	if candidates.is_empty():
-		return {
-			"targets": [],
-			"end_point": end_point,
-			"impact_kind": impact_kind,
-		}
-
-	candidates.sort_custom(func(a, b):
-		return ray_start.distance_squared_to(a.global_position) < ray_start.distance_squared_to(b.global_position)
-	)
-
-	for candidate in candidates:
-		if ray_start.distance_to(candidate.global_position) > float(weapon.attack_range):
-			continue
-		var ray_query := PhysicsRayQueryParameters2D.create(ray_start, candidate.global_position)
-		ray_query.exclude = [self]
-		var hit := direct_space_state.intersect_ray(ray_query)
-		if hit.is_empty():
-			continue
-		if hit.get("collider") == candidate:
-			return {
-				"targets": [candidate],
-				"end_point": hit.get("position", candidate.global_position),
-				"impact_kind": "enemy",
-			}
-
-	return {
-		"targets": [],
-		"end_point": end_point,
-		"impact_kind": impact_kind,
-	}
+	return combat_controller._get_hitscan_attack_result(weapon)
 
 
 func _get_spread_hitscan_attack_result(weapon: Resource) -> Dictionary:
-	var candidates := _get_enemy_targets_in_attack_shape()
-
-	var direct_space_state := get_world_2d().direct_space_state
-	var ray_start := attack_pivot.to_global(_get_muzzle_local_position())
-	var max_end := ray_start + facing_direction * float(weapon.attack_range)
-	var miss_query := PhysicsRayQueryParameters2D.create(ray_start, max_end)
-	miss_query.exclude = [self]
-	var miss_hit := direct_space_state.intersect_ray(miss_query)
-	var end_point: Vector2 = max_end
-	var impact_kind := "miss"
-	if not miss_hit.is_empty():
-		end_point = miss_hit.get("position", max_end)
-		var miss_collider = miss_hit.get("collider")
-		if miss_collider != null and miss_collider.is_in_group("defense_sockets"):
-			impact_kind = "structure"
-
-	if candidates.is_empty():
-		return {
-			"targets": [],
-			"end_point": end_point,
-			"impact_kind": impact_kind,
-		}
-
-	var max_angle_degrees := maxf(weapon.attack_cone_degrees, DEFAULT_SPREAD_HITSCAN_CONE_DEGREES) * 0.5
-	var valid_targets: Array = []
-	candidates.sort_custom(func(a, b):
-		return ray_start.distance_squared_to(a.global_position) < ray_start.distance_squared_to(b.global_position)
-	)
-
-	for candidate in candidates:
-		var to_candidate: Vector2 = candidate.global_position - ray_start
-		if to_candidate.is_zero_approx():
-			continue
-		if to_candidate.length() > float(weapon.attack_range):
-			continue
-		var angle_to_candidate: float = rad_to_deg(absf(facing_direction.angle_to(to_candidate.normalized())))
-		var angle_padding_degrees := rad_to_deg(atan2(12.0, maxf(to_candidate.length(), 1.0)))
-		if angle_to_candidate > max_angle_degrees + angle_padding_degrees:
-			continue
-
-		var ray_query := PhysicsRayQueryParameters2D.create(ray_start, candidate.global_position)
-		ray_query.exclude = [self]
-		var hit := direct_space_state.intersect_ray(ray_query)
-		if hit.is_empty():
-			continue
-		if hit.get("collider") != candidate:
-			continue
-		valid_targets.append(candidate)
-		if valid_targets.size() == 1:
-			end_point = hit.get("position", candidate.global_position)
-			impact_kind = "enemy"
-
-	return {
-		"targets": valid_targets,
-		"end_point": end_point,
-		"impact_kind": impact_kind,
-	}
+	return combat_controller._get_spread_hitscan_attack_result(weapon)
 
 
 func _commit_attack(weapon_override: Resource = null) -> void:
-	var weapon: Resource = weapon_override
-	if weapon == null:
-		weapon = _get_equipped_weapon()
-	if weapon == null:
-		return
-
-	var attack_result := _get_attack_result_for_weapon(weapon)
-	var hit_targets: Array = Array(attack_result.get("targets", []))
-	var consumes_ammo := _uses_weapon_magazine(weapon)
-	if consumes_ammo:
-		_consume_weapon_magazine_round(weapon)
-	_emit_weapon_noise(weapon)
-	if hit_targets.is_empty():
-		_play_attack_effect(weapon, attack_result)
-		_flash_body(Color(1.0, 0.82, 0.54, 1.0))
-		if consumes_ammo:
-			attack_cooldown_remaining = weapon.attack_cooldown
-		elif _attack_windup_weapon != null:
-			restore_energy(int(weapon.energy_cost))
-			_apply_miss_recovery(weapon)
-		attack_windup_timer.stop()
-		_attack_windup_pending = false
-		_attack_windup_weapon = null
-		_attack_windup_visual_only = false
-		return
-
-	_play_attack_effect(weapon, attack_result)
-	attack_cooldown_remaining = weapon.attack_cooldown
-	_flash_body(Color(1.0, 0.82, 0.54, 1.0))
-
-	var attack_damage_map := _build_attack_damage_map(weapon, hit_targets)
-	for body in hit_targets:
-		if is_instance_valid(body):
-			body.take_damage(int(attack_damage_map.get(body, weapon.damage)), {
-				"attacker": self,
-				"damage_type": weapon.damage_type,
-				"knockback_force": weapon.knockback_force,
-				"knockback_direction": facing_direction,
-				"interrupt_attack_prep": bool(weapon.interrupt_attack_prep),
-			})
-	_attack_windup_weapon = null
-	_attack_windup_visual_only = false
+	combat_controller.commit_attack(weapon_override)
 
 
 func _emit_weapon_noise(weapon: Resource) -> void:
-	if weapon == null:
-		return
-	if float(weapon.noise_radius) <= 0.0 or float(weapon.noise_alert_budget) <= 0.0:
-		return
-	weapon_noise_emitted.emit(global_position, float(weapon.noise_radius), float(weapon.noise_alert_budget), weapon.weapon_id)
+	combat_controller._emit_weapon_noise(weapon)
 
 
 func _cancel_attack_windup() -> void:
-	attack_windup_timer.stop()
-	_attack_windup_pending = false
-	_attack_windup_weapon = null
-	_attack_windup_visual_only = false
-	_hide_attack_indicator()
+	combat_controller.cancel_attack_windup()
 
 
 func _show_attack_indicator_windup(duration: float) -> void:
-	_stop_attack_indicator_tween()
-	attack_indicator.color = _attack_indicator_windup_color
-	attack_indicator.scale = _attack_indicator_windup_start_scale
-	attack_indicator.modulate = Color(1.0, 1.0, 1.0, _attack_indicator_windup_start_alpha)
-	attack_indicator.visible = false
-	if duration <= 0.0:
-		return
-	var tell_duration: float = min(_attack_indicator_lead_time, duration)
-	if tell_duration <= 0.0:
-		return
-	var tell_delay: float = max(duration - tell_duration, 0.0)
-	_attack_indicator_tween = create_tween()
-	if tell_delay > 0.0:
-		_attack_indicator_tween.tween_interval(tell_delay)
-	_attack_indicator_tween.tween_callback(func() -> void:
-		attack_indicator.visible = true
-		attack_indicator.color = _attack_indicator_windup_color
-		attack_indicator.scale = _attack_indicator_windup_start_scale
-		attack_indicator.modulate = Color(1.0, 1.0, 1.0, _attack_indicator_windup_start_alpha)
-	)
-	_attack_indicator_tween.parallel().tween_property(attack_indicator, "scale", Vector2.ONE, max(tell_duration, 0.05))
-	_attack_indicator_tween.parallel().tween_property(attack_indicator, "modulate:a", _attack_indicator_windup_end_alpha, max(tell_duration, 0.05))
+	combat_controller._show_attack_indicator_windup(duration)
 
 
 func _show_attack_indicator_strike() -> void:
-	_stop_attack_indicator_tween()
-	attack_indicator.visible = true
-	attack_indicator.color = _attack_indicator_strike_color
-	attack_indicator.scale = _attack_indicator_strike_peak_scale
-	attack_indicator.modulate = Color(1.0, 1.0, 1.0, _attack_indicator_strike_alpha)
-	_attack_indicator_tween = create_tween()
-	_attack_indicator_tween.parallel().tween_property(attack_indicator, "scale", Vector2.ONE, _attack_indicator_strike_fade_duration)
-	_attack_indicator_tween.parallel().tween_property(attack_indicator, "modulate:a", 0.0, _attack_indicator_strike_fade_duration)
-	_attack_indicator_tween.finished.connect(func() -> void:
-		_hide_attack_indicator()
-	)
+	combat_controller._show_attack_indicator_strike()
 
 
 func _hide_attack_indicator() -> void:
-	_stop_attack_indicator_tween()
-	attack_indicator.visible = false
-	attack_indicator.color = _attack_indicator_windup_color
-	attack_indicator.scale = Vector2.ONE
-	attack_indicator.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	combat_controller._hide_attack_indicator()
 
 
 func _stop_attack_indicator_tween() -> void:
-	if _attack_indicator_tween != null and is_instance_valid(_attack_indicator_tween):
-		_attack_indicator_tween.kill()
-	_attack_indicator_tween = null
-
-
-func _is_valid_weapon_resource(resource: Resource) -> bool:
-	if resource == null:
-		return false
-	if resource.get_script() != WEAPON_DEFINITION_SCRIPT and not resource.is_class("WeaponDefinition"):
-		return false
-	if not resource.has_method("is_valid_definition"):
-		return false
-	return resource.is_valid_definition()
+	combat_controller._stop_attack_indicator_tween()
 
 
 func _get_default_held_weapon_polygon() -> PackedVector2Array:
-	return PackedVector2Array([
-		Vector2(-2, -10),
-		Vector2(2, -10),
-		Vector2(2, 8),
-		Vector2(-2, 8),
-	])
+	return combat_controller.get_default_held_weapon_polygon()
 
 
 func _get_muzzle_local_position() -> Vector2:
-	return weapon_visual.position + Vector2(0.0, -10.0)
+	return combat_controller.get_muzzle_local_position()
 
 
 func _emit_weapon_state() -> void:
-	var weapon: Resource = _get_equipped_weapon()
-	if weapon == null:
-		weapon_changed.emit("", StringName())
-		weapon_status_changed.emit("Weapon: None")
-		weapon_trait_changed.emit("")
-		return
-	weapon_changed.emit(weapon.display_name, weapon.weapon_id)
-	weapon_status_changed.emit(get_weapon_status_text())
-	weapon_trait_changed.emit(get_weapon_trait_text())
+	loadout_controller.emit_full_state()
 
 
 func _build_attack_damage_map(weapon: Resource, hit_targets: Array) -> Dictionary:
-	var damage_map := {}
-	if weapon == null:
-		return damage_map
-
-	var target_count := hit_targets.size()
-	var apply_isolated_bonus := target_count == 1 and int(weapon.isolated_bonus_damage) > 0
-	var apply_cluster_bonus := target_count >= 2 and int(weapon.cluster_bonus_damage) > 0
-	var muzzle_position := attack_pivot.to_global(_get_muzzle_local_position())
-	var apply_close_range_bonus := int(weapon.close_range_bonus_damage) > 0 and float(weapon.close_range_bonus_distance) > 0.0
-
-	for target in hit_targets:
-		var damage_amount := int(weapon.damage)
-		if apply_isolated_bonus:
-			damage_amount += int(weapon.isolated_bonus_damage)
-		if apply_cluster_bonus:
-			damage_amount += int(weapon.cluster_bonus_damage)
-		if apply_close_range_bonus and target != null and is_instance_valid(target):
-			if muzzle_position.distance_to(target.global_position) <= float(weapon.close_range_bonus_distance):
-				damage_amount += int(weapon.close_range_bonus_damage)
-		damage_map[target] = damage_amount
-	return damage_map
+	return combat_controller.build_attack_damage_map(weapon, hit_targets)
 
 
 func _apply_miss_recovery(weapon: Resource) -> void:
-	if weapon == null:
-		return
-	attack_cooldown_remaining = max(attack_cooldown_remaining, float(weapon.miss_recovery_time))
+	combat_controller.apply_miss_recovery(weapon)
 
 
 func get_weapon_status_text() -> String:
-	var weapon: Resource = _get_equipped_weapon()
-	if weapon == null:
-		return "Weapon: None"
-	if not _uses_weapon_magazine(weapon):
-		return "Weapon: %s" % weapon.display_name
-
-	var ammo_in_mag := _get_weapon_magazine_ammo(weapon)
-	var status := "Weapon: %s %d/%d | ◉%d" % [weapon.display_name, ammo_in_mag, int(weapon.magazine_size), _get_bullet_reserve_amount()]
-	if _is_reloading_weapon() and _reload_weapon_id == weapon.weapon_id:
-		status += " ↻"
-	return status
+	return loadout_controller.get_weapon_status_text()
 
 
 func get_weapon_trait_text() -> String:
-	var weapon: Resource = _get_equipped_weapon()
-	if weapon == null:
-		return ""
-	return String(weapon.hud_trait_text)
+	return loadout_controller.get_weapon_trait_text()
 
 
 func _uses_weapon_magazine(weapon: Resource) -> bool:
-	return weapon != null and bool(weapon.uses_magazine)
+	return loadout_controller.uses_weapon_magazine(weapon)
 
 
 func _begin_reload(weapon: Resource, auto_triggered: bool) -> void:
@@ -1591,145 +853,59 @@ func _begin_reload(weapon: Resource, auto_triggered: bool) -> void:
 		return
 	if is_dead or is_busy or _attack_windup_pending or _is_reloading_weapon():
 		return
-
-	var current_ammo := _get_weapon_magazine_ammo(weapon)
-	if current_ammo >= int(weapon.magazine_size):
-		if not auto_triggered:
-			message_requested.emit("Magazine full")
-		return
-	if _get_bullet_reserve_amount() <= 0:
-		message_requested.emit("Out of bullets")
-		return
-
-	_reload_weapon_id = weapon.weapon_id
-	_reload_time_remaining = float(weapon.reload_time)
-	_emit_weapon_state()
-	_play_combat_sound(&"player_reload_start", randf_range(0.98, 1.03), -4.0)
-	if auto_triggered:
-		message_requested.emit("%s empty. Reloading..." % weapon.display_name)
-	else:
-		message_requested.emit("Reloading %s" % weapon.display_name)
+	loadout_controller.begin_reload(weapon, auto_triggered)
+	if _is_reloading_weapon():
+		_play_combat_sound(&"player_reload_start", randf_range(0.98, 1.03), -4.0)
 
 
 func _ensure_weapon_runtime_state(weapon: Resource) -> void:
-	if weapon == null or not _uses_weapon_magazine(weapon):
-		return
-	if not _magazine_ammo_by_weapon_id.has(weapon.weapon_id):
-		_magazine_ammo_by_weapon_id[weapon.weapon_id] = int(weapon.magazine_size)
+	loadout_controller.ensure_weapon_runtime_state(weapon)
 
 
 func _get_weapon_magazine_ammo(weapon: Resource) -> int:
-	if weapon == null or not _uses_weapon_magazine(weapon):
-		return 0
-	_ensure_weapon_runtime_state(weapon)
-	return int(_magazine_ammo_by_weapon_id.get(weapon.weapon_id, int(weapon.magazine_size)))
+	return loadout_controller.get_weapon_magazine_ammo(weapon)
 
 
 func _set_weapon_magazine_ammo(weapon: Resource, amount: int) -> void:
-	if weapon == null or not _uses_weapon_magazine(weapon):
-		return
-	_magazine_ammo_by_weapon_id[weapon.weapon_id] = clampi(amount, 0, int(weapon.magazine_size))
-	_emit_weapon_state()
+	loadout_controller.set_weapon_magazine_ammo(weapon, amount)
 
 
 func _consume_weapon_magazine_round(weapon: Resource) -> void:
-	if weapon == null or not _uses_weapon_magazine(weapon):
-		return
-	var remaining_ammo: int = maxi(_get_weapon_magazine_ammo(weapon) - 1, 0)
-	_set_weapon_magazine_ammo(weapon, remaining_ammo)
-	if remaining_ammo == 0:
-		_begin_reload(weapon, true)
+	loadout_controller.consume_weapon_magazine_round(weapon)
 
 
 func _is_reloading_weapon() -> bool:
-	return _reload_time_remaining > 0.0 and _reload_weapon_id != StringName()
+	return loadout_controller.is_reloading_weapon()
 
 
 func _cancel_reload() -> void:
-	if not _is_reloading_weapon():
-		return
-	_reload_time_remaining = 0.0
-	_reload_weapon_id = StringName()
-	_emit_weapon_state()
+	loadout_controller.cancel_reload()
 
 
 func _update_reload(delta: float) -> void:
-	if not _is_reloading_weapon():
-		return
-	_reload_time_remaining = max(_reload_time_remaining - delta, 0.0)
-	if _reload_time_remaining > 0.0:
-		return
-	_complete_reload()
+	var was_reloading := _is_reloading_weapon()
+	loadout_controller.update_reload(delta)
+	if was_reloading and not _is_reloading_weapon():
+		_play_combat_sound(&"player_reload_done", randf_range(0.99, 1.02), -3.0)
 
 
 func _complete_reload() -> void:
-	var reloaded_weapon := _find_obtained_weapon_by_id(_reload_weapon_id)
-	_reload_time_remaining = 0.0
-	_reload_weapon_id = StringName()
-	if reloaded_weapon == null:
-		_emit_weapon_state()
-		return
-	var current_ammo := _get_weapon_magazine_ammo(reloaded_weapon)
-	var bullets_needed := maxi(int(reloaded_weapon.magazine_size) - current_ammo, 0)
-	var bullets_to_load := mini(bullets_needed, _get_bullet_reserve_amount())
-	if bullets_to_load <= 0:
-		message_requested.emit("Out of bullets")
-		_emit_weapon_state()
-		return
-	spend_resource("bullets", bullets_to_load)
-	_set_weapon_magazine_ammo(reloaded_weapon, current_ammo + bullets_to_load)
-	_play_combat_sound(&"player_reload_done", randf_range(0.99, 1.02), -3.0)
-	message_requested.emit("%s reloaded" % reloaded_weapon.display_name)
-
-
-func _find_obtained_weapon_by_id(weapon_id: StringName) -> Resource:
-	for weapon in _obtained_weapons:
-		if weapon != null and weapon.weapon_id == weapon_id:
-			return weapon
-	return null
-
-
-func _resolve_weapon_from_lookup(weapon_lookup: Callable, weapon_id: StringName) -> Resource:
-	if not weapon_lookup.is_valid():
-		return null
-	var weapon: Resource = weapon_lookup.call(weapon_id)
-	if weapon == null or not _is_valid_weapon_resource(weapon):
-		return null
-	return weapon
+	var was_reloading: bool = _is_reloading_weapon()
+	loadout_controller.complete_reload()
+	if was_reloading and not _is_reloading_weapon():
+		_play_combat_sound(&"player_reload_done", randf_range(0.99, 1.02), -3.0)
 
 
 func _get_bullet_reserve_amount() -> int:
-	return int(resources.get("bullets", 0))
+	return loadout_controller.get_bullet_reserve_amount()
 
 
 func _start_attack_sequence(weapon: Resource, visual_only: bool) -> void:
-	if weapon.attack_windup <= 0.0:
-		if visual_only:
-			_play_attack_effect(weapon, _get_visual_only_attack_result_for_weapon(weapon))
-			_flash_body(Color(1.0, 0.82, 0.54, 1.0))
-			_apply_miss_recovery(weapon)
-			return
-		_commit_attack(weapon)
-		return
-
-	_attack_windup_pending = true
-	_attack_windup_weapon = weapon
-	_attack_windup_visual_only = visual_only
-	_show_attack_indicator_windup(weapon.attack_windup)
-	attack_windup_timer.start(weapon.attack_windup)
+	combat_controller.start_attack_sequence(weapon, visual_only)
 
 
 func _play_attack_effect(weapon: Resource, attack_result: Dictionary) -> void:
-	if weapon != null:
-		_play_combat_sound(_get_attack_sound_id_for_weapon(weapon), _get_attack_sound_pitch_for_weapon(weapon), _get_attack_sound_volume_for_weapon(weapon))
-		_play_combat_sound(_get_attack_impact_sound_id(String(attack_result.get("impact_kind", "miss"))), randf_range(0.98, 1.04), _get_attack_impact_volume(String(attack_result.get("impact_kind", "miss"))))
-	if weapon != null and weapon.attack_mode == "hitscan":
-		_play_hitscan_effect(
-			attack_result.get("end_point", attack_pivot.global_position),
-			String(attack_result.get("impact_kind", "miss"))
-		)
-		return
-	_play_attack_flash()
+	combat_controller.play_attack_effect(weapon, attack_result)
 
 
 func _play_combat_sound(sound_id: StringName, pitch_scale: float = 1.0, volume_db: float = 0.0) -> void:
@@ -1742,62 +918,20 @@ func play_feedback_sound(sound_id: StringName, pitch_scale: float = 1.0, volume_
 
 
 func _get_attack_sound_id_for_weapon(weapon: Resource) -> StringName:
-	if weapon == null:
-		return StringName()
-	match StringName(weapon.weapon_id):
-		&"kitchen_knife":
-			return &"knife_swing"
-		&"baseball_bat":
-			return &"bat_swing"
-		&"pistol":
-			return &"pistol_shot"
-		&"shotgun":
-			return &"shotgun_shot"
-		_:
-			if weapon.attack_mode == "melee":
-				return &"knife_swing"
-			return &"pistol_shot"
+	return combat_controller.get_attack_sound_id_for_weapon(weapon)
 
 
 func _get_attack_sound_pitch_for_weapon(weapon: Resource) -> float:
-	if weapon == null:
-		return 1.0
-	match StringName(weapon.weapon_id):
-		&"kitchen_knife":
-			return randf_range(1.02, 1.1)
-		&"baseball_bat":
-			return randf_range(0.9, 0.98)
-		&"pistol":
-			return randf_range(0.99, 1.03)
-		&"shotgun":
-			return randf_range(0.94, 0.99)
-		_:
-			return randf_range(0.98, 1.04)
+	return combat_controller.get_attack_sound_pitch_for_weapon(weapon)
 
 
 func _get_attack_sound_volume_for_weapon(weapon: Resource) -> float:
-	if weapon == null:
-		return 0.0
-	match StringName(weapon.weapon_id):
-		&"kitchen_knife":
-			return -3.5
-		&"baseball_bat":
-			return -1.5
-		&"pistol":
-			return -1.5
-		&"shotgun":
-			return -0.5
-		_:
-			return -1.5
+	return combat_controller.get_attack_sound_volume_for_weapon(weapon)
 
 
 func _get_attack_impact_sound_id(impact_kind: String) -> StringName:
-	if impact_kind == "enemy":
-		return &"attack_hit_enemy"
-	return &"attack_miss"
+	return combat_controller.get_attack_impact_sound_id(impact_kind)
 
 
 func _get_attack_impact_volume(impact_kind: String) -> float:
-	if impact_kind == "enemy":
-		return -5.0
-	return -8.0
+	return combat_controller.get_attack_impact_volume(impact_kind)

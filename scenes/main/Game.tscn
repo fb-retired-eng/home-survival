@@ -6,9 +6,7 @@
 [ext_resource type="Script" uid="uid://bgt3kfxavnrf6" path="res://scripts/managers/game_manager.gd" id="4_game_manager"]
 [ext_resource type="Script" uid="uid://c4dwsxl0tel8y" path="res://scripts/managers/wave_manager.gd" id="5_wave_manager"]
 [ext_resource type="PackedScene" path="res://scenes/world/ScavengeNode.tscn" id="6_scavenge_scene"]
-[ext_resource type="Resource" path="res://data/pois/poi_a_bonus.tres" id="7_poi_a_bonus"]
 [ext_resource type="Script" uid="uid://co0o4tek73bhg" path="res://scripts/main/game.gd" id="8_game_script"]
-[ext_resource type="Resource" path="res://data/pois/poi_b_bonus.tres" id="10_poi_b_bonus"]
 [ext_resource type="PackedScene" path="res://scenes/world/DefenseSocket.tscn" id="11_socket_scene"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/Zombie.tscn" id="12_zombie_scene"]
 [ext_resource type="Resource" uid="uid://dsae4bgh4ljxr" path="res://data/resources/mvp0_perimeter.tres" id="13_perimeter"]
@@ -19,8 +17,6 @@
 [ext_resource type="Resource" path="res://data/weapons/pistol.tres" id="18_pistol"]
 [ext_resource type="Resource" path="res://data/weapons/shotgun.tres" id="19_shotgun"]
 [ext_resource type="PackedScene" path="res://scenes/world/FoodTablePoint.tscn" id="20_food_table_scene"]
-[ext_resource type="Resource" path="res://data/pois/poi_e_bonus.tres" id="21_poi_e_bonus"]
-[ext_resource type="Resource" path="res://data/pois/poi_f_bonus.tres" id="22_poi_f_bonus"]
 [ext_resource type="Resource" path="res://data/enemies/zombie_runner.tres" id="23_runner_enemy"]
 [ext_resource type="Resource" path="res://data/enemies/zombie_spitter.tres" id="24_spitter_enemy"]
 [ext_resource type="Script" uid="uid://dwa7iri2l2fef" path="res://scripts/world/roaming_spawn_zone.gd" id="25_roaming_zone"]
@@ -35,6 +31,14 @@
 [ext_resource type="Script" path="res://scripts/main/fog_controller.gd" id="34_fog_controller"]
 [ext_resource type="PackedScene" path="res://scenes/world/ResourcePickup.tscn" id="35_resource_pickup_scene"]
 [ext_resource type="Script" path="res://scripts/world/micro_loot_spawn.gd" id="36_micro_loot_spawn"]
+[ext_resource type="Script" path="res://scripts/main/poi_controller.gd" id="39_poi_controller"]
+[ext_resource type="Script" path="res://scripts/main/exploration_controller.gd" id="40_exploration_controller"]
+[ext_resource type="Resource" path="res://data/pois/poi_a_definition.tres" id="41_poi_a_definition"]
+[ext_resource type="Resource" path="res://data/pois/poi_b_definition.tres" id="42_poi_b_definition"]
+[ext_resource type="Resource" path="res://data/pois/poi_c_definition.tres" id="43_poi_c_definition"]
+[ext_resource type="Resource" path="res://data/pois/poi_d_definition.tres" id="44_poi_d_definition"]
+[ext_resource type="Resource" path="res://data/pois/poi_e_definition.tres" id="45_poi_e_definition"]
+[ext_resource type="Resource" path="res://data/pois/poi_f_definition.tres" id="46_poi_f_definition"]
 
 [sub_resource type="RectangleShape2D" id="1_horizontal_wall"]
 size = Vector2(5120, 32)
@@ -42,12 +46,31 @@ size = Vector2(5120, 32)
 [sub_resource type="RectangleShape2D" id="2_vertical_wall"]
 size = Vector2(32, 2880)
 
+[sub_resource type="RectangleShape2D" id="3_poi_a_blocker"]
+size = Vector2(84, 72)
+
+[sub_resource type="RectangleShape2D" id="4_poi_b_blocker"]
+size = Vector2(178, 74)
+
+[sub_resource type="RectangleShape2D" id="5_poi_c_blocker"]
+size = Vector2(160, 70)
+
+[sub_resource type="RectangleShape2D" id="6_poi_d_blocker"]
+size = Vector2(170, 68)
+
+[sub_resource type="RectangleShape2D" id="7_poi_e_blocker"]
+size = Vector2(180, 56)
+
+[sub_resource type="RectangleShape2D" id="8_poi_f_blocker"]
+size = Vector2(178, 70)
+
 [node name="Game" type="Node2D" unique_id=393065020]
 script = ExtResource("8_game_script")
 defense_socket_scene = ExtResource("11_socket_scene")
 exploration_enemy_scene = ExtResource("12_zombie_scene")
 perimeter_definition = ExtResource("13_perimeter")
 default_daily_elite_enemy = ExtResource("27_elite_spitter_enemy")
+poi_definitions = Array[Resource]([ExtResource("41_poi_a_definition"), ExtResource("42_poi_b_definition"), ExtResource("43_poi_c_definition"), ExtResource("44_poi_d_definition"), ExtResource("45_poi_e_definition"), ExtResource("46_poi_f_definition")])
 construction_placeable_scene = ExtResource("30_placeable_scene")
 resource_pickup_scene = ExtResource("35_resource_pickup_scene")
 barricade_placeable_profile = ExtResource("31_barricade_profile")
@@ -68,6 +91,12 @@ wave_set_definition = ExtResource("14_waves")
 
 [node name="ConstructionController" type="Node" parent="."]
 script = ExtResource("33_construction_controller")
+
+[node name="PoiController" type="Node" parent="."]
+script = ExtResource("39_poi_controller")
+
+[node name="ExplorationController" type="Node" parent="."]
+script = ExtResource("40_exploration_controller")
 
 [node name="FogController" type="Node" parent="."]
 script = ExtResource("34_fog_controller")
@@ -122,8 +151,8 @@ amount = 2
 position = Vector2(548, 286)
 script = ExtResource("36_micro_loot_spawn")
 spawn_id = &"micro_nw_yard_parts"
-resource_id = "parts"
-amount = 1
+poi_id = &"poi_a"
+use_poi_role_defaults = true
 
 [node name="NE_RouteAmmo" type="Marker2D" parent="World/MicroLootSpawns" unique_id=1968142725]
 position = Vector2(1806, 648)
@@ -136,8 +165,8 @@ amount = 2
 position = Vector2(2048, 486)
 script = ExtResource("36_micro_loot_spawn")
 spawn_id = &"micro_ne_depot_salvage"
-resource_id = "salvage"
-amount = 2
+poi_id = &"poi_b"
+use_poi_role_defaults = true
 
 [node name="NorthCenterFood" type="Marker2D" parent="World/MicroLootSpawns" unique_id=2116939616]
 position = Vector2(1280, 326)
@@ -157,8 +186,8 @@ amount = 2
 position = Vector2(600, 1292)
 script = ExtResource("36_micro_loot_spawn")
 spawn_id = &"micro_sw_garden_food"
-resource_id = "food"
-amount = 1
+poi_id = &"poi_c"
+use_poi_role_defaults = true
 
 [node name="SE_RouteBullets" type="Marker2D" parent="World/MicroLootSpawns" unique_id=1368735390]
 position = Vector2(1792, 948)
@@ -180,6 +209,34 @@ script = ExtResource("36_micro_loot_spawn")
 spawn_id = &"micro_s_center_parts"
 resource_id = "parts"
 amount = 1
+
+[node name="ToolYardSalvage" type="Marker2D" parent="World/MicroLootSpawns" unique_id=766221228]
+position = Vector2(312, 292)
+script = ExtResource("36_micro_loot_spawn")
+spawn_id = &"micro_tool_yard_salvage"
+poi_id = &"poi_a"
+use_poi_role_defaults = true
+
+[node name="DepotParts" type="Marker2D" parent="World/MicroLootSpawns" unique_id=570075638]
+position = Vector2(2248, 308)
+script = ExtResource("36_micro_loot_spawn")
+spawn_id = &"micro_depot_parts"
+poi_id = &"poi_b"
+use_poi_role_defaults = true
+
+[node name="CheckpointAmmo" type="Marker2D" parent="World/MicroLootSpawns" unique_id=931193462]
+position = Vector2(2190, 1110)
+script = ExtResource("36_micro_loot_spawn")
+spawn_id = &"micro_checkpoint_bullets"
+poi_id = &"poi_d"
+use_poi_role_defaults = true
+
+[node name="ScrapyardParts" type="Marker2D" parent="World/MicroLootSpawns" unique_id=1877249159]
+position = Vector2(1398, 1206)
+script = ExtResource("36_micro_loot_spawn")
+spawn_id = &"micro_scrapyard_parts"
+poi_id = &"poi_f"
+use_poi_role_defaults = true
 
 [node name="NorthLane" type="Polygon2D" parent="World" unique_id=348883657]
 color = Color(0.46, 0.19, 0.16, 0.5)
@@ -361,21 +418,34 @@ offset_left = -28.0
 offset_top = 40.0
 offset_right = 36.0
 offset_bottom = 63.0
-text = "POI A"
+theme_override_colors/font_color = Color(0.95, 0.83, 0.58, 1)
+text = "Tool Yard"
+
+[node name="ShedBody" type="Polygon2D" parent="World/POI_A" unique_id=507260119]
+color = Color(0.49, 0.34, 0.23, 0.58)
+polygon = PackedVector2Array(-92, -64, -8, -64, -8, 8, -92, 8)
+
+[node name="CrateStack" type="Polygon2D" parent="World/POI_A" unique_id=117712146]
+color = Color(0.71, 0.56, 0.31, 0.44)
+polygon = PackedVector2Array(8, -24, 78, -24, 78, 42, 8, 42)
+
+[node name="ShedBlocker" type="StaticBody2D" parent="World/POI_A" unique_id=842903420]
+position = Vector2(-50, -28)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/POI_A/ShedBlocker" unique_id=2053838850]
+shape = SubResource("3_poi_a_blocker")
 
 [node name="Node1" parent="World/POI_A" unique_id=786180158 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(-50, -28)
 node_id = &"poi_a_1"
 poi_id = &"poi_a"
 reward_salvage = 3
-bonus_table = ExtResource("7_poi_a_bonus")
 
 [node name="Node2" parent="World/POI_A" unique_id=1249450925 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(54, -10)
 node_id = &"poi_a_2"
 poi_id = &"poi_a"
 reward_salvage = 2
-bonus_table = ExtResource("7_poi_a_bonus")
 
 [node name="Node3" parent="World/POI_A" unique_id=634875660 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(-18, 46)
@@ -383,17 +453,13 @@ node_id = &"poi_a_3"
 poi_id = &"poi_a"
 reward_salvage = 2
 reward_parts = 1
-reward_food = 1
-bonus_table = ExtResource("7_poi_a_bonus")
 
 [node name="Node4" parent="World/POI_A" unique_id=1818644615 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(42, 54)
 node_id = &"poi_a_4"
 poi_id = &"poi_a"
-reward_salvage = 2
-reward_medicine = 1
-reward_food = 1
-bonus_table = ExtResource("7_poi_a_bonus")
+reward_salvage = 1
+reward_parts = 2
 
 [node name="POI_B" type="Node2D" parent="World" unique_id=1746671438]
 position = Vector2(2355, 220)
@@ -408,29 +474,40 @@ offset_top = 40.0
 offset_right = 36.0
 offset_bottom = 63.0
 theme_override_colors/font_color = Color(0.92, 0.72, 0.54, 1)
-text = "POI B"
+text = "Freight Depot"
+
+[node name="DepotPad" type="Polygon2D" parent="World/POI_B" unique_id=915726329]
+color = Color(0.31, 0.36, 0.42, 0.58)
+polygon = PackedVector2Array(-90, -58, 88, -58, 88, 16, -90, 16)
+
+[node name="ContainerRow" type="Polygon2D" parent="World/POI_B" unique_id=1241902068]
+color = Color(0.71, 0.43, 0.22, 0.52)
+polygon = PackedVector2Array(-36, 26, 88, 26, 88, 76, -36, 76)
+
+[node name="DepotBlocker" type="StaticBody2D" parent="World/POI_B" unique_id=1845704466]
+position = Vector2(-1, -21)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/POI_B/DepotBlocker" unique_id=1165803866]
+shape = SubResource("4_poi_b_blocker")
 
 [node name="Node1" parent="World/POI_B" unique_id=1047047164 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(-54, -20)
 node_id = &"poi_b_1"
 poi_id = &"poi_b"
-reward_parts = 1
-bonus_table = ExtResource("10_poi_b_bonus")
+reward_parts = 2
 
 [node name="Node2" parent="World/POI_B" unique_id=1403963143 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(52, -8)
 node_id = &"poi_b_2"
 poi_id = &"poi_b"
 reward_salvage = 1
-reward_parts = 1
-bonus_table = ExtResource("10_poi_b_bonus")
+reward_parts = 2
 
 [node name="Node3" parent="World/POI_B" unique_id=905991242 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(-14, 50)
 node_id = &"poi_b_3"
 poi_id = &"poi_b"
-reward_parts = 1
-bonus_table = ExtResource("10_poi_b_bonus")
+reward_parts = 2
 
 [node name="Node4" parent="World/POI_B" unique_id=2125767290 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(50, 58)
@@ -438,7 +515,6 @@ node_id = &"poi_b_4"
 poi_id = &"poi_b"
 reward_parts = 2
 weapon_reward = ExtResource("17_baseball_bat")
-bonus_table = ExtResource("10_poi_b_bonus")
 
 [node name="POI_C" type="Node2D" parent="World" unique_id=977234679]
 position = Vector2(205, 1220)
@@ -452,40 +528,49 @@ offset_left = -28.0
 offset_top = 40.0
 offset_right = 36.0
 offset_bottom = 63.0
-text = "POI C"
+theme_override_colors/font_color = Color(0.76, 0.95, 0.76, 1)
+text = "Greenhouse"
+
+[node name="GlassHouse" type="Polygon2D" parent="World/POI_C" unique_id=369336530]
+color = Color(0.58, 0.76, 0.62, 0.34)
+polygon = PackedVector2Array(-88, -62, 72, -62, 72, 8, -88, 8)
+
+[node name="PlanterBeds" type="Polygon2D" parent="World/POI_C" unique_id=1677622089]
+color = Color(0.44, 0.33, 0.18, 0.48)
+polygon = PackedVector2Array(-52, 22, 76, 22, 76, 74, -52, 74)
+
+[node name="GreenhouseBlocker" type="StaticBody2D" parent="World/POI_C" unique_id=1387616387]
+position = Vector2(-8, -27)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/POI_C/GreenhouseBlocker" unique_id=1703122436]
+shape = SubResource("5_poi_c_blocker")
 
 [node name="Node1" parent="World/POI_C" unique_id=1226521942 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(-64, -36)
 node_id = &"poi_c_1"
 poi_id = &"poi_c"
-reward_salvage = 3
-bonus_table = ExtResource("7_poi_a_bonus")
+reward_food = 2
 
 [node name="Node2" parent="World/POI_C" unique_id=1129418087 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(52, -18)
 node_id = &"poi_c_2"
 poi_id = &"poi_c"
-reward_salvage = 2
-reward_parts = 1
-bonus_table = ExtResource("7_poi_a_bonus")
+reward_food = 2
+reward_medicine = 1
 
 [node name="Node3" parent="World/POI_C" unique_id=977986020 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(-18, 54)
 node_id = &"poi_c_3"
 poi_id = &"poi_c"
-reward_salvage = 2
-reward_medicine = 1
 reward_food = 1
-bonus_table = ExtResource("7_poi_a_bonus")
+reward_medicine = 2
 
 [node name="Node4" parent="World/POI_C" unique_id=711954846 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(56, 66)
 node_id = &"poi_c_4"
 poi_id = &"poi_c"
-reward_salvage = 2
 reward_parts = 1
-reward_food = 1
-bonus_table = ExtResource("7_poi_a_bonus")
+reward_food = 2
 
 [node name="POI_D" type="Node2D" parent="World" unique_id=721916660]
 position = Vector2(2355, 1220)
@@ -500,16 +585,29 @@ offset_top = 40.0
 offset_right = 36.0
 offset_bottom = 63.0
 theme_override_colors/font_color = Color(0.74, 0.86, 1, 1)
-text = "POI D"
+text = "Checkpoint"
+
+[node name="WatchPost" type="Polygon2D" parent="World/POI_D" unique_id=32239642]
+color = Color(0.24, 0.31, 0.39, 0.58)
+polygon = PackedVector2Array(-94, -62, 76, -62, 76, 6, -94, 6)
+
+[node name="BarricadeLine" type="Polygon2D" parent="World/POI_D" unique_id=359957572]
+color = Color(0.78, 0.63, 0.28, 0.44)
+polygon = PackedVector2Array(-44, 20, 92, 20, 92, 68, -44, 68)
+
+[node name="CheckpointBlocker" type="StaticBody2D" parent="World/POI_D" unique_id=1595424210]
+position = Vector2(-9, -28)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/POI_D/CheckpointBlocker" unique_id=1817474512]
+shape = SubResource("6_poi_d_blocker")
 
 [node name="Node1" parent="World/POI_D" unique_id=2014897771 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(-58, -32)
 node_id = &"poi_d_1"
 poi_id = &"poi_d"
 reward_parts = 1
-reward_bullets = 2
+reward_bullets = 4
 weapon_reward = ExtResource("19_shotgun")
-bonus_table = ExtResource("10_poi_b_bonus")
 
 [node name="Node2" parent="World/POI_D" unique_id=1866058416 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(54, -14)
@@ -517,8 +615,7 @@ node_id = &"poi_d_2"
 poi_id = &"poi_d"
 reward_salvage = 1
 reward_parts = 2
-reward_bullets = 3
-bonus_table = ExtResource("10_poi_b_bonus")
+reward_bullets = 4
 
 [node name="Node3" parent="World/POI_D" unique_id=1180630554 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(-20, 56)
@@ -526,17 +623,15 @@ node_id = &"poi_d_3"
 poi_id = &"poi_d"
 reward_parts = 1
 reward_medicine = 1
-reward_bullets = 2
-bonus_table = ExtResource("10_poi_b_bonus")
+reward_bullets = 3
 
 [node name="Node4" parent="World/POI_D" unique_id=446030508 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(58, 70)
 node_id = &"poi_d_4"
 poi_id = &"poi_d"
 reward_parts = 2
-reward_bullets = 4
+reward_bullets = 5
 weapon_reward = ExtResource("18_pistol")
-bonus_table = ExtResource("10_poi_b_bonus")
 
 [node name="POI_E" type="Node2D" parent="World" unique_id=631136876]
 position = Vector2(1280, 95)
@@ -551,23 +646,35 @@ offset_top = 40.0
 offset_right = 44.0
 offset_bottom = 63.0
 theme_override_colors/font_color = Color(1, 0.84, 0.68, 1)
-text = "POI E"
+text = "Truck Stop"
+
+[node name="Canopy" type="Polygon2D" parent="World/POI_E" unique_id=466175444]
+color = Color(0.68, 0.46, 0.22, 0.5)
+polygon = PackedVector2Array(-96, -58, 84, -58, 84, -2, -96, -2)
+
+[node name="PumpIslands" type="Polygon2D" parent="World/POI_E" unique_id=1887797716]
+color = Color(0.52, 0.44, 0.36, 0.46)
+polygon = PackedVector2Array(-42, 12, 74, 12, 74, 66, -42, 66)
+
+[node name="TruckStopBlocker" type="StaticBody2D" parent="World/POI_E" unique_id=792945466]
+position = Vector2(-6, -30)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/POI_E/TruckStopBlocker" unique_id=753808107]
+shape = SubResource("7_poi_e_blocker")
 
 [node name="Node1" parent="World/POI_E" unique_id=1383301538 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(-58, -26)
 node_id = &"poi_e_1"
 poi_id = &"poi_e"
-reward_salvage = 1
-reward_food = 3
-bonus_table = ExtResource("21_poi_e_bonus")
+reward_salvage = 2
+reward_food = 2
 
 [node name="Node2" parent="World/POI_E" unique_id=400129542 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(60, -12)
 node_id = &"poi_e_2"
 poi_id = &"poi_e"
 reward_parts = 1
-reward_food = 2
-bonus_table = ExtResource("21_poi_e_bonus")
+reward_food = 1
 
 [node name="Node3" parent="World/POI_E" unique_id=1207794687 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(-18, 50)
@@ -575,15 +682,13 @@ node_id = &"poi_e_3"
 poi_id = &"poi_e"
 reward_medicine = 1
 reward_food = 2
-bonus_table = ExtResource("21_poi_e_bonus")
 
 [node name="Node4" parent="World/POI_E" unique_id=72312105 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(52, 64)
 node_id = &"poi_e_4"
 poi_id = &"poi_e"
-reward_parts = 1
-reward_food = 3
-bonus_table = ExtResource("21_poi_e_bonus")
+reward_salvage = 1
+reward_food = 2
 
 [node name="POI_F" type="Node2D" parent="World" unique_id=136744481]
 position = Vector2(1280, 1345)
@@ -598,7 +703,21 @@ offset_top = 40.0
 offset_right = 44.0
 offset_bottom = 63.0
 theme_override_colors/font_color = Color(1, 0.74, 0.64, 1)
-text = "POI F"
+text = "Scrapyard"
+
+[node name="ScrapPad" type="Polygon2D" parent="World/POI_F" unique_id=574367730]
+color = Color(0.38, 0.28, 0.2, 0.52)
+polygon = PackedVector2Array(-98, -60, 80, -60, 80, 10, -98, 10)
+
+[node name="CraneFooting" type="Polygon2D" parent="World/POI_F" unique_id=737721102]
+color = Color(0.68, 0.4, 0.24, 0.44)
+polygon = PackedVector2Array(-34, 18, 98, 18, 98, 74, -34, 74)
+
+[node name="ScrapyardBlocker" type="StaticBody2D" parent="World/POI_F" unique_id=950991451]
+position = Vector2(-9, -25)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/POI_F/ScrapyardBlocker" unique_id=627083086]
+shape = SubResource("8_poi_f_blocker")
 
 [node name="Node1" parent="World/POI_F" unique_id=1822834816 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(-62, -34)
@@ -606,16 +725,14 @@ node_id = &"poi_f_1"
 poi_id = &"poi_f"
 reward_parts = 2
 reward_bullets = 1
-bonus_table = ExtResource("22_poi_f_bonus")
 
 [node name="Node2" parent="World/POI_F" unique_id=677555504 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(56, -18)
 node_id = &"poi_f_2"
 poi_id = &"poi_f"
 reward_salvage = 2
-reward_parts = 1
-reward_food = 2
-bonus_table = ExtResource("22_poi_f_bonus")
+reward_parts = 2
+reward_food = 1
 
 [node name="Node3" parent="World/POI_F" unique_id=1604277553 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(-20, 52)
@@ -623,15 +740,13 @@ node_id = &"poi_f_3"
 poi_id = &"poi_f"
 reward_medicine = 1
 reward_food = 1
-bonus_table = ExtResource("22_poi_f_bonus")
 
 [node name="Node4" parent="World/POI_F" unique_id=996463746 instance=ExtResource("6_scavenge_scene")]
 position = Vector2(54, 68)
 node_id = &"poi_f_4"
 poi_id = &"poi_f"
-reward_parts = 2
+reward_parts = 3
 reward_bullets = 3
-bonus_table = ExtResource("22_poi_f_bonus")
 
 [node name="SpawnMarkers" type="Node2D" parent="World" unique_id=1366976472]
 
@@ -684,42 +799,43 @@ position = Vector2(1232, 720)
 position = Vector2(330, 358)
 script = ExtResource("15_exploration_spawn")
 spawn_id = &"explore_guard_a"
+poi_id = &"poi_a"
 enemy_definition = ExtResource("16_basic_enemy")
-daily_elite_definition = ExtResource("27_elite_spitter_enemy")
 
 [node name="POI_B_Guard" type="Marker2D" parent="World/ExplorationSpawnPoints" unique_id=1799033528]
 position = Vector2(2215, 360)
 script = ExtResource("15_exploration_spawn")
 spawn_id = &"explore_guard_b"
-enemy_definition = ExtResource("16_basic_enemy")
-daily_elite_definition = ExtResource("28_elite_brute_enemy")
+poi_id = &"poi_b"
+enemy_definition = ExtResource("26_brute_enemy")
 
 [node name="POI_C_Guard" type="Marker2D" parent="World/ExplorationSpawnPoints" unique_id=1904742490]
 position = Vector2(345, 1090)
 script = ExtResource("15_exploration_spawn")
 spawn_id = &"explore_guard_c"
+poi_id = &"poi_c"
 enemy_definition = ExtResource("16_basic_enemy")
-daily_elite_definition = ExtResource("27_elite_spitter_enemy")
 
 [node name="POI_D_Guard" type="Marker2D" parent="World/ExplorationSpawnPoints" unique_id=525360921]
 position = Vector2(2200, 1085)
 script = ExtResource("15_exploration_spawn")
 spawn_id = &"explore_guard_d"
-enemy_definition = ExtResource("16_basic_enemy")
-daily_elite_definition = ExtResource("27_elite_spitter_enemy")
+poi_id = &"poi_d"
+enemy_definition = ExtResource("24_spitter_enemy")
 
 [node name="POI_E_Guard" type="Marker2D" parent="World/ExplorationSpawnPoints" unique_id=3365090]
 position = Vector2(1288, 235)
 script = ExtResource("15_exploration_spawn")
 spawn_id = &"explore_guard_e"
-enemy_definition = ExtResource("23_runner_enemy")
-daily_elite_definition = ExtResource("28_elite_brute_enemy")
+poi_id = &"poi_e"
+enemy_definition = ExtResource("16_basic_enemy")
 
 [node name="POI_F_Guard" type="Marker2D" parent="World/ExplorationSpawnPoints" unique_id=188126142]
 position = Vector2(1285, 1195)
 script = ExtResource("15_exploration_spawn")
 spawn_id = &"explore_guard_f"
-enemy_definition = ExtResource("27_elite_spitter_enemy")
+poi_id = &"poi_f"
+enemy_definition = ExtResource("26_brute_enemy")
 
 [node name="RoamingSpawnZones" type="Node2D" parent="World" unique_id=1631930781]
 
