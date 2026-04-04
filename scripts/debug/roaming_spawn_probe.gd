@@ -23,12 +23,12 @@ func _init() -> void:
 	print("roaming_spawn_probe_initial_roaming=%d" % _count_roaming_enemies(game.exploration_enemy_layer))
 
 	game.game_manager.current_wave = 4
-	game._spawn_roaming_exploration_enemies()
+	game.exploration_controller.spawn_roaming_exploration_enemies()
 	await process_frame
 	print("roaming_spawn_probe_mid_roaming=%d" % _count_roaming_enemies(game.exploration_enemy_layer))
 
 	game.game_manager.current_wave = 7
-	game._spawn_roaming_exploration_enemies()
+	game.exploration_controller.spawn_roaming_exploration_enemies()
 	await process_frame
 	print("roaming_spawn_probe_late_roaming=%d" % _count_roaming_enemies(game.exploration_enemy_layer))
 	quit()

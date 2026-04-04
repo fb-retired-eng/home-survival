@@ -3,6 +3,11 @@ class_name Boot
 
 const GAME_SCENE := preload("res://scenes/main/Game.tscn")
 const APP_SERVICES := preload("res://scripts/main/app_services.gd")
+const LEGACY_PERK_DEFINITIONS := [
+	preload("res://data/legacy_perks/max_energy.tres"),
+	preload("res://data/legacy_perks/prepared_stash.tres"),
+	preload("res://data/legacy_perks/dog_pack.tres"),
+]
 
 var _settings_manager
 var _save_manager
@@ -16,6 +21,8 @@ var _save_manager
 @onready var _load_button: Button = $MenuLayer/RootControl/MainMenuPanel/MenuBox/LoadButton
 @onready var _settings_button: Button = $MenuLayer/RootControl/MainMenuPanel/MenuBox/SettingsButton
 @onready var _quit_button: Button = $MenuLayer/RootControl/MainMenuPanel/MenuBox/QuitButton
+@onready var _legacy_perk_button: Button = $MenuLayer/RootControl/MainMenuPanel/MenuBox/LegacyPerkButton
+@onready var _legacy_perk_label: Label = $MenuLayer/RootControl/MainMenuPanel/MenuBox/LegacyPerkLabel
 @onready var _load_back_button: Button = $MenuLayer/RootControl/LoadPanel/LoadBox/LoadBackButton
 @onready var _back_button: Button = $MenuLayer/RootControl/SettingsPanel/SettingsBox/BackButton
 @onready var _save_settings_button: Button = $MenuLayer/RootControl/SettingsPanel/SettingsBox/SaveSettingsButton
@@ -55,6 +62,7 @@ func _bind_controls() -> void:
 	_load_button.pressed.connect(_on_load_pressed)
 	_settings_button.pressed.connect(_on_settings_pressed)
 	_quit_button.pressed.connect(_on_quit_pressed)
+	_legacy_perk_button.pressed.connect(_on_legacy_perk_pressed)
 	_save_settings_button.pressed.connect(_on_save_settings_pressed)
 	_back_button.pressed.connect(_on_back_pressed)
 	_load_back_button.pressed.connect(_on_load_back_pressed)
@@ -108,6 +116,7 @@ func _sync_settings_controls() -> void:
 		return
 	_master_volume_slider.value = _settings_manager.get_master_volume()
 	_fullscreen_check.button_pressed = _settings_manager.get_fullscreen()
+	_refresh_legacy_perk_label()
 
 
 func _on_new_game_pressed() -> void:
@@ -163,6 +172,23 @@ func _on_quit_pressed() -> void:
 	get_tree().quit()
 
 
+func _on_legacy_perk_pressed() -> void:
+	if _settings_manager == null:
+		return
+	var current_id: String = _settings_manager.get_legacy_perk_id()
+	var current_index: int = 0
+	for index in range(LEGACY_PERK_DEFINITIONS.size()):
+		var definition = LEGACY_PERK_DEFINITIONS[index]
+		if definition != null and String(definition.perk_id) == current_id:
+			current_index = index
+			break
+	var next_index: int = posmod(current_index + 1, LEGACY_PERK_DEFINITIONS.size())
+	var next_definition = LEGACY_PERK_DEFINITIONS[next_index]
+	_settings_manager.set_legacy_perk_id(String(next_definition.perk_id if next_definition != null else "max_energy"), true)
+	_refresh_legacy_perk_label()
+	_update_status("Legacy perk set to %s" % String(next_definition.display_name if next_definition != null else ""))
+
+
 func _on_back_pressed() -> void:
 	_sync_settings_controls()
 	_show_main_menu()
@@ -198,6 +224,13 @@ func _start_game_with_state(slot_id: StringName, run_state: Dictionary) -> void:
 	for child in _game_host.get_children():
 		child.queue_free()
 	var game = GAME_SCENE.instantiate()
+	if game.has_method("set_legacy_perk_id"):
+		var selected_legacy_perk_id := "max_energy"
+		if not run_state.is_empty():
+			selected_legacy_perk_id = String(run_state.get("legacy_perk_id", selected_legacy_perk_id))
+		elif _settings_manager != null:
+			selected_legacy_perk_id = _settings_manager.get_legacy_perk_id()
+		game.set_legacy_perk_id(selected_legacy_perk_id)
 	_game_host.add_child(game)
 	if game.has_signal("return_to_menu_requested") and not game.return_to_menu_requested.is_connected(_on_game_return_to_menu_requested):
 		game.return_to_menu_requested.connect(_on_game_return_to_menu_requested)
@@ -235,6 +268,7 @@ func _refresh_save_menu_state() -> void:
 		var summary: Dictionary = summaries[index]
 		button.text = _format_slot_summary(index, summary)
 		button.disabled = not bool(summary.get("occupied", false))
+	_refresh_legacy_perk_label()
 
 
 func _on_game_return_to_menu_requested() -> void:
@@ -253,3 +287,16 @@ func _format_slot_summary(index: int, summary: Dictionary) -> String:
 	var summary_text := String(summary.get("summary_text", "Slot %d" % (index + 1)))
 	var slot_id := String(summary.get("slot_id", "slot_%d" % (index + 1)))
 	return "%s\n%s" % [summary_text, slot_id.replace("_", " ").capitalize()]
+
+
+func _refresh_legacy_perk_label() -> void:
+	if _legacy_perk_label == null:
+		return
+	var label_text := "+10 Max Energy"
+	if _settings_manager != null:
+		var selected_id: String = _settings_manager.get_legacy_perk_id()
+		for definition in LEGACY_PERK_DEFINITIONS:
+			if definition != null and String(definition.perk_id) == selected_id:
+				label_text = String(definition.display_name)
+				break
+	_legacy_perk_label.text = "Legacy Perk: %s" % label_text

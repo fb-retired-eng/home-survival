@@ -4,9 +4,11 @@ class_name SettingsManager
 const SETTINGS_PATH := "user://system/settings.json"
 const KEY_MASTER_VOLUME := "master_volume"
 const KEY_FULLSCREEN := "fullscreen"
+const KEY_LEGACY_PERK_ID := "legacy_perk_id"
 
 var master_volume: float = 1.0
 var fullscreen: bool = false
+var legacy_perk_id: String = "max_energy"
 
 
 func load_settings() -> void:
@@ -18,6 +20,7 @@ func load_settings() -> void:
 				var data := parsed as Dictionary
 				master_volume = clampf(float(data.get(KEY_MASTER_VOLUME, master_volume)), 0.0, 1.0)
 				fullscreen = bool(data.get(KEY_FULLSCREEN, fullscreen))
+				legacy_perk_id = String(data.get(KEY_LEGACY_PERK_ID, legacy_perk_id))
 	_apply_settings()
 
 
@@ -30,6 +33,7 @@ func save_settings() -> void:
 	file.store_string(JSON.stringify({
 		KEY_MASTER_VOLUME: master_volume,
 		KEY_FULLSCREEN: fullscreen,
+		KEY_LEGACY_PERK_ID: legacy_perk_id,
 	}, "\t"))
 
 
@@ -53,6 +57,16 @@ func get_master_volume() -> float:
 
 func get_fullscreen() -> bool:
 	return fullscreen
+
+
+func set_legacy_perk_id(value: String, persist: bool = true) -> void:
+	legacy_perk_id = value
+	if persist:
+		save_settings()
+
+
+func get_legacy_perk_id() -> String:
+	return legacy_perk_id
 
 
 func _apply_settings() -> void:

@@ -20,6 +20,7 @@ signal state_changed(socket: DefenseSocket)
 @export var show_label: bool = false
 
 @onready var visual: Polygon2D = $Visual
+@onready var debris_visual: Polygon2D = $Debris
 @onready var label: Label = $Label
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
 @onready var interaction_area: Area2D = $InteractionArea
@@ -30,6 +31,7 @@ var _initial_tier: String = "damaged"
 var _initial_hp: int = 90
 var _context_label_visible: bool = false
 var _damage_feedback_tween: Tween
+var _has_heirloom_debris: bool = false
 
 
 func _ready() -> void:
@@ -179,6 +181,17 @@ func reset_for_new_run() -> void:
 	_refresh_visuals()
 
 
+func set_heirloom_debris_active(active: bool) -> void:
+	_has_heirloom_debris = active
+	max_hp = _get_max_hp_for_tier(tier)
+	current_hp = clamp(current_hp, 0, max_hp)
+	_refresh_visuals()
+
+
+func has_heirloom_debris() -> bool:
+	return _has_heirloom_debris
+
+
 func get_save_state() -> Dictionary:
 	return {
 		"socket_id": String(socket_id),
@@ -219,31 +232,47 @@ func _get_available_action() -> String:
 
 
 func _get_max_hp_for_tier(target_tier: String) -> int:
+	var resolved_max_hp: int = max_hp
 	if _has_structure_profile():
-		return int(structure_profile.get_max_hp_for_tier(target_tier))
-	push_warning("DefenseSocket %s is missing structure_profile for max HP lookup" % socket_id)
-	return max_hp
+		resolved_max_hp = int(structure_profile.get_max_hp_for_tier(target_tier))
+	else:
+		push_warning("DefenseSocket %s is missing structure_profile for max HP lookup" % socket_id)
+	if _has_heirloom_debris:
+		resolved_max_hp = int(round(float(resolved_max_hp) * 1.15))
+	return resolved_max_hp
 
 
 func _get_repair_cost() -> Dictionary:
 	if _has_structure_profile():
-		return structure_profile.get_repair_cost(tier)
+		return _apply_heirloom_cost_discount(structure_profile.get_repair_cost(tier))
 	push_warning("DefenseSocket %s is missing structure_profile for repair cost lookup" % socket_id)
 	return {}
 
 
 func _get_strengthen_cost() -> Dictionary:
 	if _has_structure_profile():
-		return structure_profile.get_strengthen_cost()
+		return _apply_heirloom_cost_discount(structure_profile.get_strengthen_cost())
 	push_warning("DefenseSocket %s is missing structure_profile for strengthen cost lookup" % socket_id)
 	return {}
 
 
 func _get_fortify_cost() -> Dictionary:
 	if _has_structure_profile():
-		return structure_profile.get_fortify_cost()
+		return _apply_heirloom_cost_discount(structure_profile.get_fortify_cost())
 	push_warning("DefenseSocket %s is missing structure_profile for fortify cost lookup" % socket_id)
 	return {}
+
+
+func _apply_heirloom_cost_discount(cost: Dictionary) -> Dictionary:
+	if not _has_heirloom_debris:
+		return cost.duplicate(true)
+	var discounted_cost: Dictionary = {}
+	for resource_id in cost.keys():
+		var amount: int = int(cost.get(resource_id, 0))
+		if amount <= 0:
+			continue
+		discounted_cost[resource_id] = max(int(ceil(float(amount) * 0.5)), 1)
+	return discounted_cost
 
 
 func _format_cost(cost: Dictionary) -> String:
@@ -265,6 +294,9 @@ func _refresh_visuals() -> void:
 	_apply_socket_geometry()
 
 	visual.color = _get_visual_color()
+	debris_visual.visible = _has_heirloom_debris
+	if _has_heirloom_debris:
+		debris_visual.color = Color(0.96, 0.8, 0.34, 0.88 if current_hp > 0 else 0.42)
 
 	label.text = "%s %d/%d" % [socket_id, current_hp, max_hp]
 	label.visible = show_label or _context_label_visible

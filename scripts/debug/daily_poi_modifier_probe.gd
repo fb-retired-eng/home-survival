@@ -18,7 +18,7 @@ func _clear_wave_by_killing_enemies(game) -> void:
 
 
 func _force_day_phase_with_modifiers(game, modifiers: Dictionary) -> void:
-	game.debug_queue_forced_next_daily_poi_modifiers(modifiers)
+	game.poi_controller.debug_queue_forced_next_daily_poi_modifiers(modifiers)
 	game._enter_day_phase()
 	await process_frame
 	await physics_frame
@@ -42,7 +42,7 @@ func _count_modifier_types(modifiers: Dictionary) -> Dictionary:
 
 
 func _get_guard_spawn(game, poi_id: StringName):
-	return game._get_poi_guard_spawn_point(poi_id)
+	return game.poi_controller.get_poi_guard_spawn_point(poi_id)
 
 
 func _count_daily_elites(game, poi_id: StringName) -> int:
@@ -114,14 +114,14 @@ func _init() -> void:
 	await physics_frame
 	await process_frame
 
-	var initial_modifiers: Dictionary = game.debug_get_daily_poi_modifiers()
+	var initial_modifiers: Dictionary = game.poi_controller.debug_get_daily_poi_modifiers()
 	var modifier_counts := _count_modifier_types(initial_modifiers)
 	print("daily_poi_modifier_probe_positive_count=%d" % int(modifier_counts.get("positive", 0)))
 	print("daily_poi_modifier_probe_negative_count=%d" % int(modifier_counts.get("negative", 0)))
 
 	for poi_id_variant in initial_modifiers.keys():
 		var poi_id := StringName(poi_id_variant)
-		print("daily_poi_modifier_probe_label_%s=%s" % [String(poi_id), game.debug_get_poi_label_text(poi_id)])
+		print("daily_poi_modifier_probe_label_%s=%s" % [String(poi_id), game.poi_controller.debug_get_poi_label_text(poi_id)])
 
 	game.player.resources["food"] = 0
 	game.player.resources_changed.emit(game.player.resources.duplicate(true))
@@ -129,17 +129,17 @@ func _init() -> void:
 	game.player.energy_changed.emit(game.player.current_energy, game.player.max_energy)
 	game.player.add_resource("food", 3, false)
 	await process_frame
-	game._on_food_table_requested(game.player)
+	game.run_phase_controller.on_food_table_requested(game.player)
 	await process_frame
 	await physics_frame
 	await process_frame
 	await _clear_wave_by_killing_enemies(game)
 	await process_frame
-	game._on_sleep_requested(game.player)
+	game.run_phase_controller.on_sleep_requested(game.player)
 	await process_frame
 	await physics_frame
 	await process_frame
-	var live_cycle_modifiers: Dictionary = game.debug_get_daily_poi_modifiers()
+	var live_cycle_modifiers: Dictionary = game.poi_controller.debug_get_daily_poi_modifiers()
 	var live_cycle_counts := _count_modifier_types(live_cycle_modifiers)
 	print("daily_poi_modifier_probe_live_cycle_positive=%d" % int(live_cycle_counts.get("positive", 0)))
 	print("daily_poi_modifier_probe_live_cycle_negative=%d" % int(live_cycle_counts.get("negative", 0)))
@@ -156,10 +156,10 @@ func _init() -> void:
 	print("daily_poi_modifier_probe_food_reward=%d" % int(game.player.resources.get("food", 0)))
 
 	var poi_b_guard = _get_guard_spawn(game, &"poi_b")
-	var poi_b_base_count: int = game._get_or_roll_exploration_spawn_count(poi_b_guard)
-	var poi_b_adjusted_count: int = game._get_adjusted_exploration_spawn_count(poi_b_guard)
+	var poi_b_base_count: int = game.exploration_controller.get_base_exploration_spawn_count(poi_b_guard)
+	var poi_b_adjusted_count: int = game.exploration_controller.get_adjusted_exploration_spawn_count(poi_b_guard)
 	print("daily_poi_modifier_probe_disturbed_counts=%d>%d" % [poi_b_adjusted_count, poi_b_base_count])
-	game._clear_exploration_enemies()
+	game.exploration_controller.clear_exploration_enemies()
 	game._defeated_exploration_spawn_ids.erase("explore_guard_b")
 	game._defeated_exploration_enemy_counts.erase("explore_guard_b")
 	game._current_exploration_target_counts.erase("explore_guard_b")
@@ -176,7 +176,7 @@ func _init() -> void:
 	await _kill_enemies_for_spawn_id(game, &"explore_guard_b", 1)
 	print("daily_poi_modifier_probe_disturbed_cleared_after_extra=%s" % str(game._defeated_exploration_spawn_ids.has("explore_guard_b")))
 
-	game._clear_exploration_enemies()
+	game.exploration_controller.clear_exploration_enemies()
 	await process_frame
 	await physics_frame
 	await process_frame
@@ -192,7 +192,7 @@ func _init() -> void:
 			continue
 		print("daily_poi_modifier_probe_elite_enemy_id=%s" % String(child.definition.enemy_id))
 		break
-	game._clear_exploration_enemies()
+	game.exploration_controller.clear_exploration_enemies()
 	await process_frame
 	await physics_frame
 	await process_frame
@@ -215,9 +215,9 @@ func _init() -> void:
 	var elite_roll_invalid := false
 	var elite_roll_seen := false
 	for _roll in range(24):
-		game._roll_daily_poi_modifiers()
-		game._refresh_poi_modifier_visuals()
-		var rolled_modifiers: Dictionary = game.debug_get_daily_poi_modifiers()
+		game.poi_controller.roll_daily_poi_modifiers()
+		game.poi_controller.refresh_poi_modifier_visuals()
+		var rolled_modifiers: Dictionary = game.poi_controller.debug_get_daily_poi_modifiers()
 		for poi_id_variant in rolled_modifiers.keys():
 			var poi_id := StringName(poi_id_variant)
 			if StringName(rolled_modifiers[poi_id]) != &"elite_present":
@@ -234,10 +234,10 @@ func _init() -> void:
 	_deplete_poi(game, &"poi_b")
 	_deplete_poi(game, &"poi_d")
 	_deplete_poi(game, &"poi_f")
-	game._roll_daily_poi_modifiers()
-	game._refresh_poi_modifier_visuals()
+	game.poi_controller.roll_daily_poi_modifiers()
+	game.poi_controller.refresh_poi_modifier_visuals()
 	var no_elite_when_blocked := true
-	var blocked_modifiers: Dictionary = game.debug_get_daily_poi_modifiers()
+	var blocked_modifiers: Dictionary = game.poi_controller.debug_get_daily_poi_modifiers()
 	for poi_id_variant in blocked_modifiers.keys():
 		var poi_id := StringName(poi_id_variant)
 		if StringName(blocked_modifiers[poi_id]) == &"elite_present":
@@ -249,9 +249,9 @@ func _init() -> void:
 	_restore_poi(game, &"poi_f")
 
 	_deplete_poi(game, &"poi_a")
-	game._roll_daily_poi_modifiers()
-	game._refresh_poi_modifier_visuals()
-	var rerolled_modifiers: Dictionary = game.debug_get_daily_poi_modifiers()
+	game.poi_controller.roll_daily_poi_modifiers()
+	game.poi_controller.refresh_poi_modifier_visuals()
+	var rerolled_modifiers: Dictionary = game.poi_controller.debug_get_daily_poi_modifiers()
 	print("daily_poi_modifier_probe_depleted_poi_a_selected=%s" % str(rerolled_modifiers.has(&"poi_a")))
 
 	game._is_resetting_run = true
@@ -259,7 +259,7 @@ func _init() -> void:
 	await process_frame
 	await physics_frame
 	await process_frame
-	var reset_modifiers: Dictionary = game.debug_get_daily_poi_modifiers()
+	var reset_modifiers: Dictionary = game.poi_controller.debug_get_daily_poi_modifiers()
 	var reset_counts := _count_modifier_types(reset_modifiers)
 	print("daily_poi_modifier_probe_after_reset_positive=%d" % int(reset_counts.get("positive", 0)))
 	print("daily_poi_modifier_probe_after_reset_negative=%d" % int(reset_counts.get("negative", 0)))

@@ -46,9 +46,9 @@ func _init() -> void:
 	print("day_night_cycle_probe_day_state=%d" % game.game_manager.run_state)
 	print("day_night_cycle_probe_day_phase=%s" % game.hud.wave_label.text)
 	print("day_night_cycle_probe_day_enemy_count=%d" % _count_live_exploration_enemies(game))
-	print("day_night_cycle_probe_table_label=%s" % game._get_food_table_label(game.player))
+	print("day_night_cycle_probe_table_label=%s" % game.run_phase_controller.get_food_table_label(game.player))
 
-	game._on_food_table_requested(game.player)
+	game.run_phase_controller.on_food_table_requested(game.player)
 	await process_frame
 	await physics_frame
 	await process_frame
@@ -58,9 +58,9 @@ func _init() -> void:
 	await _clear_wave_by_killing_enemies(game)
 	await process_frame
 	print("day_night_cycle_probe_after_wave_state=%d" % game.game_manager.run_state)
-	print("day_night_cycle_probe_bed_label=%s" % game._get_sleep_label(game.player))
+	print("day_night_cycle_probe_bed_label=%s" % game.run_phase_controller.get_sleep_label(game.player))
 
-	game._on_sleep_requested(game.player)
+	game.run_phase_controller.on_sleep_requested(game.player)
 	await process_frame
 	await physics_frame
 	await process_frame

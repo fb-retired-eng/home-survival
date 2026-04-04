@@ -4,7 +4,7 @@ class_name MicroLootSpawn
 @export var spawn_id: StringName
 @export var poi_id: StringName
 @export var use_poi_role_defaults: bool = false
-@export_enum("salvage", "parts", "medicine", "bullets", "food") var resource_id: String = "salvage"
+@export_enum("salvage", "parts", "medicine", "bullets", "food", "battery") var resource_id: String = "salvage"
 @export_range(1, 10, 1) var amount: int = 1
 
 

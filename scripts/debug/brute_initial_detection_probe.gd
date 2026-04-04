@@ -27,7 +27,7 @@ func _init() -> void:
 	enemy.configure_exploration_context(player, Vector2.LEFT, true, enemy.global_position, true)
 	await _wait_frames(4)
 
-	print("brute_initial_detection_probe_idle_target=%s" % str(enemy._get_current_target() == null))
+	print("brute_initial_detection_probe_idle_target=%s" % str(enemy.targeting_controller.get_current_target() == null))
 	print("brute_initial_detection_probe_engaged=%s" % str(enemy.is_engaged_with_player()))
 	print("brute_initial_detection_probe_alerted=%s" % str(enemy._is_alerted_to_player))
 

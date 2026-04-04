@@ -14,7 +14,7 @@ func _count_investigating(game) -> int:
 
 
 func _clear_exploration_layer(game) -> void:
-	game._clear_exploration_enemies()
+	game.exploration_controller.clear_exploration_enemies()
 	await process_frame
 	await physics_frame
 	await process_frame
@@ -91,7 +91,7 @@ func _init() -> void:
 	await process_frame
 	await physics_frame
 	await process_frame
-	game._on_player_weapon_noise_emitted(game.player.global_position, 160.0, 1.5, &"probe")
+	game.exploration_controller.on_player_weapon_noise_emitted(game.player.global_position, 160.0, 1.5, &"probe")
 	await process_frame
 	await physics_frame
 	await process_frame

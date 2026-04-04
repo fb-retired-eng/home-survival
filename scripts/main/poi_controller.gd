@@ -29,6 +29,7 @@ var _poi_visuals_by_id: Dictionary = {}
 var _poi_definitions_by_id: Dictionary = {}
 var _debug_forced_next_daily_poi_modifiers: Dictionary = {}
 var _last_daily_refilled_pois: Array[StringName] = []
+var _visited_poi_ids: Dictionary = {}
 
 
 func configure(config: Dictionary) -> void:
@@ -46,6 +47,8 @@ func configure(config: Dictionary) -> void:
 	daily_poi_refill_bonus_nodes = int(config.get("daily_poi_refill_bonus_nodes", daily_poi_refill_bonus_nodes))
 	_cache_poi_definitions()
 	cache_poi_visuals()
+	_connect_poi_discovery_areas()
+	refresh_player_poi_discovery_from_current_position()
 
 
 func configure_scavenge_nodes() -> void:
@@ -60,6 +63,7 @@ func configure_scavenge_nodes() -> void:
 func reset_for_new_run() -> void:
 	_daily_poi_modifiers.clear()
 	_last_daily_refilled_pois.clear()
+	_visited_poi_ids.clear()
 
 
 func apply_daily_poi_reward_modifier(node, rewards: Dictionary) -> Dictionary:
@@ -279,6 +283,7 @@ func get_save_state() -> Dictionary:
 	return {
 		"daily_poi_modifiers": saved_daily_modifiers,
 		"last_daily_refilled_pois": saved_refilled_pois,
+		"visited_poi_ids": _get_saved_visited_poi_ids(),
 	}
 
 
@@ -287,6 +292,12 @@ func apply_game_state(game_state: Dictionary) -> void:
 	_last_daily_refilled_pois.clear()
 	for raw_poi_id in game_state.get("last_daily_refilled_pois", []):
 		_last_daily_refilled_pois.append(StringName(raw_poi_id))
+	_visited_poi_ids.clear()
+	for raw_poi_id in game_state.get("visited_poi_ids", []):
+		var poi_id := StringName(raw_poi_id)
+		if poi_id != StringName():
+			_visited_poi_ids[poi_id] = true
+	refresh_player_poi_discovery_from_current_position()
 
 
 func debug_get_daily_poi_modifiers() -> Dictionary:
@@ -322,6 +333,85 @@ func debug_get_poi_reward_role_label(poi_id: StringName) -> String:
 	if poi_definition == null:
 		return ""
 	return poi_definition.get_reward_role_label()
+
+
+func get_poi_guard_spawn_point(poi_id: StringName):
+	return _get_poi_guard_spawn_point(poi_id)
+
+
+func get_or_roll_exploration_spawn_count(spawn_point, exploration_spawn_counts: Dictionary) -> int:
+	return _get_or_roll_exploration_spawn_count(spawn_point, exploration_spawn_counts)
+
+
+func is_poi_known(poi_id: StringName) -> bool:
+	return bool(_visited_poi_ids.get(poi_id, false))
+
+
+func refresh_player_poi_discovery_from_current_position() -> void:
+	if player == null or not is_instance_valid(player):
+		return
+	_refresh_player_poi_discovery(player.global_position)
+
+
+func get_best_known_poi_for_dog(from_position: Vector2) -> StringName:
+	var best_poi_id := StringName()
+	var best_distance := INF
+	for poi_id_variant in _visited_poi_ids.keys():
+		var poi_id := StringName(poi_id_variant)
+		if not bool(_visited_poi_ids.get(poi_id, false)):
+			continue
+		if _is_poi_depleted(poi_id):
+			continue
+		var poi_position := _get_poi_world_position(poi_id)
+		var distance := from_position.distance_squared_to(poi_position)
+		if distance < best_distance:
+			best_distance = distance
+			best_poi_id = poi_id
+	return best_poi_id
+
+
+func roll_dog_scavenge_reward(poi_id: StringName) -> Dictionary:
+	var totals := {
+		"salvage": 0,
+		"parts": 0,
+		"medicine": 0,
+		"bullets": 0,
+		"food": 0,
+		"battery": 0,
+	}
+	for node in _get_local_scavenge_nodes():
+		if node == null or not is_instance_valid(node):
+			continue
+		if StringName(node.poi_id) != poi_id:
+			continue
+		totals["salvage"] += int(node.reward_salvage)
+		totals["parts"] += int(node.reward_parts)
+		totals["medicine"] += int(node.reward_medicine)
+		totals["bullets"] += int(node.reward_bullets)
+		totals["food"] += int(node.reward_food)
+		totals["battery"] += int(node.reward_battery)
+	var weighted_ids: Array[String] = []
+	for resource_id in totals.keys():
+		var weight := int(totals[resource_id])
+		for _i in range(max(weight, 0)):
+			weighted_ids.append(resource_id)
+	if weighted_ids.is_empty():
+		return {}
+	var primary_resource_id := weighted_ids[randi() % weighted_ids.size()]
+	var rewards := {
+		"salvage": 0,
+		"parts": 0,
+		"medicine": 0,
+		"bullets": 0,
+		"food": 0,
+		"battery": 0,
+	}
+	rewards[primary_resource_id] = _get_dog_reward_amount(primary_resource_id, int(totals.get(primary_resource_id, 0)))
+	if randf() <= 0.28:
+		var secondary_resource_id := weighted_ids[randi() % weighted_ids.size()]
+		if secondary_resource_id != primary_resource_id:
+			rewards[secondary_resource_id] = _get_dog_reward_amount(secondary_resource_id, int(totals.get(secondary_resource_id, 0)))
+	return rewards
 
 
 func get_poi_id_for_exploration_spawn(spawn_point) -> StringName:
@@ -457,6 +547,46 @@ func _get_modifier_tint(modifier_id: StringName) -> Color:
 		&"elite_present":
 			return Color(1.0, 0.86, 0.32, 1.0)
 	return Color.WHITE
+
+
+func _get_saved_visited_poi_ids() -> Array[String]:
+	var saved_ids: Array[String] = []
+	for poi_id_variant in _visited_poi_ids.keys():
+		var poi_id := StringName(poi_id_variant)
+		if bool(_visited_poi_ids.get(poi_id, false)):
+			saved_ids.append(String(poi_id))
+	return saved_ids
+
+
+func _refresh_player_poi_discovery(player_position: Vector2) -> void:
+	for poi_id_variant in _poi_visuals_by_id.keys():
+		var poi_id := StringName(poi_id_variant)
+		if bool(_visited_poi_ids.get(poi_id, false)):
+			continue
+		var poi_position := _get_poi_world_position(poi_id)
+		if player_position.distance_to(poi_position) <= 150.0:
+			_visited_poi_ids[poi_id] = true
+
+
+func _get_poi_world_position(poi_id: StringName) -> Vector2:
+	if not _poi_visuals_by_id.has(poi_id):
+		return Vector2.ZERO
+	var root: Node2D = _poi_visuals_by_id[poi_id].get("root")
+	if root == null or not is_instance_valid(root):
+		return Vector2.ZERO
+	return root.global_position
+
+
+func _get_dog_reward_amount(resource_id: String, total_amount: int) -> int:
+	match resource_id:
+		"salvage", "food":
+			return clampi(max(total_amount / 3, 1), 1, 2)
+		"bullets":
+			return clampi(max(total_amount / 4, 1), 1, 3)
+		"battery":
+			return 1
+		_:
+			return 1
 
 
 func _get_modifier_marker_scale(modifier_id: StringName) -> Vector2:
@@ -611,3 +741,31 @@ func _get_poi_id_for_world_poi_root(root: Node) -> StringName:
 		if node_poi_id != EMPTY_POI_ID:
 			return node_poi_id
 	return EMPTY_POI_ID
+
+
+func _connect_poi_discovery_areas() -> void:
+	if world_root == null or not is_instance_valid(world_root):
+		return
+	for poi_id_variant in _poi_visuals_by_id.keys():
+		var poi_id := StringName(poi_id_variant)
+		var visual_data: Dictionary = _poi_visuals_by_id.get(poi_id, {})
+		var root: Node = visual_data.get("root")
+		if root == null or not is_instance_valid(root):
+			continue
+		var discovery_area: Area2D = root.get_node_or_null("DiscoveryArea")
+		if discovery_area == null:
+			continue
+		discovery_area.monitoring = true
+		discovery_area.monitorable = true
+		if not discovery_area.body_entered.is_connected(_on_poi_discovery_area_body_entered):
+			discovery_area.body_entered.connect(_on_poi_discovery_area_body_entered.bind(poi_id))
+
+
+func _on_poi_discovery_area_body_entered(body: Node, poi_id: StringName) -> void:
+	if poi_id == EMPTY_POI_ID:
+		return
+	if player == null or not is_instance_valid(player):
+		return
+	if body != player:
+		return
+	_visited_poi_ids[poi_id] = true

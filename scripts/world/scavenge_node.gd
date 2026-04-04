@@ -14,6 +14,7 @@ signal state_changed(node: ScavengeNode)
 @export var reward_medicine: int = 0
 @export var reward_bullets: int = 0
 @export var reward_food: int = 0
+@export var reward_battery: int = 0
 @export var weapon_reward: Resource
 @export var bonus_table: Resource
 
@@ -82,6 +83,7 @@ func _complete_search(player) -> void:
 		"medicine": reward_medicine,
 		"bullets": reward_bullets,
 		"food": reward_food,
+		"battery": reward_battery,
 	}
 	if _reward_modifier_provider.is_valid():
 		rewards = _reward_modifier_provider.call(self, rewards)
@@ -98,13 +100,13 @@ func _apply_bonus_reward(rewards: Dictionary) -> void:
 		return
 
 	var rolled_rewards: Dictionary = bonus_table.roll_bonus()
-	for resource_id in ["salvage", "parts", "medicine", "bullets", "food"]:
+	for resource_id in ["salvage", "parts", "medicine", "bullets", "food", "battery"]:
 		rewards[resource_id] = int(rewards.get(resource_id, 0)) + int(rolled_rewards.get(resource_id, 0))
 
 
 func _grant_rewards(player, rewards: Dictionary) -> void:
 	var reward_summary: Array[String] = []
-	for resource_id in ["salvage", "parts", "medicine", "bullets", "food"]:
+	for resource_id in ["salvage", "parts", "medicine", "bullets", "food", "battery"]:
 		var amount := int(rewards.get(resource_id, 0))
 		if amount <= 0:
 			continue
@@ -177,7 +179,7 @@ func is_eligible_for_daily_refill() -> bool:
 		return false
 	if _get_valid_weapon_reward() != null:
 		return false
-	return reward_salvage > 0 or reward_parts > 0 or reward_medicine > 0 or reward_bullets > 0 or reward_food > 0
+	return reward_salvage > 0 or reward_parts > 0 or reward_medicine > 0 or reward_bullets > 0 or reward_food > 0 or reward_battery > 0
 
 
 func apply_daily_refill() -> bool:

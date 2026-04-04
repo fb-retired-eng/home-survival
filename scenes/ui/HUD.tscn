@@ -322,6 +322,18 @@ theme_override_font_sizes/font_size = 12
 theme_override_colors/font_color = Color(0.78, 0.86, 0.96, 0.92)
 text = "Fast, isolated"
 
+[node name="DogLabel" type="Label" parent="MainPanel/MarginContainer/VBoxContainer"]
+unique_name_in_owner = true
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.92, 0.86, 0.7, 0.94)
+text = "Dog 100/100 | Ready [G]"
+
+[node name="PowerLabel" type="Label" parent="MainPanel/MarginContainer/VBoxContainer"]
+unique_name_in_owner = true
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.84, 0.92, 0.78, 0.94)
+text = "Power 0/3"
+
 [node name="StatusPanel" type="PanelContainer" parent="."]
 custom_minimum_size = Vector2(316, 0)
 offset_left = 16.0

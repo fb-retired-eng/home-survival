@@ -23,7 +23,7 @@ func _init() -> void:
 	zombie.configure_exploration_context(player, Vector2.LEFT, true, zombie.global_position, true)
 	await _wait_frames()
 
-	zombie.receive_noise_alert(player, player.global_position)
+	zombie.targeting_controller.receive_noise_alert(player, player.global_position)
 	await _wait_frames()
 	print("zombie_chase_drop_probe_initial_investigating=%s" % str(zombie.is_investigating_noise()))
 
@@ -36,7 +36,7 @@ func _init() -> void:
 	var screen_world_top_left: Vector2 = canvas_to_world * viewport_rect.position
 	var screen_world_bottom_right: Vector2 = canvas_to_world * viewport_rect.end
 	var visible_world_size: Vector2 = (screen_world_bottom_right - screen_world_top_left).abs()
-	var on_screen_offset_x := minf(visible_world_size.x * 0.18, zombie._get_player_screen_detect_keep_radius() - 12.0)
+	var on_screen_offset_x := minf(visible_world_size.x * 0.18, zombie.targeting_controller.get_player_screen_detect_keep_radius() - 12.0)
 	player.global_position = zombie.global_position + Vector2(on_screen_offset_x, 0.0)
 	await _wait_frames()
 	var chase_rect := Rect2(
@@ -48,7 +48,7 @@ func _init() -> void:
 	print("zombie_chase_drop_probe_enemy_still_on_screen=%s" % str(chase_rect.has_point(zombie.global_position)))
 
 	player.global_position = zombie.global_position + Vector2(
-		minf(visible_world_size.x * 0.35, zombie._get_player_screen_detect_keep_radius() + 48.0),
+		minf(visible_world_size.x * 0.35, zombie.targeting_controller.get_player_screen_detect_keep_radius() + 48.0),
 		0.0
 	)
 	await _wait_frames()
@@ -69,7 +69,7 @@ func _init() -> void:
 	print("zombie_chase_drop_probe_far_engaged=%s" % str(zombie.is_engaged_with_player()))
 	print("zombie_chase_drop_probe_far_alerted=%s" % str(zombie._is_alerted_to_player))
 	print("zombie_chase_drop_probe_enemy_off_screen=%s" % str(not chase_rect.has_point(zombie.global_position)))
-	print("zombie_chase_drop_probe_break_radius=%.1f" % float(zombie._get_player_lost_sight_break_radius()))
+	print("zombie_chase_drop_probe_break_radius=%.1f" % float(zombie.targeting_controller._get_player_lost_sight_break_radius()))
 
 	game.queue_free()
 	await _wait_frames()

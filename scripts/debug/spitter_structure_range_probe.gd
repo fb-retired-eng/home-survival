@@ -21,9 +21,9 @@ func _init() -> void:
 	zombie.configure_wave_context(null, [socket], PackedStringArray([String(socket.socket_id)]))
 	await process_frame
 
-	print("spitter_structure_range_probe_far=%s" % str(zombie._is_target_in_damage_range(socket)))
+	print("spitter_structure_range_probe_far=%s" % str(zombie.combat_controller.is_target_in_damage_range(socket)))
 
 	zombie.global_position = Vector2(258.0, 100.0)
 	await process_frame
-	print("spitter_structure_range_probe_near=%s" % str(zombie._is_target_in_damage_range(socket)))
+	print("spitter_structure_range_probe_near=%s" % str(zombie.combat_controller.is_target_in_damage_range(socket)))
 	quit()

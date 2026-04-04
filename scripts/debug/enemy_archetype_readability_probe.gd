@@ -56,7 +56,7 @@ func _init() -> void:
 	brute._update_facing_direction(player.global_position - brute.global_position)
 	brute.set_physics_process(false)
 	brute._attack_prep_armed = true
-	brute._attack_prep_remaining = brute._get_attack_prep_time() * 0.45
+	brute._attack_prep_remaining = brute.combat_controller.get_attack_prep_time() * 0.45
 	var brute_prep_scale_x := 0.0
 	for _i in 20:
 		await _wait_frames(1)

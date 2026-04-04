@@ -35,7 +35,7 @@ func _init() -> void:
 	zombie.definition = non_elite_definition
 	await process_frame
 
-	zombie._spawn_death_drop()
+	zombie.runtime_controller.spawn_death_drop()
 	await process_frame
 
 	print("elite_weapon_drop_probe_weapon_pickups=%d" % _count_weapon_pickups(world_node))

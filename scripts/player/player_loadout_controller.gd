@@ -1,7 +1,7 @@
 extends Node
 class_name PlayerLoadoutController
 
-const RESOURCE_IDS := ["salvage", "parts", "medicine", "bullets", "food"]
+const RESOURCE_IDS := ["salvage", "parts", "medicine", "bullets", "food", "battery"]
 const WEAPON_DEFINITION_SCRIPT := preload("res://scripts/data/weapon_definition.gd")
 const DEFAULT_WEAPON_RESOURCE := preload("res://data/weapons/kitchen_knife.tres")
 
@@ -18,6 +18,7 @@ var resources: Dictionary = {
 	"medicine": 0,
 	"bullets": 0,
 	"food": 0,
+	"battery": 0,
 }
 
 var _equipped_weapon: Resource
@@ -184,6 +185,7 @@ func reset_for_new_run() -> void:
 		"medicine": 0,
 		"bullets": 0,
 		"food": 0,
+		"battery": 0,
 	}
 	_obtained_weapons.clear()
 	_magazine_ammo_by_weapon_id.clear()
@@ -223,6 +225,7 @@ func apply_save_state(save_state: Dictionary, weapon_lookup: Callable) -> void:
 		"medicine": 0,
 		"bullets": 0,
 		"food": 0,
+		"battery": 0,
 	}
 	var saved_resources: Dictionary = save_state.get("resources", {})
 	for resource_id in RESOURCE_IDS:

@@ -226,6 +226,21 @@ theme_override_styles/normal = SubResource("5_button")
 theme_override_styles/hover = SubResource("7_button_hover")
 theme_override_styles/pressed = SubResource("6_button_pressed")
 
+[node name="LegacyPerkButton" type="Button" parent="MenuLayer/RootControl/MainMenuPanel/MenuBox"]
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+text = "Cycle Legacy Perk"
+theme_override_styles/normal = SubResource("5_button")
+theme_override_styles/hover = SubResource("7_button_hover")
+theme_override_styles/pressed = SubResource("6_button_pressed")
+
+[node name="LegacyPerkLabel" type="Label" parent="MenuLayer/RootControl/MainMenuPanel/MenuBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+theme_override_colors/font_color = Color(0.88, 0.94, 0.84, 0.9)
+autowrap_mode = 3
+text = "Legacy Perk: +10 Max Energy"
+
 [node name="Status" type="Label" parent="MenuLayer/RootControl/MainMenuPanel/MenuBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 14

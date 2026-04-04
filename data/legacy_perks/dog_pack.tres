@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="LegacyPerkDefinition" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/legacy_perk_definition.gd" id="1_definition"]
+
+[resource]
+script = ExtResource("1_definition")
+perk_id = &"dog_pack"
+display_name = "Dog +20 Max Stamina"
+description = "Your dog starts each run with more stamina."
+dog_max_stamina_bonus = 20

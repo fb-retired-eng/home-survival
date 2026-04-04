@@ -17,6 +17,11 @@ script = ExtResource("1_socket")
 color = Color(0.57, 0.45, 0.35, 1)
 polygon = PackedVector2Array(-24, -8, 24, -8, 24, 8, -24, 8)
 
+[node name="Debris" type="Polygon2D" parent="."]
+visible = false
+color = Color(0.96, 0.8, 0.34, 0.88)
+polygon = PackedVector2Array(-18, 10, -6, 6, 2, 12, 12, 7, 20, 12, 20, 18, -18, 18)
+
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("1_socket_shape")
 

@@ -65,13 +65,13 @@ func _init() -> void:
 
 	var attack_enemy_audio = attack_enemy.get_node("CombatAudio")
 	attack_enemy._update_facing_direction(player.global_position - attack_enemy.global_position)
-	attack_enemy._process_attack_prep(player)
+	attack_enemy.combat_controller.process_attack_prep(player)
 	await process_frame
 	await physics_frame
 	print("combat_audio_probe_enemy_tell=%s" % str(attack_enemy_audio.get_last_sound_id()))
 
 	attack_enemy._update_facing_direction(player.global_position - attack_enemy.global_position)
-	attack_enemy._try_damage_target(player)
+	attack_enemy.combat_controller.try_damage_target(player)
 	await process_frame
 	await physics_frame
 	print("combat_audio_probe_enemy_hit=%s" % str(attack_enemy_audio.get_last_sound_id()))

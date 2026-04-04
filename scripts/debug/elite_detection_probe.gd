@@ -38,8 +38,8 @@ func _init() -> void:
 
 	print("elite_detection_probe_brute_engaged=%s" % str(brute.is_engaged_with_player()))
 	print("elite_detection_probe_elite_brute_engaged=%s" % str(elite_brute.is_engaged_with_player()))
-	print("elite_detection_probe_brute_detection_radius=%.1f" % float(brute._get_player_detection_radius()))
-	print("elite_detection_probe_elite_brute_detection_radius=%.1f" % float(elite_brute._get_player_detection_radius()))
+	print("elite_detection_probe_brute_detection_radius=%.1f" % float(brute.targeting_controller.get_player_detection_radius()))
+	print("elite_detection_probe_elite_brute_detection_radius=%.1f" % float(elite_brute.targeting_controller.get_player_detection_radius()))
 
 	game.queue_free()
 	await _wait_frames(2)

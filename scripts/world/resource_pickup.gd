@@ -3,7 +3,7 @@ class_name ResourcePickup
 
 signal collected(pickup: ResourcePickup, player)
 
-@export_enum("salvage", "parts", "medicine", "bullets", "food") var resource_id: String = "salvage"
+@export_enum("salvage", "parts", "medicine", "bullets", "food", "battery") var resource_id: String = "salvage"
 @export var amount: int = 1
 @export var is_weapon_drop: bool = false
 @export var weapon_reward: Resource
@@ -63,5 +63,7 @@ func _sync_visuals() -> void:
 			visual.color = Color(0.93, 0.78, 0.42, 1.0)
 		"food":
 			visual.color = Color(0.84, 0.43, 0.28, 1.0)
+		"battery":
+			visual.color = Color(0.54, 0.86, 0.57, 1.0)
 		_:
 			visual.color = Color(0.91, 0.84, 0.39, 1.0)

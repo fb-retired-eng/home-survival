@@ -55,14 +55,16 @@ func _init() -> void:
 	game.player.take_damage(17)
 	game.player.add_resource("salvage", 9, false)
 	game.player.add_resource("parts", 4, false)
+	game.player.add_resource("food", 1, false)
 	game.player.set_build_mode_active(true, false)
-	game._on_player_build_selection_next_requested()
-	game._on_player_build_rotation_requested()
+	game.dog.current_stamina = 58
+	game.construction_controller.on_player_build_selection_next_requested()
+	game.construction_controller.on_player_build_rotation_requested()
 	var build_profile = game.get_selected_buildable_profile()
 	var build_cell := Vector2i(10, 8)
 	game.construction_grid.set_preview_footprint_offsets(build_profile.get_rotated_footprint_offsets(game.get_selected_buildable_rotation()))
 	game.construction_grid.set_preview_world_position(game.construction_grid.get_world_position_for_cell(build_cell))
-	game._on_player_build_placement_requested()
+	game.construction_controller.on_player_build_placement_requested()
 
 	var wall_socket = _find_socket(game, &"wall_n")
 	if wall_socket != null:
@@ -74,7 +76,7 @@ func _init() -> void:
 		if scavenge_node.has_method("_refresh_visuals"):
 			scavenge_node._refresh_visuals()
 
-	game.debug_set_daily_poi_modifiers({&"poi_b": &"elite_present"})
+	game.poi_controller.debug_set_daily_poi_modifiers({&"poi_b": &"elite_present"})
 	game.game_manager.set_wave(2)
 	game.game_manager.set_run_state(game.game_manager.RunState.POST_WAVE)
 	game.player.set_build_mode_active(true, false)
@@ -95,7 +97,7 @@ func _init() -> void:
 	var loaded_node = _find_scavenge_node(loaded_game, &"poi_a_1")
 	var loaded_placeables: Array = loaded_game.construction_placeables.get_children()
 	var loaded_placeable = loaded_placeables[0] if not loaded_placeables.is_empty() else null
-	var loaded_modifiers: Dictionary = loaded_game.debug_get_daily_poi_modifiers()
+	var loaded_modifiers: Dictionary = loaded_game.poi_controller.debug_get_daily_poi_modifiers()
 	var loaded_placeable_id := ""
 	var loaded_placeable_rotation := -1
 	var loaded_socket_hp := -1
@@ -112,6 +114,8 @@ func _init() -> void:
 	print("save_probe_player_energy=%d" % loaded_game.player.current_energy)
 	print("save_probe_player_build_mode=%s" % str(loaded_game.player.is_build_mode_active()))
 	print("save_probe_player_position=%s" % str(loaded_game.player.global_position))
+	print("save_probe_dog_stamina=%d" % int(loaded_game.dog.current_stamina))
+	print("save_probe_dog_state=%s" % str(loaded_game.dog._build_status_text()))
 	print("save_probe_wave=%d" % loaded_game.game_manager.current_wave)
 	print("save_probe_run_state=%d" % loaded_game.game_manager.run_state)
 	print("save_probe_placeable_count=%d" % loaded_placeables.size())

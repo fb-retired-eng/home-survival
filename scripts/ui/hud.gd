@@ -43,6 +43,7 @@ var _wave_final: int = 0
 var _phase_text: String = "Pre-Wave"
 var _weapon_status_base_text: String = "Weapon: None"
 var _firearm_windup_active: bool = false
+var _power_status_text: String = ""
 
 @onready var health_value_label: Label = %HealthValueLabel
 @onready var health_bar: ProgressBar = %HealthBar
@@ -56,6 +57,8 @@ var _firearm_windup_active: bool = false
 @onready var base_label: Label = %BaseLabel
 @onready var weapon_label: Label = %WeaponLabel
 @onready var weapon_trait_label: Label = %WeaponTraitLabel
+@onready var dog_label: Label = %DogLabel
+@onready var power_label: Label = %PowerLabel
 @onready var resources_label: RichTextLabel = %ResourcesLabel
 @onready var status_label: Label = %StatusLabel
 @onready var _status_title_label: Label = %StatusTitle
@@ -104,6 +107,20 @@ func bind_player(target) -> void:
 	_on_weapon_trait_changed(player.get_weapon_trait_text())
 	_on_firearm_windup_changed(false)
 	set_interaction_prompt("")
+
+
+func bind_dog(target) -> void:
+	if target == null:
+		dog_label.text = ""
+		return
+	target.status_changed.connect(_on_dog_status_changed)
+	_on_dog_status_changed(target._build_status_text())
+
+
+func set_power_status(used_slots: int, max_slots: int) -> void:
+	_power_status_text = "Power %d/%d" % [used_slots, max_slots]
+	power_label.text = _power_status_text
+	power_label.visible = max_slots > 0
 
 
 func _process(delta: float) -> void:
@@ -221,6 +238,10 @@ func _on_weapon_trait_changed(text: String) -> void:
 	weapon_trait_label.text = text
 
 
+func _on_dog_status_changed(text: String) -> void:
+	dog_label.text = text
+
+
 func _on_firearm_windup_changed(active: bool) -> void:
 	_firearm_windup_active = active
 	_refresh_weapon_status_display()
@@ -266,13 +287,15 @@ func _on_resources_changed(resources: Dictionary) -> void:
 		+ "[color=#a69f86]🔩[/color] [color=#f5e6ae]%d[/color]  "
 		+ "[color=#a69f86]⚙️[/color] [color=#f5e6ae]%d[/color]  "
 		+ "[color=#a69f86]🩹[/color] [color=#f5e6ae]%d[/color]  "
-		+ "[color=#a69f86]🍗[/color] [color=#f5e6ae]%d[/color]"
+		+ "[color=#a69f86]🍗[/color] [color=#f5e6ae]%d[/color]  "
+		+ "[color=#a69f86]🔋[/color] [color=#b8f2a8]%d[/color]"
 		+ "[/right]"
 	) % [
 		int(resources.get("salvage", 0)),
 		int(resources.get("parts", 0)),
 		int(resources.get("medicine", 0)),
 		int(resources.get("food", 0)),
+		int(resources.get("battery", 0)),
 	]
 
 

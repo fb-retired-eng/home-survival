@@ -3,8 +3,8 @@ class_name Placeable
 
 const PLACEABLE_PROFILE_SCRIPT := preload("res://scripts/data/placeable_profile.gd")
 const PLAYER_BLOCKING_LAYER := 2
-const ZOMBIE_GROUP := "enemies"
 const GAMEPLAY_Z_BASE := 1000
+const ENEMY_GROUP := "enemies"
 
 signal state_changed(placeable: Placeable)
 
@@ -29,6 +29,7 @@ var _collision_grace_radius_cells: int = 0
 var _collision_grace_remaining: float = 0.0
 var _trap_hit_cooldowns: Dictionary = {}
 var _trap_tick_remaining: float = 0.0
+var _is_powered: bool = false
 
 
 func _ready() -> void:
@@ -44,7 +45,7 @@ func _refresh_from_profile() -> void:
 	if profile == null or profile.get_script() != PLACEABLE_PROFILE_SCRIPT:
 		return
 	current_hp = clamp(current_hp, 0, int(profile.max_hp))
-	visual.color = profile.visual_color
+	_apply_power_visuals()
 	collision_layer = 2 if bool(profile.blocks_movement) else 0
 	collision_mask = 0
 	if collision_shape.shape != null:
@@ -125,6 +126,31 @@ func _is_trap_profile() -> bool:
 	if profile == null or profile.get_script() != PLACEABLE_PROFILE_SCRIPT:
 		return false
 	return profile.category == "trap"
+
+
+func requires_power() -> bool:
+	if profile == null or profile.get_script() != PLACEABLE_PROFILE_SCRIPT:
+		return false
+	return int(profile.power_draw) > 0
+
+
+func get_power_draw() -> int:
+	if not requires_power():
+		return 0
+	return int(profile.power_draw)
+
+
+func is_powered() -> bool:
+	return _is_powered
+
+
+func set_powered(powered: bool) -> void:
+	var resolved_powered: bool = powered and requires_power() and current_hp > 0 and not is_dismantled
+	if _is_powered == resolved_powered:
+		return
+	_is_powered = resolved_powered
+	_apply_power_visuals()
+	state_changed.emit(self)
 
 
 func is_breached() -> bool:
@@ -210,6 +236,8 @@ func reset_for_new_run() -> void:
 	is_dismantled = false
 	placed_this_run = true
 	_trap_hit_cooldowns.clear()
+	_is_powered = false
+	_apply_power_visuals()
 	state_changed.emit(self)
 
 
@@ -229,6 +257,7 @@ func get_save_state() -> Dictionary:
 			"x": global_position.x,
 			"y": global_position.y,
 		},
+		"is_powered": _is_powered,
 	}
 
 
@@ -247,6 +276,7 @@ func apply_save_state(save_state: Dictionary) -> void:
 		float(position_data.get("x", global_position.x)),
 		float(position_data.get("y", global_position.y))
 	)
+	_is_powered = bool(save_state.get("is_powered", false))
 	_update_render_order()
 	_refresh_from_profile()
 	_configure_trap_nodes()
@@ -392,6 +422,19 @@ func _get_trap_target_count() -> int:
 	return _get_trap_targets().size()
 
 
+func _apply_power_visuals() -> void:
+	if profile == null or profile.get_script() != PLACEABLE_PROFILE_SCRIPT:
+		return
+	var base_color: Color = profile.visual_color
+	if not requires_power():
+		visual.color = base_color
+		return
+	if _is_powered:
+		visual.color = base_color.lightened(0.22)
+	else:
+		visual.color = Color(base_color.r * 0.45, base_color.g * 0.45, base_color.b * 0.45, base_color.a)
+
+
 func _get_trap_targets() -> Array:
 	var targets: Array = []
 	if profile == null or profile.get_script() != PLACEABLE_PROFILE_SCRIPT:
@@ -404,7 +447,7 @@ func _get_trap_targets() -> Array:
 		maxf(float(footprint.x), 1.0) * 24.0 + 8.0,
 		maxf(float(footprint.y), 1.0) * 24.0 + 8.0
 	)
-	for body in get_tree().get_nodes_in_group(ZOMBIE_GROUP):
+	for body in get_tree().get_nodes_in_group(ENEMY_GROUP):
 		if body == null or not is_instance_valid(body) or not body.has_method("take_damage"):
 			continue
 		if absf(body.global_position.x - global_position.x) > half_extents.x:
@@ -444,7 +487,7 @@ func _apply_refund(player, refund: Dictionary) -> void:
 
 func _format_cost(cost: Dictionary) -> String:
 	var parts: Array[String] = []
-	for resource_id in ["salvage", "parts", "medicine", "food", "bullets"]:
+	for resource_id in ["salvage", "parts", "medicine", "food", "bullets", "battery"]:
 		var amount := int(cost.get(resource_id, 0))
 		if amount <= 0:
 			continue

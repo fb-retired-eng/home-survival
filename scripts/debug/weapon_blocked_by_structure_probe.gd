@@ -54,7 +54,7 @@ func _init() -> void:
 	root.add_child(game)
 	await _wait_frames()
 
-	game._clear_exploration_enemies()
+	game.exploration_controller.clear_exploration_enemies()
 	await _wait_frames()
 
 	var wall_n = _get_socket(game, &"wall_n")

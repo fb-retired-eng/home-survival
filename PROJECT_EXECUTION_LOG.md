@@ -1995,3 +1995,100 @@ Validation:
 - `weapon_balance_probe_shotgun_vs_runner=defeated:true,shots:1,time:1.18,ammo:1`
 - `weapon_balance_probe_shotgun_vs_brute=defeated:true,shots:2,time:2.36,ammo:2`
 - `save_probe_continue_did_not_rewrite=true`
+
+## 2026-04-03 MVP1 Core Systems
+- Implemented the first complete MVP1 layer on top of the MVP0 loop:
+  - Dog companion support with follow, feed-at-home recovery, known-POI scavenging, night-only lure, HUD status, and save/load.
+  - Generator-based `PowerManager` with battery-backed load-slot upgrades, powered turrets, powered floodlights, and HUD power status.
+  - Heirloom debris persistence for previously broken fortified sockets, including `50%` rebuild-cost reduction and `+15%` socket HP.
+  - Boot-time legacy perk selection with three small persistent choices: `+10 max energy`, `prepared stash`, and `dog pack`.
+- Added dedicated authored/content support for MVP1:
+  - [`scenes/world/Dog.tscn`](scenes/world/Dog.tscn)
+  - [`scripts/world/dog_companion.gd`](scripts/world/dog_companion.gd)
+  - [`scripts/main/power_manager.gd`](scripts/main/power_manager.gd)
+  - [`scenes/world/GeneratorPoint.tscn`](scenes/world/GeneratorPoint.tscn)
+  - [`scripts/world/generator_point.gd`](scripts/world/generator_point.gd)
+  - [`data/placeables/turret.tres`](data/placeables/turret.tres)
+  - [`data/placeables/floodlight.tres`](data/placeables/floodlight.tres)
+- Extended save/load and boot flow so run-owned legacy perk state, dog state, power upgrades, and heirloom socket state restore correctly and do not get overwritten by the current menu selection.
+- Fixed two MVP1-specific correctness issues during verification:
+  - generator upgrades now reset to the base slot count on new-run reset instead of persisting across runs
+  - run reset now sets `_is_resetting_run = true` before rebuilding state, so autosave requests do not fire from transient reset-time socket updates
+
+Validation:
+- `dog_companion_probe` confirmed:
+  - `dog_probe_can_feed=true`
+  - `dog_probe_scavenge_started=true`
+  - `dog_probe_save_restore_stamina=65`
+- `dog_lure_probe` confirmed:
+  - `dog_lure_probe_started=true`
+  - `dog_lure_probe_enemy_investigating=true`
+- `power_manager_probe` confirmed:
+  - `power_probe_near_turret_powered=true`
+  - `power_probe_floodlight_powered=true`
+  - `power_probe_far_turret_powered=false`
+  - `power_probe_turret_enemy_health=32`
+  - `power_probe_floodlight_enemy_slow=0.72`
+- `generator_upgrade_probe` confirmed:
+  - `generator_probe_slots_before=3`
+  - `generator_probe_slots_after=4`
+  - `generator_probe_power_label=Power 0/4`
+- `legacy_perk_probe` confirmed:
+  - `legacy_probe_max_energy=110`
+  - `legacy_probe_stash_battery=1`
+  - `legacy_probe_stash_bullets=40`
+  - `legacy_probe_dog_max_stamina=120`
+- `fortified_socket_probe` confirmed:
+  - `fortified_socket_probe_heirloom_active=true`
+  - `fortified_socket_probe_heirloom_hp=138`
+  - `fortified_socket_probe_heirloom_label=Repair (1 Salvage)`
+- `mvp1_persistence_probe` confirmed:
+  - `mvp1_probe_reset_slots_after=3`
+  - `mvp1_probe_saved_legacy_perk=dog_pack`
+  - `mvp1_probe_saved_power_slots=4`
+  - `mvp1_probe_saved_dog_stamina=77`
+  - `mvp1_probe_saved_heirloom_active=true`
+  - `mvp1_probe_boot_loaded_legacy_perk=dog_pack`
+- Cross-system regressions still passed:
+  - `save_probe_continue_did_not_rewrite=true`
+  - `pause_probe_active_wave_quit_back_to_menu=true`
+  - `build_selector_probe_placed=true`
+  - `barricade_probe_cell_occupied_after_recycle=false`
+  - `combat_audio_probe_enemy_hit=enemy_attack_hit`
+
+## 2026-04-04 Controller Cleanup and Script Shrink Pass
+- Continued the post-MVP1 architecture cleanup to align the repo with the Godot scene-owned controller rules in `GODOT_BEST_PRACTICES.md`.
+- Moved more run-owned orchestration out of `game.gd`:
+  - added `Mvp1RunController` for legacy-perk application, dog command routing, generator interaction, and heirloom socket state
+  - added `RunPhaseController` for food-table, sleep, generator, wave-start, and wave-clear phase handling
+  - removed dead POI/debug wrapper methods once probes were updated to call `poi_controller` and `exploration_controller` directly
+- Replaced per-frame POI discovery polling with scene-authored discovery areas through `poi_discovery_area.gd`, plus an explicit reconciliation refresh on configure/load for direct reposition and save-restore cases.
+- Split enemy runtime ownership into dedicated scene-owned controllers:
+  - `enemy_targeting_controller.gd` for target selection, detection, alerting, and chase/drop rules
+  - `enemy_presentation_controller.gd` for hit feedback, state indicators, attack-tell visuals, and visual-definition application
+  - `enemy_movement_controller.gd` for separation, sidestep, obstruction, and knockback decay
+  - `enemy_runtime_controller.gd` for player/runtime lookup, local node context, touch checks, and death-drop spawning
+- Shrunk the top-level scripts materially:
+  - `game.gd` reduced to `960` lines
+  - `enemy.gd` reduced to `408` lines
+- Fixed refactor regressions during the split:
+  - corrected strict GDScript typing in `enemy_movement_controller.gd` so the controller actually loads in scene instances
+  - aligned generator power-center logic to the authored `GeneratorPoint`
+  - made dog lure target a real world position instead of always using the player position
+  - restored direct `Game.apply_save_state()` perk-owned max-stat application order before player/dog state clamping
+
+Validation:
+- enemy/controller regressions passed:
+  - `zombie_chase_drop_probe_on_screen_engaged=true`
+  - `zombie_chase_drop_probe_far_engaged=false`
+  - `enemy_screen_chase_cap_probe_brute_engaged=false`
+  - `enemy_attack_readability_probe_spitter_flash_larger=true`
+  - `combat_audio_probe_enemy_hit=enemy_attack_hit`
+- MVP1 persistence and interaction regressions passed:
+  - `mvp1_probe_saved_energy_player_max=110`
+  - `mvp1_probe_saved_dog_max_stamina=120`
+  - `dog_lure_probe_dog_moved_toward_target=true`
+  - `generator_probe_can_interact_no_battery=false`
+- save/load and construction regressions still passed:
+  - `save_probe_continue_did_not_rewrite=true`
+  - `construction_escape_probe_both=true`

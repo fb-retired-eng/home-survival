@@ -56,5 +56,6 @@ func _init() -> void:
 	print("barricade_attack_probe_placed=true")
 	print("barricade_attack_probe_barricade_hp=%d" % int(barricade.current_hp))
 	print("barricade_attack_probe_enemy_prep=%s" % str(zombie.is_attack_prep_armed()))
-	print("barricade_attack_probe_enemy_target=%s" % str(zombie._get_current_target().get_placeable_id() if zombie._get_current_target() != null and zombie._get_current_target().has_method("get_placeable_id") else StringName()))
+	var current_target = zombie.targeting_controller.get_current_target()
+	print("barricade_attack_probe_enemy_target=%s" % str(current_target.get_placeable_id() if current_target != null and current_target.has_method("get_placeable_id") else StringName()))
 	quit()

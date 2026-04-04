@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="LegacyPerkDefinition" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/legacy_perk_definition.gd" id="1_definition"]
+
+[resource]
+script = ExtResource("1_definition")
+perk_id = &"prepared_stash"
+display_name = "+1 Battery, +4 Bullets"
+description = "Start each run with a small prepared stash."
+stash_battery_bonus = 1
+stash_bullets_bonus = 4

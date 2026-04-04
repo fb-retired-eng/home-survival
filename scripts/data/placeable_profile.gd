@@ -16,9 +16,11 @@ class_name PlaceableProfile
 @export var contact_damage: int = 0
 @export_range(0.0, 1.0, 0.05) var slow_factor: float = 0.0
 @export_range(0.0, 600.0, 5.0) var lure_radius: float = 0.0
+@export_range(0, 10, 1) var power_draw: int = 0
 @export_range(0.0, 600.0, 5.0) var fire_range: float = 0.0
 @export_range(0.0, 360.0, 1.0) var fire_arc: float = 90.0
 @export_range(0.05, 10.0, 0.05) var fire_interval: float = 1.0
+@export_range(0, 100, 1) var attack_damage: int = 0
 @export var bullet_cost_per_shot: int = 0
 @export_range(1, 20, 1) var burst_count: int = 1
 @export_range(0.0, 3.0, 0.05) var burst_spacing: float = 0.1

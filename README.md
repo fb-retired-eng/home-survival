@@ -35,6 +35,13 @@ The repo currently includes:
 - enriched outer-map structure with authored district landmarks, route islands, micro-loot between POIs, and a broader ambient roaming-threat layer so the enlarged map has actual travel value instead of empty margins
 - data-driven POI identity through `PoiDefinition` resources, with role-driven bonus tables, POI-tied micro-loot defaults, explicit `poi_id` wiring, and probe-visible role labels for debugging and UI
 - authored POI guard tuning and softer mid/late-wave pacing, plus an economy balance probe that reports POI yield, support loot, construction costs, and wave pressure totals for future tuning passes
+- MVP1 strategic systems now live:
+  - Dog companion support with follow, feed, known-POI scavenging, night lure, HUD status, and save/load
+  - generator-based power management with battery upgrades, powered turrets, and floodlights
+  - heirloom debris on previously broken fortified sockets, plus a small legacy-perk layer at boot
+- the largest runtime scripts have been cut back into scene-owned controllers:
+  - `game.gd` now delegates MVP1 run state, phase flow, POI logic, exploration, construction, and fog to child controllers
+  - `enemy.gd` now delegates targeting, combat, presentation, movement, and runtime/drop plumbing to dedicated enemy controllers
 - generated positional combat and interaction SFX, including weapon-specific attack sounds, hit-vs-miss feedback, enemy attack tell/impact, structure hits, trap triggers, pickup sounds, and construction feedback routed through a dedicated `SFX` bus
 - shared app-service access through `AppServices`, so boot/game code resolve autoloaded settings/save services through one helper instead of ad hoc `/root/...` lookups
 - placeholder world scenes for sockets, scavenging nodes, bed/table interactions, pickups, and enemy actor
@@ -104,15 +111,9 @@ godot --headless --path . --quit
 - [`data/`](data): future data-driven content definitions
 
 ## Next Development Steps
-- tune food scarcity versus prep energy demands
-- balance roaming prep spawns and the full 8-wave run
-- tune elite weapon-drop odds and duplicate-conversion economy
-- decide whether elite variants need even stronger silhouette differentiation beyond the new aura/marker treatment
-- decide whether the next content step is enemy patrols, reserve-ammo scarcity, or the fifth weapon pickup
-- tune the selectable buildable catalog and add the next construction-placeable type after barricades and spike traps
-- tune the enlarged-map enrichment pass so landmark density, micro-loot, and ambient roaming pressure feel worthwhile without crowding prep-time scavenging
-- keep pushing POI tuning through `PoiDefinition` data instead of scene-only overrides now that role-driven reward defaults and validation are in place
-- keep improving combat and interaction audio feel now that the basic SFX layer is in place
-- use the new economy probe to finish one last MVP0 route/pressure tuning pass before moving on to MVP1 feature work
-- use the new weapon balance probe to do one more firearm-versus-melee tuning pass now that pistol and shotgun are true projectile weapons
-- continue UI and readability polish from playtest feedback
+- run a full MVP1 playtest pass covering Dog commands, generator upgrades, battery scarcity, and heirloom carryover
+- tune Dog scavenging haul, lure stamina pressure, and known-POI usefulness against real prep-route choices
+- tune battery availability and powered-placeable value so turret/floodlight choices stay meaningful
+- decide whether the next post-MVP1 step is broader powered construction, more enemy variety, or deeper meta progression
+- continue weapon/combat tuning with the balance probe now that projectile firearms and shotgun spread are stable
+- continue HUD and readability polish from playtest feedback

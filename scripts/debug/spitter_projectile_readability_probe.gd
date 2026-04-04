@@ -27,7 +27,7 @@ func _init() -> void:
 	enemy._update_facing_direction(player.global_position - enemy.global_position)
 	await _wait_frames(2)
 
-	var spawned: bool = enemy._spawn_attack_projectile(player)
+	var spawned: bool = enemy.combat_controller.spawn_attack_projectile(player)
 	await _wait_frames(1)
 
 	var projectiles: Array = get_nodes_in_group("enemy_projectiles")

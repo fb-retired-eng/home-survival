@@ -36,7 +36,7 @@ func _init() -> void:
 	zombie.configure_exploration_context(player)
 	await _wait_frames()
 
-	zombie.receive_noise_alert(player, player.global_position + Vector2(120.0, 0.0))
+	zombie.targeting_controller.receive_noise_alert(player, player.global_position + Vector2(120.0, 0.0))
 	await _wait_frames()
 	print("actor_visual_probe_enemy_noise_indicator=%s" % str(zombie.get_node("StateIndicator").visible))
 

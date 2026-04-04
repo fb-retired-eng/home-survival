@@ -18,9 +18,9 @@ func _init() -> void:
 
 	print("food_table_probe_before_energy=%d" % game.player.current_energy)
 	print("food_table_probe_before_food=%d" % int(game.player.resources.get("food", 0)))
-	print("food_table_probe_label=%s" % game._get_food_table_label(game.player))
+	print("food_table_probe_label=%s" % game.run_phase_controller.get_food_table_label(game.player))
 
-	game._on_food_table_requested(game.player)
+	game.run_phase_controller.on_food_table_requested(game.player)
 	await process_frame
 	await physics_frame
 	await process_frame

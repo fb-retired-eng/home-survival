@@ -1,9 +1,13 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/enemies/enemy.gd" id="1_enemy"]
 [ext_resource type="Resource" path="res://data/enemies/zombie_basic.tres" id="2_definition"]
 [ext_resource type="Script" path="res://scripts/audio/combat_audio_2d.gd" id="3_combat_audio"]
 [ext_resource type="Script" path="res://scripts/enemies/enemy_combat_controller.gd" id="4_combat_controller"]
+[ext_resource type="Script" path="res://scripts/enemies/enemy_presentation_controller.gd" id="5_presentation_controller"]
+[ext_resource type="Script" path="res://scripts/enemies/enemy_targeting_controller.gd" id="6_targeting_controller"]
+[ext_resource type="Script" path="res://scripts/enemies/enemy_movement_controller.gd" id="7_movement_controller"]
+[ext_resource type="Script" path="res://scripts/enemies/enemy_runtime_controller.gd" id="8_runtime_controller"]
 
 [sub_resource type="CircleShape2D" id="1_hit_shape"]
 radius = 12.0
@@ -89,3 +93,15 @@ attenuation = 1.5
 
 [node name="CombatController" type="Node" parent="."]
 script = ExtResource("4_combat_controller")
+
+[node name="TargetingController" type="Node" parent="."]
+script = ExtResource("6_targeting_controller")
+
+[node name="PresentationController" type="Node" parent="."]
+script = ExtResource("5_presentation_controller")
+
+[node name="MovementController" type="Node" parent="."]
+script = ExtResource("7_movement_controller")
+
+[node name="RuntimeController" type="Node" parent="."]
+script = ExtResource("8_runtime_controller")

@@ -19,8 +19,8 @@ func _spawn_enemy(root_node: Node, definition_path: String, position: Vector2):
 func _arm_visual_prep(enemy, prep_fraction: float) -> void:
 	enemy.set_physics_process(false)
 	enemy._attack_prep_armed = true
-	enemy._attack_prep_remaining = enemy._get_attack_prep_time() * prep_fraction
-	enemy._update_attack_prep_visual()
+	enemy._attack_prep_remaining = enemy.combat_controller.get_attack_prep_time() * prep_fraction
+	enemy.combat_controller.update_attack_prep_visual()
 
 
 func _init() -> void:
@@ -54,7 +54,9 @@ func _init() -> void:
 	var brute_tell: Polygon2D = brute.get_node("VisualRoot/AttackTell")
 
 	print("enemy_attack_readability_probe_basic_tell_visible=%s" % str(basic_tell.visible))
-	print("enemy_attack_readability_probe_runner_tell_faster=%s" % str(runner._get_attack_tell_pulse_speed() > basic._get_attack_tell_pulse_speed()))
+	print("enemy_attack_readability_probe_runner_tell_faster=%s" % str(
+		runner.presentation_controller.get_attack_tell_pulse_speed() > basic.presentation_controller.get_attack_tell_pulse_speed()
+	))
 	print("enemy_attack_readability_probe_spitter_tell_offset_higher=%s" % str(spitter.attack_tell.position.y < basic.attack_tell.position.y))
 	print("enemy_attack_readability_probe_brute_tell_larger=%s" % str(brute_tell.scale.x > basic_tell.scale.x))
 	print("enemy_attack_readability_probe_runner_tell_narrower=%s" % str(runner_tell.polygon[0].x > basic_tell.polygon[0].x))

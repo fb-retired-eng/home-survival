@@ -27,6 +27,7 @@ signal return_to_menu_requested
 @export var resource_pickup_scene: PackedScene
 @export var barricade_placeable_profile: Resource
 @export var buildable_placeable_profiles: Array[Resource] = []
+@export var legacy_perk_definitions: Array[Resource] = []
 @export var sleep_heal_amount: int = 25
 @export_range(1, 100, 1) var food_energy_per_unit: int = 25
 @export_range(0, 4, 1) var daily_poi_refill_base_nodes: int = 1
@@ -41,6 +42,7 @@ signal return_to_menu_requested
 @export var roaming_early_enemies: Array[Resource] = []
 @export var roaming_mid_enemies: Array[Resource] = []
 @export var roaming_late_enemies: Array[Resource] = []
+@export var legacy_perk_id: String = "max_energy"
 
 @onready var game_manager = $GameManager
 @onready var player = $Player
@@ -48,6 +50,7 @@ signal return_to_menu_requested
 @onready var wave_manager = $WaveManager
 @onready var world_root: Node2D = $World
 @onready var food_table: Area2D = $World/FoodTable
+@onready var generator_point: Area2D = $World/GeneratorPoint
 @onready var sleep_point: Area2D = $World/SleepPoint
 @onready var spawn_markers_root: Node2D = $World/SpawnMarkers
 @onready var defense_sockets: Node2D = $World/DefenseSockets
@@ -64,6 +67,10 @@ signal return_to_menu_requested
 @onready var poi_controller = $PoiController
 @onready var exploration_controller = $ExplorationController
 @onready var fog_controller = $FogController
+@onready var power_manager = $PowerManager
+@onready var mvp1_run_controller = $Mvp1RunController
+@onready var run_phase_controller = $RunPhaseController
+@onready var dog = $Dog
 
 # Compatibility aliases for existing probes; exploration_controller owns these dictionaries.
 var _defeated_exploration_spawn_ids: Dictionary = {}
@@ -72,34 +79,33 @@ var _defeated_exploration_enemy_counts: Dictionary = {}
 var _current_exploration_target_counts: Dictionary = {}
 var _is_resetting_run: bool = false
 var _collected_micro_loot_ids: Dictionary = {}
+var _active_heirloom_socket_ids: Dictionary = {}
+var _pending_heirloom_socket_ids: Dictionary = {}
+var _last_terminal_run_state: int = -1
 
 
 func _ready() -> void:
 	randomize()
 	_build_defense_sockets()
 	player.set_interaction_gate(Callable(self, "_can_player_interact_with"))
-	food_table.configure(Callable(self, "_can_player_eat"), Callable(self, "_get_food_table_label"))
-	sleep_point.configure(Callable(self, "_can_player_sleep"), Callable(self, "_get_sleep_label"))
 	hud.bind_player(player)
+	hud.bind_dog(dog)
 	_apply_test_mode_loadout()
 	wave_manager.configure(_collect_spawn_markers(), wave_enemy_layer, player, defense_sockets)
 	_sync_final_wave_with_definitions()
 	game_manager.wave_changed.connect(_on_wave_changed)
 	game_manager.run_reset.connect(_on_run_reset)
-	wave_manager.wave_started.connect(_on_wave_started)
-	wave_manager.wave_cleared.connect(_on_wave_cleared)
-	food_table.table_requested.connect(_on_food_table_requested)
-	sleep_point.sleep_requested.connect(_on_sleep_requested)
 	_connect_defense_socket_signals()
 	hud.set_interaction_prompt("")
 	player.message_requested.connect(hud.set_status)
 	player.player_died.connect(_on_player_died)
 	player.weapon_noise_emitted.connect(_on_player_weapon_noise_emitted)
 	player.build_mode_toggled.connect(_on_player_build_mode_toggled)
-	player.build_placement_requested.connect(_on_player_build_placement_requested)
-	player.build_selection_prev_requested.connect(_on_player_build_selection_prev_requested)
-	player.build_selection_next_requested.connect(_on_player_build_selection_next_requested)
-	player.build_rotation_requested.connect(_on_player_build_rotation_requested)
+	player.build_placement_requested.connect(Callable(construction_controller, "on_player_build_placement_requested"))
+	player.build_selection_prev_requested.connect(Callable(construction_controller, "on_player_build_selection_prev_requested"))
+	player.build_selection_next_requested.connect(Callable(construction_controller, "on_player_build_selection_next_requested"))
+	player.build_rotation_requested.connect(Callable(construction_controller, "on_player_build_rotation_requested"))
+	player.dog_command_requested.connect(_on_player_dog_command_requested)
 	hud.pause_toggle_requested.connect(_on_pause_toggle_requested)
 	hud.pause_resume_requested.connect(_on_pause_resume_requested)
 	hud.pause_save_requested.connect(_on_pause_save_requested)
@@ -161,13 +167,68 @@ func _ready() -> void:
 		"fog_world_min": MAP_WORLD_MIN,
 		"fog_world_max": MAP_WORLD_MAX,
 	})
+	dog.configure({
+		"player": player,
+		"poi_controller": poi_controller,
+		"game_manager": game_manager,
+		"home_world_position": Vector2(1280.0, 720.0),
+	})
+	power_manager.configure({
+		"hud": hud,
+		"player": player,
+		"construction_placeables": construction_placeables,
+		"exploration_enemy_layer": exploration_enemy_layer,
+		"wave_enemy_layer": wave_enemy_layer,
+		"generator_world_position": generator_point.global_position if generator_point != null and is_instance_valid(generator_point) else Vector2(1280.0, 720.0),
+		"power_radius": 260.0,
+		"max_load_slots": 3,
+	})
+	mvp1_run_controller.configure({
+		"game_manager": game_manager,
+		"player": player,
+		"hud": hud,
+		"generator_point": generator_point,
+		"power_manager": power_manager,
+		"dog": dog,
+		"defense_sockets": defense_sockets,
+		"legacy_perk_definitions": legacy_perk_definitions,
+		"legacy_perk_id": legacy_perk_id,
+	})
+	run_phase_controller.configure({
+		"game_manager": game_manager,
+		"player": player,
+		"hud": hud,
+		"wave_manager": wave_manager,
+		"exploration_controller": exploration_controller,
+		"poi_controller": poi_controller,
+		"construction_controller": construction_controller,
+		"mvp1_run_controller": mvp1_run_controller,
+		"food_energy_per_unit": food_energy_per_unit,
+		"sleep_heal_amount": sleep_heal_amount,
+	})
+	food_table.configure(Callable(run_phase_controller, "can_player_eat"), Callable(run_phase_controller, "get_food_table_label"))
+	generator_point.configure(Callable(run_phase_controller, "can_player_upgrade_generator"), Callable(run_phase_controller, "get_generator_label"))
+	sleep_point.configure(Callable(run_phase_controller, "can_player_sleep"), Callable(run_phase_controller, "get_sleep_label"))
+	wave_manager.wave_started.connect(Callable(run_phase_controller, "on_wave_started"))
+	wave_manager.wave_cleared.connect(Callable(run_phase_controller, "on_wave_cleared"))
+	food_table.table_requested.connect(Callable(run_phase_controller, "on_food_table_requested"))
+	generator_point.upgrade_requested.connect(Callable(run_phase_controller, "on_generator_upgrade_requested"))
+	sleep_point.sleep_requested.connect(Callable(run_phase_controller, "on_sleep_requested"))
+	if not run_phase_controller.autosave_requested.is_connected(_request_autosave):
+		run_phase_controller.autosave_requested.connect(_request_autosave)
+	_sync_mvp1_state_aliases()
+	mvp1_run_controller.apply_legacy_perk_baseline()
+	legacy_perk_id = mvp1_run_controller.legacy_perk_id
+	dog.message_requested.connect(hud.set_status)
+	if not dog.autosave_requested.is_connected(_request_autosave):
+		dog.autosave_requested.connect(_request_autosave)
 	_configure_world_art_layers()
 	_configure_camera_bounds()
-	_validate_exploration_spawn_points()
-	_validate_roaming_spawn_zones()
-	_validate_micro_loot_spawns()
+	exploration_controller.validate_exploration_spawn_points()
+	exploration_controller.validate_roaming_spawn_zones()
+	exploration_controller.validate_micro_loot_spawns()
 	_configure_scavenge_nodes()
-	_spawn_micro_loot_pickups()
+	exploration_controller.spawn_micro_loot_pickups()
 	_sync_exploration_state_aliases()
 	_register_fixed_grid_footprints()
 	player.set_build_mode_allowed(true)
@@ -317,10 +378,12 @@ func _on_player_died() -> void:
 
 
 func _on_run_state_changed(new_state: int) -> void:
+	mvp1_run_controller.on_run_state_changed(new_state)
+	_sync_mvp1_state_aliases()
 	player.set_build_mode_allowed(new_state != game_manager.RunState.LOSS and new_state != game_manager.RunState.WIN)
 	if new_state == game_manager.RunState.LOSS:
 		wave_manager.reset()
-		_clear_exploration_enemies()
+		exploration_controller.clear_exploration_enemies()
 		player.set_build_mode_active(false, false)
 		player.cancel_timed_action()
 		hud.show_end_overlay("Run Failed", "You died.\nPress R to restart.", Color(0.94, 0.42, 0.38, 1.0))
@@ -331,7 +394,7 @@ func _on_run_state_changed(new_state: int) -> void:
 
 	if new_state == game_manager.RunState.WIN:
 		wave_manager.reset()
-		_clear_exploration_enemies()
+		exploration_controller.clear_exploration_enemies()
 		player.set_build_mode_active(false, false)
 		hud.show_end_overlay("Victory", "You survived all %d waves.\nPress R to restart." % game_manager.final_wave, Color(0.96, 0.84, 0.42, 1.0))
 		hud.set_phase("Phase: Victory")
@@ -342,8 +405,8 @@ func _on_run_state_changed(new_state: int) -> void:
 	hud.hide_end_overlay()
 
 	if new_state == game_manager.RunState.ACTIVE_WAVE:
-		_clear_roaming_exploration_enemies()
-		_set_exploration_enemies_suspended(true)
+		exploration_controller.clear_roaming_exploration_enemies()
+		exploration_controller.set_exploration_enemies_suspended(true)
 		hud.set_phase("Phase: Night")
 		if player.is_build_mode_active():
 			construction_controller.refresh_build_mode_status()
@@ -375,18 +438,6 @@ func _on_player_build_mode_toggled(active: bool) -> void:
 		_refresh_phase_status()
 
 
-func _on_player_build_selection_prev_requested() -> void:
-	_cycle_selected_buildable_profile(-1)
-
-
-func _on_player_build_selection_next_requested() -> void:
-	_cycle_selected_buildable_profile(1)
-
-
-func _on_player_build_rotation_requested() -> void:
-	_cycle_selected_buildable_rotation(1)
-
-
 func _on_pause_toggle_requested() -> void:
 	_set_pause_state(not get_tree().paused)
 
@@ -416,30 +467,7 @@ func _on_wave_changed(new_wave: int) -> void:
 
 
 func _refresh_phase_status() -> void:
-	if player != null and is_instance_valid(player) and player.is_build_mode_active():
-		construction_controller.refresh_build_mode_status()
-		return
-	var base_status := ""
-	match game_manager.run_state:
-		game_manager.RunState.PRE_WAVE:
-			if game_manager.current_wave <= 0:
-				base_status = "Day 1. Scavenge carefully, build up, and eat dinner at the table to start night 1."
-			elif game_manager.current_wave < game_manager.final_wave - 1:
-				base_status = "Day %d. Explore, build, and eat dinner at the table to start night %d." % [game_manager.current_wave + 1, game_manager.current_wave + 1]
-			else:
-				base_status = "Final day. Make repairs, gather food, and eat dinner before the last night."
-		game_manager.RunState.ACTIVE_WAVE:
-			base_status = "Night %d in progress. Hold the base." % game_manager.current_wave
-		game_manager.RunState.POST_WAVE:
-			base_status = "Night %d cleared. Sleep on the bed to start the next day." % game_manager.current_wave
-		_:
-			return
-
-	var modifier_summary := _get_daily_modifier_summary()
-	if modifier_summary.is_empty():
-		hud.set_status(base_status)
-		return
-	hud.set_status("%s %s" % [base_status, modifier_summary])
+	run_phase_controller.refresh_phase_status()
 
 
 func _can_player_interact_with(_interactable) -> bool:
@@ -450,109 +478,27 @@ func _can_player_interact_with(_interactable) -> bool:
 	return false
 
 
-func _can_player_eat(_player) -> bool:
-	return game_manager.run_state == game_manager.RunState.PRE_WAVE and game_manager.can_start_next_wave()
-
-
-func _get_food_table_label(_player) -> String:
-	if game_manager.run_state != game_manager.RunState.PRE_WAVE:
-		return ""
-
-	var next_wave: int = game_manager.current_wave + 1
-	if not game_manager.can_start_next_wave():
-		return ""
-	if _has_sleep_blocking_exploration_threat():
-		return "Enemies too close for dinner"
-	if not wave_manager.can_start_wave(next_wave):
-		return "Night %d not configured" % next_wave
-
-	var food_needed := _get_missing_food_units_for_full_energy()
-	if food_needed <= 0:
-		return "Eat dinner to start night %d" % next_wave
-
-	var current_food := int(player.resources.get("food", 0))
-	if current_food < food_needed:
-		return "Need %d food for dinner" % food_needed
-
-	return "Eat %d food and start night %d" % [food_needed, next_wave]
-
-
-func _can_player_sleep(_player) -> bool:
-	return game_manager.run_state == game_manager.RunState.POST_WAVE
-
-
-func _get_sleep_label(_player) -> String:
-	if game_manager.run_state != game_manager.RunState.POST_WAVE:
-		return ""
-	return "Sleep on bed until morning"
-
-
-func _on_food_table_requested(_player) -> void:
-	var next_wave: int = game_manager.current_wave + 1
-	if game_manager.run_state != game_manager.RunState.PRE_WAVE or not game_manager.can_start_next_wave():
-		return
-	if _has_sleep_blocking_exploration_threat():
-		hud.set_status("Enemies too close for dinner")
-		player.refresh_interaction_prompt()
-		return
-	if not wave_manager.can_start_wave(next_wave):
-		hud.set_status("Night %d is not configured" % next_wave)
-		player.refresh_interaction_prompt()
-		return
-
-	var food_needed := _get_missing_food_units_for_full_energy()
-	if food_needed > 0:
-		if int(player.resources.get("food", 0)) < food_needed:
-			hud.set_status("Need %d food for dinner" % food_needed)
-			player.refresh_interaction_prompt()
-			return
-		if not player.spend_resource("food", food_needed):
-			hud.set_status("Not enough food")
-			player.refresh_interaction_prompt()
-			return
-		player.restore_full_energy()
-
-	if not wave_manager.start_wave(next_wave):
-		if food_needed > 0:
-			player.add_resource("food", food_needed, false)
-		hud.set_status("Night %d failed to start" % next_wave)
-		player.refresh_interaction_prompt()
-		return
-
-	game_manager.set_wave(next_wave)
-	game_manager.set_run_state(game_manager.RunState.ACTIVE_WAVE)
-
-
-func _on_sleep_requested(_player) -> void:
-	if game_manager.run_state != game_manager.RunState.POST_WAVE:
-		return
-
-	player.heal(sleep_heal_amount)
-	game_manager.set_run_state(game_manager.RunState.PRE_WAVE)
-
-
-func _on_wave_started(wave_number: int) -> void:
-	hud.set_phase("Phase: Night")
-	hud.set_status("Night %d incoming. Hold the perimeter." % wave_number)
-
-
-func _on_wave_cleared(_wave_number: int) -> void:
-	game_manager.complete_active_wave()
-
-
 func _on_run_reset() -> void:
+	_is_resetting_run = true
+	mvp1_run_controller.reset_for_new_run()
+	_sync_mvp1_state_aliases()
 	wave_manager.reset()
 	exploration_controller.reset_for_new_run()
 	poi_controller.reset_for_new_run()
 	_sync_exploration_state_aliases()
 	construction_controller.reset_selection()
+	if power_manager != null and is_instance_valid(power_manager):
+		power_manager.reset_for_new_run()
 	for pickup in _get_local_group_members(&"pickups"):
 		pickup.queue_free()
 	player.reset_for_new_run()
+	if dog != null and is_instance_valid(dog):
+		dog.reset_for_new_run()
 	_apply_test_mode_loadout()
 	for socket in defense_sockets.get_children():
 		if socket.has_method("reset_for_new_run"):
 			socket.reset_for_new_run()
+	mvp1_run_controller.apply_heirloom_socket_state()
 	for child in construction_placeables.get_children():
 		if is_instance_valid(child):
 			child.queue_free()
@@ -560,7 +506,7 @@ func _on_run_reset() -> void:
 		if is_instance_valid(pickup):
 			pickup.queue_free()
 	_register_fixed_grid_footprints()
-	_spawn_micro_loot_pickups()
+	exploration_controller.spawn_micro_loot_pickups()
 	for node in _get_local_scavenge_nodes():
 		if node.has_method("reset_for_new_run"):
 			node.reset_for_new_run()
@@ -586,26 +532,19 @@ func _apply_test_mode_loadout() -> void:
 		player.add_resource("food", test_mode_food, false)
 
 
+func set_legacy_perk_id(perk_id: String) -> void:
+	legacy_perk_id = perk_id
+	if mvp1_run_controller != null and is_instance_valid(mvp1_run_controller):
+		mvp1_run_controller.set_legacy_perk_id(perk_id)
+		_sync_mvp1_state_aliases()
+
+
 func get_selected_buildable_profile() -> PlaceableProfile:
 	return construction_controller.get_selected_buildable_profile()
 
 
 func get_selected_buildable_rotation() -> int:
 	return construction_controller.get_selected_buildable_rotation()
-
-
-func _cycle_selected_buildable_profile(step: int) -> void:
-	if step < 0:
-		construction_controller.on_player_build_selection_prev_requested()
-	elif step > 0:
-		construction_controller.on_player_build_selection_next_requested()
-
-
-func _cycle_selected_buildable_rotation(step: int) -> void:
-	if step == 0:
-		return
-	for _index in range(abs(step)):
-		construction_controller.on_player_build_rotation_requested()
 
 
 func _refresh_build_mode_preview() -> void:
@@ -622,10 +561,6 @@ func _register_fixed_grid_footprints() -> void:
 		"food_table": food_table,
 		"defense_sockets": defense_sockets,
 	})
-
-
-func _on_player_build_placement_requested() -> void:
-	construction_controller.on_player_build_placement_requested()
 
 
 func _on_construction_placeable_state_changed(_placeable) -> void:
@@ -653,10 +588,6 @@ func _on_player_weapon_noise_emitted(source_position: Vector2, noise_radius: flo
 	exploration_controller.on_player_weapon_noise_emitted(source_position, noise_radius, noise_alert_budget, _weapon_id)
 
 
-func _can_enemy_hear_weapon_noise(enemy, source_position: Vector2, noise_radius: float) -> bool:
-	return exploration_controller.can_enemy_hear_weapon_noise(enemy, source_position, noise_radius)
-
-
 func _enter_day_phase() -> void:
 	poi_controller.roll_daily_poi_modifiers()
 	poi_controller.apply_daily_poi_refills()
@@ -672,194 +603,6 @@ func _enter_day_phase() -> void:
 
 func _configure_scavenge_nodes() -> void:
 	poi_controller.configure_scavenge_nodes()
-
-
-func _apply_daily_poi_reward_modifier(node, rewards: Dictionary) -> Dictionary:
-	return poi_controller.apply_daily_poi_reward_modifier(node, rewards)
-
-
-func _roll_daily_poi_modifiers() -> void:
-	poi_controller.roll_daily_poi_modifiers()
-
-
-func _assign_random_daily_modifier(candidate_modifiers: Array[StringName], used_pois: Dictionary) -> void:
-	poi_controller._assign_random_daily_modifier(candidate_modifiers, used_pois)
-
-
-func _get_modifier_eligible_poi_ids(modifier_id: StringName, excluded_pois: Dictionary) -> Array[StringName]:
-	return poi_controller._get_modifier_eligible_poi_ids(modifier_id, excluded_pois)
-
-
-func _is_poi_depleted(poi_id: StringName) -> bool:
-	return poi_controller._is_poi_depleted(poi_id)
-
-
-func _is_poi_eligible_for_elite_modifier(poi_id: StringName) -> bool:
-	return poi_controller._is_poi_eligible_for_elite_modifier(poi_id)
-
-
-func _cache_poi_visuals() -> void:
-	poi_controller.cache_poi_visuals()
-
-
-func _refresh_poi_modifier_visuals() -> void:
-	poi_controller.refresh_poi_modifier_visuals()
-
-
-func _get_modifier_label_text(modifier_id: StringName) -> String:
-	return poi_controller._get_modifier_label_text(modifier_id)
-
-
-func _get_modifier_tint(modifier_id: StringName) -> Color:
-	return poi_controller._get_modifier_tint(modifier_id)
-
-
-func _get_modifier_marker_scale(modifier_id: StringName) -> Vector2:
-	return poi_controller._get_modifier_marker_scale(modifier_id)
-
-
-func _get_daily_modifier_summary() -> String:
-	return poi_controller.get_daily_modifier_summary()
-
-
-func _get_poi_display_name(poi_id: StringName) -> String:
-	return poi_controller.get_poi_display_name(poi_id)
-
-
-func _get_daily_poi_modifier(poi_id: StringName) -> StringName:
-	return poi_controller.get_daily_poi_modifier(poi_id)
-
-
-func _apply_daily_poi_refills() -> void:
-	poi_controller.apply_daily_poi_refills()
-
-
-func _get_adjusted_exploration_spawn_count(spawn_point) -> int:
-	return exploration_controller.get_adjusted_exploration_spawn_count(spawn_point)
-
-
-func _sync_daily_modifier_enemies() -> void:
-	poi_controller.sync_daily_modifier_enemies()
-
-
-func _clear_stale_daily_modifier_enemies() -> void:
-	poi_controller.clear_stale_daily_modifier_enemies()
-
-
-func _has_active_daily_modifier_elite(poi_id: StringName) -> bool:
-	return poi_controller._has_active_daily_modifier_elite(poi_id)
-
-
-func _spawn_daily_modifier_elite(poi_id: StringName, guard_spawn) -> void:
-	poi_controller._spawn_daily_modifier_elite(poi_id, guard_spawn)
-
-
-func _resolve_daily_modifier_elite_definition(guard_spawn) -> Resource:
-	return poi_controller._resolve_daily_modifier_elite_definition(guard_spawn)
-
-
-func _get_poi_guard_spawn_point(poi_id: StringName):
-	return poi_controller._get_poi_guard_spawn_point(poi_id)
-
-
-func debug_get_daily_poi_modifiers() -> Dictionary:
-	return poi_controller.debug_get_daily_poi_modifiers()
-
-
-func debug_set_daily_poi_modifiers(modifiers: Dictionary) -> void:
-	poi_controller.debug_set_daily_poi_modifiers(modifiers)
-
-
-func debug_queue_forced_next_daily_poi_modifiers(modifiers: Dictionary) -> void:
-	poi_controller.debug_queue_forced_next_daily_poi_modifiers(modifiers)
-
-
-func debug_get_poi_label_text(poi_id: StringName) -> String:
-	return poi_controller.debug_get_poi_label_text(poi_id)
-
-
-func debug_get_poi_base_label_text(poi_id: StringName) -> String:
-	return poi_controller.debug_get_poi_base_label_text(poi_id)
-
-
-func debug_get_poi_reward_role_label(poi_id: StringName) -> String:
-	return poi_controller.debug_get_poi_reward_role_label(poi_id)
-
-
-func _sync_exploration_enemies() -> void:
-	exploration_controller.sync_exploration_enemies()
-
-
-func _spawn_roaming_exploration_enemies() -> void:
-	exploration_controller.spawn_roaming_exploration_enemies()
-
-
-func _clear_exploration_enemies() -> void:
-	exploration_controller.clear_exploration_enemies()
-
-
-func _clear_roaming_exploration_enemies() -> void:
-	exploration_controller.clear_roaming_exploration_enemies()
-
-
-func _set_exploration_enemies_suspended(suspended: bool) -> void:
-	exploration_controller.set_exploration_enemies_suspended(suspended)
-
-
-func _has_sleep_blocking_exploration_threat() -> bool:
-	return exploration_controller.has_sleep_blocking_exploration_threat()
-
-
-func _get_missing_food_units_for_full_energy() -> int:
-	var missing_energy: int = maxi(int(player.max_energy) - int(player.current_energy), 0)
-	if missing_energy <= 0:
-		return 0
-	return int(ceili(float(missing_energy) / float(max(food_energy_per_unit, 1))))
-
-
-func _on_exploration_enemy_died(enemy, spawn_id: String) -> void:
-	exploration_controller._on_exploration_enemy_died(enemy, spawn_id)
-
-
-func _get_exploration_spawn_point_by_id(spawn_id: String):
-	return exploration_controller.get_exploration_spawn_point_by_id(spawn_id)
-
-
-func _count_live_exploration_enemies_for_spawn_id(spawn_id: String, excluded_enemy = null) -> int:
-	return exploration_controller._count_live_exploration_enemies_for_spawn_id(spawn_id, excluded_enemy)
-
-
-func _get_or_roll_exploration_spawn_count(spawn_point) -> int:
-	return poi_controller._get_or_roll_exploration_spawn_count(spawn_point, _exploration_spawn_counts)
-
-
-func _get_exploration_spawn_position(spawn_point) -> Vector2:
-	return exploration_controller.get_exploration_spawn_position(spawn_point)
-
-
-func _validate_exploration_spawn_points() -> void:
-	exploration_controller.validate_exploration_spawn_points()
-
-
-func _validate_roaming_spawn_zones() -> void:
-	exploration_controller.validate_roaming_spawn_zones()
-
-
-func _get_roaming_enemy_pool() -> Array[Resource]:
-	return exploration_controller.get_roaming_enemy_pool()
-
-
-func _get_roaming_spawn_budget() -> int:
-	return exploration_controller.get_roaming_spawn_budget()
-
-
-func _choose_weighted_roaming_zone(zones: Array):
-	return exploration_controller.choose_weighted_roaming_zone(zones)
-
-
-func _get_roaming_spawn_position(zone) -> Vector2:
-	return exploration_controller.get_roaming_spawn_position(zone)
-
 
 func _collect_spawn_markers() -> Dictionary:
 	var markers := {}
@@ -885,12 +628,10 @@ func _connect_defense_socket_signals() -> void:
 
 
 func _on_defense_socket_state_changed(_socket) -> void:
+	mvp1_run_controller.on_defense_socket_state_changed(_socket)
+	_sync_mvp1_state_aliases()
 	_register_fixed_grid_footprints()
 	_refresh_base_status()
-	_request_autosave()
-
-
-func _on_scavenge_node_state_changed(_node) -> void:
 	_request_autosave()
 
 
@@ -930,6 +671,7 @@ func get_save_state() -> Dictionary:
 	saved_daily_modifiers = poi_state.get("daily_poi_modifiers", {})
 	var saved_refilled_pois: Array[String] = poi_state.get("last_daily_refilled_pois", [])
 	var exploration_state: Dictionary = exploration_controller.get_save_state()
+	var mvp1_state: Dictionary = mvp1_run_controller.get_save_state_fragment()
 	return {
 		"game": {
 			"wave": int(game_manager.current_wave),
@@ -946,6 +688,10 @@ func get_save_state() -> Dictionary:
 			"collected_micro_loot_ids": exploration_state.get("collected_micro_loot_ids", []),
 		},
 		"player": player.get_save_state() if player != null and is_instance_valid(player) else {},
+		"dog": dog.get_save_state() if dog != null and is_instance_valid(dog) else {},
+		"power": power_manager.get_save_state() if power_manager != null and is_instance_valid(power_manager) else {},
+		"legacy_perk_id": mvp1_state.get("legacy_perk_id", legacy_perk_id),
+		"heirlooms": mvp1_state.get("heirlooms", {}),
 		"defense_sockets": _get_defense_socket_save_states(),
 		"scavenge_nodes": _get_scavenge_node_save_states(),
 		"placeables": construction_controller.get_construction_placeable_save_states(),
@@ -973,20 +719,30 @@ func apply_save_state(save_state: Dictionary) -> void:
 
 	construction_controller.restore_selection_from_state(game_state)
 	_restore_daily_run_state(game_state)
+	mvp1_run_controller.apply_save_state_fragment(save_state)
+	_sync_mvp1_state_aliases()
+	legacy_perk_id = mvp1_run_controller.legacy_perk_id
 
 	if player != null and is_instance_valid(player):
 		player.apply_save_state(player_state, Callable(self, "_get_weapon_definition_by_id"))
+	if dog != null and is_instance_valid(dog):
+		dog.apply_save_state(save_state.get("dog", {}))
+	if power_manager != null and is_instance_valid(power_manager):
+		power_manager.apply_save_state(save_state.get("power", {}))
 
 	_apply_defense_socket_save_states(save_state.get("defense_sockets", []))
+	mvp1_run_controller.apply_heirloom_socket_state()
+	_sync_mvp1_state_aliases()
 	_apply_scavenge_node_save_states(save_state.get("scavenge_nodes", []))
-	_spawn_micro_loot_pickups()
+	exploration_controller.spawn_micro_loot_pickups()
 	construction_controller.apply_construction_placeable_save_states(save_state.get("placeables", []))
 	fog_controller.apply_save_state(save_state.get("fog", {}))
 
 	_register_fixed_grid_footprints()
 	_configure_scavenge_nodes()
+	poi_controller.refresh_player_poi_discovery_from_current_position()
 	poi_controller.refresh_poi_modifier_visuals()
-	_sync_exploration_enemies()
+	exploration_controller.sync_exploration_enemies()
 	poi_controller.sync_daily_modifier_enemies()
 	_refresh_base_status()
 	_refresh_phase_status()
@@ -1042,6 +798,10 @@ func _set_pause_state(paused: bool) -> void:
 			hud.hide_pause_menu()
 	if player != null and is_instance_valid(player):
 		player.refresh_interaction_prompt()
+
+
+func _on_player_dog_command_requested() -> void:
+	mvp1_run_controller.on_player_dog_command_requested()
 
 
 func _get_defense_socket_save_states() -> Array[Dictionary]:
@@ -1146,6 +906,15 @@ func _restore_daily_run_state(game_state: Dictionary) -> void:
 	poi_controller.apply_game_state(game_state)
 
 
+func _sync_mvp1_state_aliases() -> void:
+	if mvp1_run_controller == null or not is_instance_valid(mvp1_run_controller):
+		return
+	legacy_perk_id = mvp1_run_controller.legacy_perk_id
+	_active_heirloom_socket_ids = mvp1_run_controller.get_active_heirloom_socket_ids()
+	_pending_heirloom_socket_ids = mvp1_run_controller.get_pending_heirloom_socket_ids()
+	_last_terminal_run_state = mvp1_run_controller.get_last_terminal_run_state()
+
+
 func _get_run_state_label(run_state: int) -> String:
 	match run_state:
 		game_manager.RunState.PRE_WAVE:
@@ -1189,15 +958,3 @@ func _get_weapon_definition_by_id(weapon_id: StringName) -> Resource:
 			return weapon
 
 	return null
-
-
-func _validate_micro_loot_spawns() -> void:
-	exploration_controller.validate_micro_loot_spawns()
-
-
-func _spawn_micro_loot_pickups() -> void:
-	exploration_controller.spawn_micro_loot_pickups()
-
-
-func _on_micro_loot_collected(pickup, _collector) -> void:
-	exploration_controller._on_micro_loot_collected(pickup, _collector)

@@ -1,7 +1,7 @@
 extends CharacterBody2D
 class_name Player
 
-const RESOURCE_IDS := ["salvage", "parts", "medicine", "bullets", "food"]
+const RESOURCE_IDS := ["salvage", "parts", "medicine", "bullets", "food", "battery"]
 const DEFAULT_ATTACK_FLASH_COLOR := Color(1.0, 0.83, 0.42, 0.75)
 const DEFAULT_ATTACK_FLASH_START_SCALE := Vector2(0.8, 0.8)
 const DEFAULT_ATTACK_FLASH_PEAK_SCALE := Vector2(1.1, 1.1)
@@ -39,6 +39,7 @@ signal weapon_status_changed(text: String)
 signal weapon_trait_changed(text: String)
 signal firearm_windup_changed(active: bool)
 signal weapon_noise_emitted(source_position: Vector2, noise_radius: float, noise_alert_budget: float, weapon_id: StringName)
+signal dog_command_requested
 signal build_mode_toggled(active: bool)
 signal build_placement_requested()
 signal build_selection_prev_requested()
@@ -68,6 +69,7 @@ var resources: Dictionary = {
 	"medicine": 0,
 	"bullets": 0,
 	"food": 0,
+	"battery": 0,
 }
 
 var is_dead: bool = false
@@ -261,6 +263,9 @@ func _physics_process(delta: float) -> void:
 
 	if Input.is_action_just_pressed("reload_weapon"):
 		_attempt_reload(false)
+
+	if Input.is_action_just_pressed("dog_command"):
+		dog_command_requested.emit()
 
 func add_resource(resource_id: String, amount: int, show_message: bool = true) -> bool:
 	return loadout_controller.add_resource(resource_id, amount, show_message)

@@ -17,6 +17,8 @@
 [ext_resource type="Resource" path="res://data/weapons/pistol.tres" id="18_pistol"]
 [ext_resource type="Resource" path="res://data/weapons/shotgun.tres" id="19_shotgun"]
 [ext_resource type="PackedScene" path="res://scenes/world/FoodTablePoint.tscn" id="20_food_table_scene"]
+[ext_resource type="PackedScene" path="res://scenes/world/GeneratorPoint.tscn" id="21_generator_scene"]
+[ext_resource type="Resource" path="res://data/legacy_perks/max_energy.tres" id="22_legacy_max_energy"]
 [ext_resource type="Resource" path="res://data/enemies/zombie_runner.tres" id="23_runner_enemy"]
 [ext_resource type="Resource" path="res://data/enemies/zombie_spitter.tres" id="24_spitter_enemy"]
 [ext_resource type="Script" uid="uid://dwa7iri2l2fef" path="res://scripts/world/roaming_spawn_zone.gd" id="25_roaming_zone"]
@@ -32,12 +34,21 @@
 [ext_resource type="Script" uid="uid://ci6myjdqkg1bs" path="res://scripts/world/micro_loot_spawn.gd" id="36_micro_loot_spawn"]
 [ext_resource type="Script" uid="uid://dnj8cse3afaib" path="res://scripts/main/poi_controller.gd" id="39_poi_controller"]
 [ext_resource type="Script" uid="uid://oifrb4s8gwg0" path="res://scripts/main/exploration_controller.gd" id="40_exploration_controller"]
+[ext_resource type="Script" path="res://scripts/world/poi_discovery_area.gd" id="53_poi_discovery_area"]
+[ext_resource type="Script" path="res://scripts/main/mvp1_run_controller.gd" id="54_mvp1_run_controller"]
+[ext_resource type="Script" path="res://scripts/main/run_phase_controller.gd" id="55_run_phase_controller"]
+[ext_resource type="Script" path="res://scripts/main/power_manager.gd" id="50_power_manager"]
 [ext_resource type="Resource" path="res://data/pois/poi_a_definition.tres" id="41_poi_a_definition"]
 [ext_resource type="Resource" path="res://data/pois/poi_b_definition.tres" id="42_poi_b_definition"]
 [ext_resource type="Resource" path="res://data/pois/poi_c_definition.tres" id="43_poi_c_definition"]
 [ext_resource type="Resource" path="res://data/pois/poi_d_definition.tres" id="44_poi_d_definition"]
 [ext_resource type="Resource" path="res://data/pois/poi_e_definition.tres" id="45_poi_e_definition"]
 [ext_resource type="Resource" path="res://data/pois/poi_f_definition.tres" id="46_poi_f_definition"]
+[ext_resource type="PackedScene" path="res://scenes/world/Dog.tscn" id="47_dog_scene"]
+[ext_resource type="Resource" path="res://data/placeables/turret.tres" id="48_turret_profile"]
+[ext_resource type="Resource" path="res://data/placeables/floodlight.tres" id="49_floodlight_profile"]
+[ext_resource type="Resource" path="res://data/legacy_perks/prepared_stash.tres" id="51_legacy_prepared_stash"]
+[ext_resource type="Resource" path="res://data/legacy_perks/dog_pack.tres" id="52_legacy_dog_pack"]
 
 [sub_resource type="RectangleShape2D" id="3_poi_a_blocker"]
 size = Vector2(84, 72)
@@ -63,6 +74,9 @@ size = Vector2(5120, 32)
 [sub_resource type="RectangleShape2D" id="2_vertical_wall"]
 size = Vector2(32, 2880)
 
+[sub_resource type="CircleShape2D" id="9_poi_discovery_shape"]
+radius = 150.0
+
 [node name="Game" type="Node2D" unique_id=393065020]
 script = ExtResource("8_game_script")
 defense_socket_scene = ExtResource("11_socket_scene")
@@ -73,7 +87,8 @@ poi_definitions = Array[Resource]([ExtResource("41_poi_a_definition"), ExtResour
 construction_placeable_scene = ExtResource("30_placeable_scene")
 resource_pickup_scene = ExtResource("35_resource_pickup_scene")
 barricade_placeable_profile = ExtResource("31_barricade_profile")
-buildable_placeable_profiles = Array[Resource]([ExtResource("31_barricade_profile"), ExtResource("32_spike_trap_profile")])
+buildable_placeable_profiles = Array[Resource]([ExtResource("31_barricade_profile"), ExtResource("32_spike_trap_profile"), ExtResource("48_turret_profile"), ExtResource("49_floodlight_profile")])
+legacy_perk_definitions = Array[Resource]([ExtResource("22_legacy_max_energy"), ExtResource("51_legacy_prepared_stash"), ExtResource("52_legacy_dog_pack")])
 enable_test_mode = true
 test_mode_weapons = Array[Resource]([ExtResource("17_baseball_bat"), ExtResource("18_pistol"), ExtResource("19_shotgun")])
 roaming_early_enemies = Array[Resource]([ExtResource("16_basic_enemy"), ExtResource("23_runner_enemy")])
@@ -97,8 +112,20 @@ script = ExtResource("39_poi_controller")
 [node name="ExplorationController" type="Node" parent="." unique_id=571054771]
 script = ExtResource("40_exploration_controller")
 
+[node name="PowerManager" type="Node" parent="." unique_id=347891004]
+script = ExtResource("50_power_manager")
+
+[node name="Mvp1RunController" type="Node" parent="." unique_id=347891005]
+script = ExtResource("54_mvp1_run_controller")
+
+[node name="RunPhaseController" type="Node" parent="." unique_id=347891006]
+script = ExtResource("55_run_phase_controller")
+
 [node name="FogController" type="Node" parent="." unique_id=1984275659]
 script = ExtResource("34_fog_controller")
+
+[node name="Dog" parent="." unique_id=981240771 instance=ExtResource("47_dog_scene")]
+position = Vector2(1248, 752)
 
 [node name="World" type="Node2D" parent="." unique_id=715950200]
 
@@ -167,6 +194,12 @@ spawn_id = &"micro_ne_depot_salvage"
 poi_id = &"poi_b"
 use_poi_role_defaults = true
 
+[node name="NE_DepotBattery" type="Marker2D" parent="World/MicroLootSpawns" unique_id=615470028]
+position = Vector2(2180, 404)
+script = ExtResource("36_micro_loot_spawn")
+spawn_id = &"micro_ne_depot_battery"
+resource_id = "battery"
+
 [node name="NorthCenterFood" type="Marker2D" parent="World/MicroLootSpawns" unique_id=2116939616]
 position = Vector2(1280, 326)
 script = ExtResource("36_micro_loot_spawn")
@@ -232,6 +265,12 @@ script = ExtResource("36_micro_loot_spawn")
 spawn_id = &"micro_scrapyard_parts"
 poi_id = &"poi_f"
 use_poi_role_defaults = true
+
+[node name="ScrapyardBattery" type="Marker2D" parent="World/MicroLootSpawns" unique_id=177049280]
+position = Vector2(1508, 1272)
+script = ExtResource("36_micro_loot_spawn")
+spawn_id = &"micro_scrapyard_battery"
+resource_id = "battery"
 
 [node name="NorthLane" type="Polygon2D" parent="World" unique_id=348883657]
 color = Color(0.46, 0.19, 0.16, 0.5)
@@ -404,6 +443,13 @@ polygon = PackedVector2Array(1144, 898, 1416, 898, 1416, 1022, 1144, 1022)
 [node name="POI_A" type="Node2D" parent="World" unique_id=1508732079]
 position = Vector2(205, 220)
 
+[node name="DiscoveryArea" type="Area2D" parent="World/POI_A" unique_id=102001]
+script = ExtResource("53_poi_discovery_area")
+poi_id = &"poi_a"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/POI_A/DiscoveryArea" unique_id=102002]
+shape = SubResource("9_poi_discovery_shape")
+
 [node name="Marker" type="Polygon2D" parent="World/POI_A" unique_id=671602528]
 color = Color(0.93, 0.72, 0.28, 1)
 polygon = PackedVector2Array(0, -28, 24, 0, 0, 28, -24, 0)
@@ -458,6 +504,13 @@ reward_parts = 2
 
 [node name="POI_B" type="Node2D" parent="World" unique_id=1746671438]
 position = Vector2(2355, 220)
+
+[node name="DiscoveryArea" type="Area2D" parent="World/POI_B" unique_id=102003]
+script = ExtResource("53_poi_discovery_area")
+poi_id = &"poi_b"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/POI_B/DiscoveryArea" unique_id=102004]
+shape = SubResource("9_poi_discovery_shape")
 
 [node name="Marker" type="Polygon2D" parent="World/POI_B" unique_id=269955236]
 color = Color(0.72, 0.31, 0.18, 1)
@@ -514,6 +567,13 @@ weapon_reward = ExtResource("17_baseball_bat")
 [node name="POI_C" type="Node2D" parent="World" unique_id=977234679]
 position = Vector2(205, 1220)
 
+[node name="DiscoveryArea" type="Area2D" parent="World/POI_C" unique_id=102005]
+script = ExtResource("53_poi_discovery_area")
+poi_id = &"poi_c"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/POI_C/DiscoveryArea" unique_id=102006]
+shape = SubResource("9_poi_discovery_shape")
+
 [node name="Marker" type="Polygon2D" parent="World/POI_C" unique_id=2030169250]
 color = Color(0.9, 0.67, 0.25, 1)
 polygon = PackedVector2Array(0, -28, 24, 0, 0, 28, -24, 0)
@@ -569,6 +629,13 @@ reward_food = 2
 
 [node name="POI_D" type="Node2D" parent="World" unique_id=721916660]
 position = Vector2(2355, 1220)
+
+[node name="DiscoveryArea" type="Area2D" parent="World/POI_D" unique_id=102007]
+script = ExtResource("53_poi_discovery_area")
+poi_id = &"poi_d"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/POI_D/DiscoveryArea" unique_id=102008]
+shape = SubResource("9_poi_discovery_shape")
 
 [node name="Marker" type="Polygon2D" parent="World/POI_D" unique_id=949901016]
 color = Color(0.18, 0.28, 0.42, 1)
@@ -631,6 +698,13 @@ weapon_reward = ExtResource("18_pistol")
 [node name="POI_E" type="Node2D" parent="World" unique_id=631136876]
 position = Vector2(1280, 95)
 
+[node name="DiscoveryArea" type="Area2D" parent="World/POI_E" unique_id=102009]
+script = ExtResource("53_poi_discovery_area")
+poi_id = &"poi_e"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/POI_E/DiscoveryArea" unique_id=102010]
+shape = SubResource("9_poi_discovery_shape")
+
 [node name="Marker" type="Polygon2D" parent="World/POI_E" unique_id=214485449]
 color = Color(0.78, 0.42, 0.26, 1)
 polygon = PackedVector2Array(0, -28, 24, 0, 0, 28, -24, 0)
@@ -688,6 +762,13 @@ reward_food = 1
 
 [node name="POI_F" type="Node2D" parent="World" unique_id=136744481]
 position = Vector2(1280, 1345)
+
+[node name="DiscoveryArea" type="Area2D" parent="World/POI_F" unique_id=102011]
+script = ExtResource("53_poi_discovery_area")
+poi_id = &"poi_f"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/POI_F/DiscoveryArea" unique_id=102012]
+shape = SubResource("9_poi_discovery_shape")
 
 [node name="Marker" type="Polygon2D" parent="World/POI_F" unique_id=1092195253]
 color = Color(0.6, 0.18, 0.18, 1)
@@ -786,6 +867,9 @@ position = Vector2(1328, 720)
 
 [node name="FoodTable" parent="World" unique_id=1408184640 instance=ExtResource("20_food_table_scene")]
 position = Vector2(1232, 720)
+
+[node name="GeneratorPoint" parent="World" unique_id=1428063010 instance=ExtResource("21_generator_scene")]
+position = Vector2(1180, 720)
 
 [node name="DefenseSockets" type="Node2D" parent="World" unique_id=1508673809]
 

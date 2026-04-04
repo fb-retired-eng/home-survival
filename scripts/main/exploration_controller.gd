@@ -131,7 +131,7 @@ func on_player_weapon_noise_emitted(source_position: Vector2, noise_radius: floa
 			continue
 		if child.is_queued_for_deletion():
 			continue
-		if not child.has_method("receive_noise_alert"):
+		if child.get("targeting_controller") == null:
 			continue
 		if not can_enemy_hear_weapon_noise(child, source_position, noise_radius):
 			continue
@@ -144,13 +144,14 @@ func on_player_weapon_noise_emitted(source_position: Vector2, noise_radius: floa
 	var remaining_budget := noise_alert_budget
 	for enemy in candidates:
 		var alert_weight := 1.0
-		if enemy.has_method("get_noise_alert_weight"):
-			alert_weight = float(enemy.get_noise_alert_weight())
+		var enemy_targeting = enemy.get("targeting_controller")
+		if enemy_targeting != null and enemy_targeting.has_method("get_noise_alert_weight"):
+			alert_weight = float(enemy_targeting.get_noise_alert_weight())
 		if alert_weight <= 0.0:
 			continue
 		if remaining_budget < alert_weight:
 			continue
-		enemy.receive_noise_alert(player, source_position)
+		enemy_targeting.receive_noise_alert(player, source_position)
 		remaining_budget -= alert_weight
 
 
@@ -396,6 +397,12 @@ func get_adjusted_exploration_spawn_count(spawn_point) -> int:
 	if poi_controller == null:
 		return 1
 	return poi_controller.get_adjusted_exploration_spawn_count(spawn_point, _current_exploration_target_counts, _exploration_spawn_counts)
+
+
+func get_base_exploration_spawn_count(spawn_point) -> int:
+	if poi_controller == null:
+		return 1
+	return poi_controller.get_or_roll_exploration_spawn_count(spawn_point, _exploration_spawn_counts)
 
 
 func get_exploration_spawn_point_by_id(spawn_id: String):

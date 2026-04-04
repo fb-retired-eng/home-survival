@@ -140,7 +140,7 @@ func _init() -> void:
 	print("construction_grid_probe_reload_blocked=%s" % str(not player.is_build_mode_active()))
 	player._cancel_reload()
 
-	game._on_food_table_requested(player)
+	game.run_phase_controller.on_food_table_requested(player)
 	await _wait_frames()
 	game.game_manager.set_run_state(game.game_manager.RunState.ACTIVE_WAVE)
 	await _wait_frames()

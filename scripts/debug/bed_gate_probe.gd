@@ -36,8 +36,8 @@ func _init() -> void:
 	await physics_frame
 	await process_frame
 
-	print("bed_gate_probe_sleep_label_before=%s" % game._get_sleep_label(game.player))
-	print("bed_gate_probe_can_sleep_before=%s" % str(game._can_player_sleep(game.player)))
+	print("bed_gate_probe_sleep_label_before=%s" % game.run_phase_controller.get_sleep_label(game.player))
+	print("bed_gate_probe_can_sleep_before=%s" % str(game.run_phase_controller.can_player_sleep(game.player)))
 
 	game.player.resources["food"] = 0
 	game.player.resources_changed.emit(game.player.resources.duplicate(true))
@@ -45,16 +45,16 @@ func _init() -> void:
 	game.player.energy_changed.emit(game.player.current_energy, game.player.max_energy)
 	game.player.add_resource("food", 2, false)
 	await process_frame
-	game._on_food_table_requested(game.player)
+	game.run_phase_controller.on_food_table_requested(game.player)
 	await process_frame
 	await physics_frame
 	await process_frame
 	await _clear_wave_by_killing_enemies(game)
 	await process_frame
 
-	print("bed_gate_probe_sleep_label_after=%s" % game._get_sleep_label(game.player))
-	print("bed_gate_probe_can_sleep_after=%s" % str(game._can_player_sleep(game.player)))
-	game._on_sleep_requested(game.player)
+	print("bed_gate_probe_sleep_label_after=%s" % game.run_phase_controller.get_sleep_label(game.player))
+	print("bed_gate_probe_can_sleep_after=%s" % str(game.run_phase_controller.can_player_sleep(game.player)))
+	game.run_phase_controller.on_sleep_requested(game.player)
 	await process_frame
 	await physics_frame
 	await process_frame

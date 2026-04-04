@@ -79,12 +79,12 @@ func _init() -> void:
 	await _wait_frames()
 
 	for poi_id in [&"poi_a", &"poi_b", &"poi_c", &"poi_d", &"poi_e", &"poi_f"]:
-		var guard_spawn = game._get_poi_guard_spawn_point(poi_id)
+		var guard_spawn = game.poi_controller.get_poi_guard_spawn_point(poi_id)
 		var support_spawn = _find_support_spawn(game, poi_id)
 		var support_defaults := {}
 		if support_spawn != null:
 			support_defaults = game.poi_controller.resolve_micro_loot_spawn_defaults(support_spawn)
-		print("economy_probe_%s_role=%s" % [String(poi_id), game.debug_get_poi_reward_role_label(poi_id)])
+		print("economy_probe_%s_role=%s" % [String(poi_id), game.poi_controller.debug_get_poi_reward_role_label(poi_id)])
 		print("economy_probe_%s_base_rewards=%s" % [String(poi_id), _format_rewards(_sum_poi_rewards(game, poi_id))])
 		if guard_spawn != null:
 			print("economy_probe_%s_guard=%s:%d-%d" % [
