@@ -80,6 +80,7 @@ var _prep_pose_tilt_radians: float = 0.0
 var _damage_feedback_distance: float = 4.0
 var _damage_feedback_scale: Vector2 = Vector2(1.06, 0.94)
 var _damage_feedback_duration: float = 0.12
+var _damage_feedback_rotation_offset: float = 0.0
 
 @onready var body_shadow: Polygon2D = $BodyShadow
 @onready var state_indicator: Polygon2D = $StateIndicator
@@ -1416,16 +1417,33 @@ func _play_damage_feedback(source: Variant) -> void:
 		_damage_feedback_tween.kill()
 
 	var knock_direction := _get_damage_knock_direction(source)
-	body_visual.position = knock_direction * _damage_feedback_distance
-	body_visual.scale = _damage_feedback_scale
-	facing_marker.position = knock_direction * _damage_feedback_distance
-	facing_marker.scale = _damage_feedback_scale
+	var intensity := _get_damage_feedback_intensity(source)
+	body_visual.position = knock_direction * (_damage_feedback_distance * intensity)
+	body_visual.scale = Vector2.ONE.lerp(_damage_feedback_scale, minf(intensity, 1.6))
+	facing_marker.position = knock_direction * (_damage_feedback_distance * intensity)
+	facing_marker.scale = Vector2.ONE.lerp(_damage_feedback_scale, minf(intensity, 1.6))
+	_damage_feedback_rotation_offset = signf(knock_direction.x if not is_zero_approx(knock_direction.x) else 1.0) * deg_to_rad(4.0 * intensity)
 
 	_damage_feedback_tween = create_tween()
 	_damage_feedback_tween.parallel().tween_property(body_visual, "position", Vector2.ZERO, _damage_feedback_duration)
 	_damage_feedback_tween.parallel().tween_property(body_visual, "scale", Vector2.ONE, _damage_feedback_duration)
 	_damage_feedback_tween.parallel().tween_property(facing_marker, "position", Vector2.ZERO, _damage_feedback_duration)
 	_damage_feedback_tween.parallel().tween_property(facing_marker, "scale", Vector2.ONE, _damage_feedback_duration)
+	_damage_feedback_tween.parallel().tween_property(self, "_damage_feedback_rotation_offset", 0.0, _damage_feedback_duration)
+
+
+func _get_damage_feedback_intensity(source: Variant) -> float:
+	if not (source is Dictionary):
+		return 1.0
+	var damage_amount := float(source.get("damage_amount", 0))
+	var knockback_force := float(source.get("knockback_force", 0.0))
+	var damage_type := StringName(source.get("damage_type", &"impact"))
+	var intensity := 0.85
+	intensity += clampf(damage_amount / 36.0, 0.0, 0.7)
+	intensity += clampf(knockback_force / 700.0, 0.0, 0.5)
+	if damage_type == &"ballistic":
+		intensity += 0.08
+	return clampf(intensity, 0.8, 1.8)
 
 
 func _get_damage_knock_direction(source: Variant) -> Vector2:
@@ -1477,7 +1495,7 @@ func _update_visual_animation(delta: float) -> void:
 		_presentation_scale.x * locomotion_scale.x * prep_scale.x,
 		_presentation_scale.y * locomotion_scale.y * prep_scale.y
 	)
-	var target_body_rotation := (_facing_direction.angle() - PI / 2.0) + (_prep_pose_tilt_radians * prep_progress)
+	var target_body_rotation := (_facing_direction.angle() - PI / 2.0) + (_prep_pose_tilt_radians * prep_progress) + _damage_feedback_rotation_offset
 	_visual_body_rotation = lerp_angle(_visual_body_rotation, target_body_rotation, minf(delta * _visual_turn_speed, 1.0))
 	body_visual.rotation = _visual_body_rotation
 	facing_marker.rotation = _visual_body_rotation + PI

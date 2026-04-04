@@ -12,6 +12,7 @@ var _direction: Vector2 = Vector2.ZERO
 var _remaining_distance: float = 0.0
 var _hit_radius: float = 0.0
 var _damage: int = 0
+var _weapon_id: StringName = &"weapon"
 var _damage_type: StringName = &"ballistic"
 var _knockback_force: float = 0.0
 var _impact_kind: String = "miss"
@@ -34,6 +35,7 @@ func configure(config: Dictionary) -> void:
 	_remaining_distance = maxf(float(config.get("range", 0.0)), 0.0)
 	_hit_radius = maxf(float(config.get("hit_radius", 0.0)), 0.0)
 	_damage = int(config.get("damage", 0))
+	_weapon_id = StringName(config.get("weapon_id", &"weapon"))
 	_damage_type = StringName(config.get("damage_type", &"ballistic"))
 	_knockback_force = float(config.get("knockback_force", 0.0))
 	var projectile_polygon: PackedVector2Array = config.get("polygon", PackedVector2Array())
@@ -107,6 +109,8 @@ func _handle_hit(collider) -> void:
 		_impact_kind = "enemy"
 		collider.take_damage(_damage, {
 			"attacker": _attacker,
+			"weapon_id": _weapon_id,
+			"damage_amount": _damage,
 			"damage_type": _damage_type,
 			"knockback_force": _knockback_force,
 			"knockback_direction": _direction,

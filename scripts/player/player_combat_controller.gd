@@ -245,6 +245,8 @@ func commit_attack(weapon_override: Resource = null) -> void:
 		if is_instance_valid(body):
 			body.take_damage(int(attack_damage_map.get(body, weapon.damage)), {
 				"attacker": player,
+				"weapon_id": weapon.weapon_id,
+				"damage_amount": int(attack_damage_map.get(body, weapon.damage)),
 				"damage_type": weapon.damage_type,
 				"knockback_force": weapon.knockback_force,
 				"knockback_direction": player.facing_direction,
@@ -685,15 +687,17 @@ func _play_shot_impact(end_point: Vector2, impact_kind: String) -> void:
 		player._shot_impact_tween.kill()
 
 	var impact_color: Color = player._impact_hit_color if impact_kind == "enemy" else player._impact_block_color
+	var impact_scale_multiplier: float = 1.18 if impact_kind == "enemy" else 1.0
+	var impact_duration: float = player._impact_flash_duration * (1.45 if impact_kind == "enemy" else 1.0)
 	player.shot_impact.position = player.to_local(end_point)
 	player.shot_impact.visible = true
-	player.shot_impact.scale = Vector2.ONE * (player._impact_flash_scale * 0.7)
+	player.shot_impact.scale = Vector2.ONE * (player._impact_flash_scale * 0.7 * impact_scale_multiplier)
 	player.shot_impact.color = impact_color
 	player.shot_impact.modulate = Color(impact_color.r, impact_color.g, impact_color.b, 1.0)
 
 	player._shot_impact_tween = create_tween()
-	player._shot_impact_tween.parallel().tween_property(player.shot_impact, "scale", Vector2.ONE * player._impact_flash_scale, player._impact_flash_duration)
-	player._shot_impact_tween.parallel().tween_property(player.shot_impact, "modulate:a", 0.0, player._impact_flash_duration)
+	player._shot_impact_tween.parallel().tween_property(player.shot_impact, "scale", Vector2.ONE * player._impact_flash_scale * impact_scale_multiplier, impact_duration)
+	player._shot_impact_tween.parallel().tween_property(player.shot_impact, "modulate:a", 0.0, impact_duration)
 	player._shot_impact_tween.finished.connect(func() -> void:
 		player.shot_impact.visible = false
 		player.shot_impact.scale = Vector2.ONE
@@ -763,6 +767,7 @@ func _spawn_player_projectile(projectile_parent: Node, weapon: Resource, origin:
 		"speed": float(weapon.projectile_speed),
 		"hit_radius": float(weapon.projectile_hit_radius),
 		"damage": damage,
+		"weapon_id": weapon.weapon_id,
 		"damage_type": weapon.damage_type,
 		"knockback_force": float(weapon.knockback_force),
 		"polygon": weapon.projectile_polygon,

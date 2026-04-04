@@ -111,6 +111,8 @@ var _damage_feedback_tween: Tween
 var _starting_weapon: Resource
 var _knockback_velocity: Vector2 = Vector2.ZERO
 var _shot_impact_tween: Tween
+var _weapon_recoil_tween: Tween
+var _camera_recoil_tween: Tween
 var _build_mode_active: bool = false
 var _build_mode_allowed: bool = true
 var _visual_time: float = 0.0
@@ -124,6 +126,7 @@ var _visual_bob_offset_y: float = 0.0
 @onready var body_visual: Polygon2D = $VisualRoot/Body
 @onready var facing_marker: Polygon2D = $VisualRoot/FacingMarker
 @onready var attack_pivot: Node2D = $AttackPivot
+@onready var player_camera: Camera2D = $Camera2D
 @onready var weapon_visual: Polygon2D = $AttackPivot/WeaponVisual
 @onready var attack_area: Area2D = $AttackPivot/AttackArea
 @onready var attack_area_shape: CollisionShape2D = $AttackPivot/AttackArea/CollisionShape2D
@@ -608,6 +611,30 @@ func _play_damage_feedback(source: Variant) -> void:
 	_damage_feedback_tween.parallel().tween_property(body_visual, "scale", Vector2.ONE, 0.12)
 	_damage_feedback_tween.parallel().tween_property(facing_marker, "position", Vector2.ZERO, 0.12)
 	_damage_feedback_tween.parallel().tween_property(facing_marker, "scale", Vector2.ONE, 0.12)
+
+
+func _play_weapon_recoil_feedback(weapon: Resource) -> void:
+	if weapon == null or attack_pivot == null:
+		return
+
+	if _weapon_recoil_tween != null and is_instance_valid(_weapon_recoil_tween):
+		_weapon_recoil_tween.kill()
+	var recoil_distance := clampf(float(weapon.knockback_force) / 70.0, 0.8, 4.0)
+	if bool(weapon.uses_projectile):
+		recoil_distance += 0.8
+	var recoil_offset := -facing_direction * recoil_distance
+	attack_pivot.position = recoil_offset
+	_weapon_recoil_tween = create_tween()
+	_weapon_recoil_tween.tween_property(attack_pivot, "position", Vector2.ZERO, 0.12)
+
+	if player_camera == null or not is_instance_valid(player_camera):
+		return
+	if _camera_recoil_tween != null and is_instance_valid(_camera_recoil_tween):
+		_camera_recoil_tween.kill()
+	var camera_kick := recoil_offset * 0.7
+	player_camera.offset = camera_kick
+	_camera_recoil_tween = create_tween()
+	_camera_recoil_tween.tween_property(player_camera, "offset", Vector2.ZERO, 0.16)
 
 
 func _get_damage_knock_direction(source: Variant) -> Vector2:
