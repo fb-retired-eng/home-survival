@@ -710,6 +710,9 @@ func _spawn_projectile_attack(weapon: Resource, attack_result: Dictionary, damag
 	var muzzle_global: Vector2 = player.attack_pivot.to_global(get_muzzle_local_position())
 	var resolved_end_point: Vector2 = attack_result.get("end_point", muzzle_global + player.facing_direction * float(weapon.attack_range))
 	var hit_targets: Array = Array(attack_result.get("targets", []))
+	if int(weapon.projectile_count) > 1:
+		_spawn_projectile_spread_attack(projectile_parent, weapon, muzzle_global, hit_targets)
+		return
 	if hit_targets.is_empty():
 		var structure_hit: Dictionary = _get_structure_block_hit(player.attack_pivot.global_position, resolved_end_point)
 		if not structure_hit.is_empty():
@@ -766,6 +769,68 @@ func _spawn_player_projectile(projectile_parent: Node, weapon: Resource, origin:
 		"color": weapon.projectile_color,
 		"impact_color": weapon.projectile_impact_color,
 	})
+
+
+func _spawn_projectile_spread_attack(projectile_parent: Node, weapon: Resource, origin: Vector2, hit_targets: Array) -> void:
+	var projectile_count: int = maxi(int(weapon.projectile_count), 1)
+	var spread_degrees: float = maxf(float(weapon.projectile_spread_degrees), 0.0)
+	var damage_per_projectile: int = maxi(int(ceil(float(int(weapon.damage)) / float(projectile_count))), 1)
+	var fired_directions: Array[Vector2] = []
+	var angle_step: float = 0.0
+	var start_offset: float = 0.0
+	if projectile_count > 1 and spread_degrees > 0.0:
+		angle_step = spread_degrees / float(projectile_count - 1)
+		start_offset = -spread_degrees * 0.5
+
+	for target in hit_targets:
+		if target == null or not is_instance_valid(target):
+			continue
+		if fired_directions.size() >= projectile_count:
+			break
+		var target_direction: Vector2 = (target.global_position - origin).normalized()
+		if target_direction.is_zero_approx():
+			target_direction = player.facing_direction
+		fired_directions.append(target_direction)
+
+	for index in range(projectile_count):
+		if fired_directions.size() >= projectile_count:
+			break
+		var angle_offset_degrees: float = start_offset + angle_step * float(index)
+		var direction: Vector2 = player.facing_direction.rotated(deg_to_rad(angle_offset_degrees))
+		fired_directions.append(direction)
+
+	var spawned_projectiles := 0
+	var blocked_impact_point := Vector2.ZERO
+	for direction in fired_directions:
+		var resolved_direction := direction.normalized()
+		if resolved_direction.is_zero_approx():
+			resolved_direction = player.facing_direction
+		var block_hit := _get_structure_block_hit(
+			player.attack_pivot.global_position,
+			origin + resolved_direction * float(weapon.attack_range)
+		)
+		var projectile_range := float(weapon.attack_range)
+		if not block_hit.is_empty():
+			blocked_impact_point = block_hit.get("position", origin + resolved_direction * projectile_range)
+			projectile_range = minf(projectile_range, origin.distance_to(blocked_impact_point))
+		if projectile_range <= 1.0:
+			continue
+		_spawn_player_projectile(
+			projectile_parent,
+			weapon,
+			origin,
+			resolved_direction,
+			damage_per_projectile,
+			projectile_range
+		)
+		spawned_projectiles += 1
+	if spawned_projectiles == 0 and blocked_impact_point != Vector2.ZERO:
+		player._play_combat_sound(
+			get_attack_impact_sound_id("structure"),
+			randf_range(0.98, 1.04),
+			get_attack_impact_volume("structure")
+		)
+		player._play_shot_impact(blocked_impact_point, "structure")
 
 
 func _get_structure_block_hit(from_position: Vector2, to_position: Vector2) -> Dictionary:

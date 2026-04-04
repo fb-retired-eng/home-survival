@@ -19,6 +19,7 @@ held_visual_offset = Vector2(13, -18)
 held_visual_polygon = PackedVector2Array(-5, -22, 5, -22, 3, 10, 0, 16, -3, 10)
 held_visual_color = Color(0.8, 0.58, 0.28, 1)
 knockback_force = 560.0
+isolated_bonus_damage = 2
 interrupt_attack_prep = true
 attack_flash_color = Color(0.9, 0.71, 0.39, 0.78)
 attack_flash_start_scale = Vector2(0.84, 0.84)

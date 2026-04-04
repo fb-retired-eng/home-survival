@@ -21,7 +21,7 @@ The current run can start with hostile POIs already active, while wave enemies r
 The repo currently includes:
 - project scaffold and main scene setup
 - player movement, health, energy, melee/ranged attack, medicine use, and inventory tracking
-- multiple weapons, including POI-obtained baseball bat, pistol, and shotgun upgrades, bullet pickups, weapon switching, reloadable firearm behavior, true projectile-based pistol/shotgun shots, simple on-player weapon illustrations, and visible weapon-trait HUD text
+- multiple weapons, including POI-obtained baseball bat, pistol, and shotgun upgrades, bullet pickups, weapon switching, reloadable firearm behavior, true projectile-based pistol/shotgun shots, blocker-aware multi-pellet shotgun spread, bat/pistol/shotgun role tuning backed by a balance probe, simple on-player weapon illustrations, and visible weapon-trait HUD text
 - food as a prep resource, a dinner-at-table transition that starts the night wave, and bed-based sleep that returns the run to the next day with partial HP restore
 - six authored POIs, eight authored waves, roaming prep-stage exploration spawns, and six live enemy definitions including elite spitter and elite brute variants
 - exploration enemies now keep chasing while they remain effectively on the current player view, then drop aggro once sight is broken and they fall off-screen/far enough away

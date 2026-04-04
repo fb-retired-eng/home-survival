@@ -44,6 +44,8 @@ class_name WeaponDefinition
 @export var uses_projectile: bool = false
 @export_range(0.0, 2400.0, 10.0) var projectile_speed: float = 1000.0
 @export_range(0.0, 64.0, 1.0) var projectile_hit_radius: float = 6.0
+@export_range(1, 12, 1) var projectile_count: int = 1
+@export_range(0.0, 180.0, 1.0) var projectile_spread_degrees: float = 0.0
 @export var projectile_polygon: PackedVector2Array = PackedVector2Array([
 	Vector2(-2.0, -6.0),
 	Vector2(2.0, -6.0),
@@ -121,6 +123,10 @@ func is_valid_definition() -> bool:
 	if projectile_speed < 0.0:
 		return false
 	if projectile_hit_radius < 0.0:
+		return false
+	if projectile_count <= 0:
+		return false
+	if projectile_spread_degrees < 0.0:
 		return false
 	if uses_projectile and projectile_polygon.size() < 3:
 		return false

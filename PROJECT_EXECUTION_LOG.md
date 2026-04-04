@@ -1974,3 +1974,24 @@ Validation:
 - `pause_probe_active_wave_quit_label=Quit Without Saving`
 - `pause_probe_active_wave_quit_back_to_menu=true`
 - `save_probe_continue_did_not_rewrite=true`
+
+## 2026-04-03 Weapon Role Follow-Up
+- Reworked the shotgun into a real pellet-spread firearm by extending `WeaponDefinition` with projectile-count and spread fields, then taught `player_combat_controller.gd` to spawn blocker-aware pellet paths instead of the previous fake per-target shotgun routing.
+- Fixed the shotgun regression where spread shots ignored nearby blocking geometry, and normalized pellet damage so one shell no longer multiplied into an unintended point-blank brute delete.
+- Tightened the shotgun spread from `16` to `14` degrees so close-range brute kills land reliably in two shells without pushing the shotgun back into a universal one-shot answer.
+- Restored the baseball bat's heavy single-target niche by adding a small isolated-damage bonus, so it now cleanly one-shots basic and runner enemies while still taking two hits for a brute.
+
+Validation:
+- `shotgun_probe_health_a_after=38`
+- `shotgun_probe_health_b_after=14`
+- `shotgun_probe_health_c_after=38`
+- `weapon_blocked_by_structure_probe_wall_blocked_bat_health=50`
+- `weapon_blocked_by_structure_probe_open_bat_health=0`
+- `weapon_blocked_by_structure_probe_door_blocked_pistol_health=50`
+- `weapon_balance_probe_baseball_bat_vs_basic=defeated:true,shots:1,time:1.18,ammo:0`
+- `weapon_balance_probe_baseball_bat_vs_runner=defeated:true,shots:1,time:1.18,ammo:0`
+- `weapon_balance_probe_baseball_bat_vs_brute=defeated:true,shots:2,time:2.36,ammo:0`
+- `weapon_balance_probe_shotgun_vs_basic=defeated:true,shots:1,time:1.18,ammo:1`
+- `weapon_balance_probe_shotgun_vs_runner=defeated:true,shots:1,time:1.18,ammo:1`
+- `weapon_balance_probe_shotgun_vs_brute=defeated:true,shots:2,time:2.36,ammo:2`
+- `save_probe_continue_did_not_rewrite=true`
