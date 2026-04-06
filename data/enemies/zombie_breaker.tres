@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_definition.gd" id="1_enemy_definition"]
+
+[resource]
+script = ExtResource("1_enemy_definition")
+enemy_id = &"zombie_breaker"
+body_color = Color(0.46, 0.34, 0.26, 1)
+shadow_polygon = PackedVector2Array(-15, -7, 15, -7, 20, 0, 15, 7, -15, 7, -20, 0)
+body_polygon = PackedVector2Array(-12, -14, 12, -14, 15, 2, 10, 13, 0, 16, -10, 13, -15, 2)
+facing_marker_polygon = PackedVector2Array(0, -22, 7, -8, -7, -8)
+attack_tell_polygon = PackedVector2Array(-11, -28, 11, -28, 16, -10, 0, 9, -16, -10)
+attack_flash_polygon = PackedVector2Array(-12, -29, 12, -29, 18, -8, 0, 10, -18, -8)
+max_health = 82
+defense_flat_reduction = 1
+move_speed = 35.0
+player_damage = 12
+structure_damage = 16
+structure_damage_type = &"crush"
+attack_interval = 1.28
+attack_prep_time = 0.62
+wave_target_mode = 2
+exploration_target_mode = 3
+chase_player_when_nearby = true
+idle_until_player_detected = true
+noise_alert_weight = 1.7
+player_detection_radius = 84.0
+player_chase_break_radius = 126.0
+prefers_powered_placeables = true
+presentation_scale = Vector2(1.1, 1.08)
+visual_turn_speed = 6.0
+attack_tell_color = Color(0.98, 0.68, 0.34, 0.78)
+drop_salvage = 2
+bonus_salvage_chance = 0.3

@@ -1,0 +1,16 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/contract_board_point.gd" id="1_board"]
+
+[sub_resource type="RectangleShape2D" id="1_board_shape"]
+size = Vector2(40, 28)
+
+[node name="ContractBoardPoint" type="Area2D"]
+script = ExtResource("1_board")
+
+[node name="Visual" type="Polygon2D" parent="."]
+color = Color(0.72, 0.68, 0.46, 1)
+polygon = PackedVector2Array(-20, -14, 20, -14, 20, 14, -20, 14)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("1_board_shape")

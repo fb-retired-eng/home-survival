@@ -23,7 +23,7 @@ The repo currently includes:
 - player movement, health, energy, melee/ranged attack, medicine use, and inventory tracking
 - multiple weapons, including POI-obtained baseball bat, pistol, and shotgun upgrades, bullet pickups, weapon switching, reloadable firearm behavior, true projectile-based pistol/shotgun shots, blocker-aware multi-pellet shotgun spread, bat/pistol/shotgun role tuning backed by a balance probe, simple on-player weapon illustrations, and visible weapon-trait HUD text
 - food as a prep resource, a dinner-at-table transition that starts the night wave, and bed-based sleep that returns the run to the next day with partial HP restore
-- six authored POIs, eight authored waves, roaming prep-stage exploration spawns, and six live enemy definitions including elite spitter and elite brute variants
+- six authored POIs, eight authored waves, roaming prep-stage exploration spawns, and eight live enemy definitions including screamer, breaker, elite spitter, and elite brute variants
 - exploration enemies now keep chasing while they remain effectively on the current player view, then drop aggro once sight is broken and they fall off-screen/far enough away
 - fortified wall/door upgrades beyond the original reinforced tier
 - review-driven guardrails around elite-only weapon drops, spitter structure range, reset-state UI consistency, and bat-only attack interrupt behavior
@@ -39,6 +39,14 @@ The repo currently includes:
   - Dog companion support with follow, feed, known-POI scavenging, night lure, HUD status, and save/load
   - generator-based power management with battery upgrades, powered turrets, and floodlights
   - heirloom debris on previously broken fortified sockets, plus a small legacy-perk layer at boot
+- MVP2 expansion systems now live:
+  - daytime patrol pressure through scene-authored patrol routes and a dedicated `PatrolDirector`
+  - daily POI events that modify reward pressure and guard expectations, including event-owned forced-elite pressure
+  - a home contract board with day-specific objectives and rewards chosen from the live event/depletion-aware world state
+  - powered-construction expansion with `Power Relay`, plus earlier utility placeables (`alarm beacon`, `repair station`, `ammo locker`)
+  - wave- and day-facing enemy counterplay through `screamer` and `breaker`
+  - one-per-day mutators that currently modify patrol count, salvage yield, floodlight strength, POI guard pressure, and enemy movement pressure
+  - expanded legacy-perk pool with `ammo cache`, `scrapper`, and `trainer`
 - the largest runtime scripts have been cut back into scene-owned controllers:
   - `game.gd` now delegates MVP1 run state, phase flow, POI logic, exploration, construction, and fog to child controllers
   - `enemy.gd` now delegates targeting, combat, presentation, movement, and runtime/drop plumbing to dedicated enemy controllers
@@ -88,6 +96,7 @@ godot --headless --path . --quit
 - [`MVP0_SPEC.md`](MVP0_SPEC.md): implementation source of truth
 - [`MVP0_5_SPEC.md`](MVP0_5_SPEC.md): bridge spec for menu, settings, save/load, and persistence
 - [`MVP1_SPEC.md`](MVP1_SPEC.md): expansion spec for power, dog synergy, and heirlooms
+- [`MVP2_SPEC.md`](MVP2_SPEC.md): pressure, POI events, contracts, counterplay enemies, mutators, and powered-expansion roadmap
 - [`MVP0_ONE_PAGER.md`](MVP0_ONE_PAGER.md): product framing
 - [`TASK_BREAKDOWN.md`](TASK_BREAKDOWN.md): milestone plan
 - [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md): coding and review workflow, including the picky post-change review rule
@@ -111,9 +120,9 @@ godot --headless --path . --quit
 - [`data/`](data): future data-driven content definitions
 
 ## Next Development Steps
-- run a full MVP1 playtest pass covering Dog commands, generator upgrades, battery scarcity, and heirloom carryover
-- tune Dog scavenging haul, lure stamina pressure, and known-POI usefulness against real prep-route choices
-- tune battery availability and powered-placeable value so turret/floodlight choices stay meaningful
-- decide whether the next post-MVP1 step is broader powered construction, more enemy variety, or deeper meta progression
-- continue weapon/combat tuning with the balance probe now that projectile firearms and shotgun spread are stable
+- run a full MVP2 playtest pass covering patrol pressure, daily event variety, contract reward value, and relay-driven base layouts
+- tune mutator intensity so `strong_lights`, `restless_dead`, and `extra_patrols` change the day meaningfully without making routes unreadable
+- tune screamer and breaker wave pressure against turret/floodlight/alarm-beacon clusters
+- decide whether the next post-MVP2 step is more powered utility depth, more POI-event variety, or a broader contract/intel layer
+- continue weapon/combat tuning with the balance probe now that projectile firearms, spread shotgun behavior, and new defense-side enemies are stable
 - continue HUD and readability polish from playtest feedback

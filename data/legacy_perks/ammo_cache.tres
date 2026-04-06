@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1_definition")
-perk_id = &"dog_pack"
-display_name = "Dog +25 Max Stamina"
-description = "Your dog starts each run with more stamina."
-dog_max_stamina_bonus = 25
+perk_id = &"ammo_cache"
+display_name = "+6 Bullets"
+description = "Start each run with extra ammunition."
+stash_bullets_bonus = 6

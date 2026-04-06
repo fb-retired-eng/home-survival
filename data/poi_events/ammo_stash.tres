@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PoiEventDefinition" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/poi_event_definition.gd" id="1_event"]
+
+[resource]
+script = ExtResource("1_event")
+event_id = &"ammo_stash"
+display_name = "Ammo Stash"
+description = "Loose ammunition is still scattered here."
+reward_bonus = {
+"bullets": 4
+}
+guard_count_delta = 1
+eligible_reward_roles = Array[StringName]([&"ammo"])
+event_tint = Color(1, 0.72, 0.34, 1)

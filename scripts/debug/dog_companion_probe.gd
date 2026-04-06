@@ -15,6 +15,7 @@ func _init() -> void:
 	var game = game_scene.instantiate()
 	root.add_child(game)
 	await _wait_frames(3)
+	game.mvp2_run_controller.active_mutator_id = StringName()
 
 	var player = game.player
 	var dog = game.dog

@@ -7,6 +7,9 @@ const LEGACY_PERK_DEFINITIONS := [
 	preload("res://data/legacy_perks/max_energy.tres"),
 	preload("res://data/legacy_perks/prepared_stash.tres"),
 	preload("res://data/legacy_perks/dog_pack.tres"),
+	preload("res://data/legacy_perks/ammo_cache.tres"),
+	preload("res://data/legacy_perks/scrapper.tres"),
+	preload("res://data/legacy_perks/trainer.tres"),
 ]
 
 var _settings_manager

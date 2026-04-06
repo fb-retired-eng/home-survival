@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PoiEventDefinition" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/poi_event_definition.gd" id="1_event"]
+
+[resource]
+script = ExtResource("1_event")
+event_id = &"battery_cache"
+display_name = "Battery Cache"
+description = "A rumored battery stash drew attention here."
+reward_bonus = {
+"battery": 1
+}
+guard_count_delta = 1
+eligible_reward_roles = Array[StringName]([&"parts", &"mixed", &"ammo"])
+event_tint = Color(0.66, 0.9, 1, 1)

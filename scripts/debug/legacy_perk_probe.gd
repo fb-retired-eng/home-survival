@@ -36,4 +36,23 @@ func _init() -> void:
 	print("legacy_probe_dog_max_stamina=%d" % int(dog_game.dog.max_stamina))
 	dog_game.queue_free()
 	await _wait_frames(2)
+
+	var ammo_game = _spawn_game("ammo_cache")
+	await _wait_frames(3)
+	print("legacy_probe_ammo_cache_bullets=%d" % int(ammo_game.player.resources.get("bullets", 0)))
+	ammo_game.queue_free()
+	await _wait_frames(2)
+
+	var scrapper_game = _spawn_game("scrapper")
+	await _wait_frames(3)
+	print("legacy_probe_scrapper_energy=%d" % int(scrapper_game.player.max_energy))
+	print("legacy_probe_scrapper_battery=%d" % int(scrapper_game.player.resources.get("battery", 0)))
+	scrapper_game.queue_free()
+	await _wait_frames(2)
+
+	var trainer_game = _spawn_game("trainer")
+	await _wait_frames(3)
+	print("legacy_probe_trainer_dog_stamina=%d" % int(trainer_game.dog.max_stamina))
+	trainer_game.queue_free()
+	await _wait_frames(2)
 	quit()

@@ -333,8 +333,12 @@ func _spawn_next_enemy() -> void:
 			var world_root := _enemy_parent.get_parent() if _enemy_parent != null else null
 			var placeables_root := world_root.get_node_or_null("ConstructionPlaceables") if world_root != null else null
 			enemy.configure_runtime_context(_player, _enemy_parent, placeables_root)
+			var game_root := world_root.get_parent() if world_root != null else null
+			var mvp2_run_controller = game_root.get_node_or_null("Mvp2RunController") if game_root != null else null
+			if mvp2_run_controller != null and enemy.has_method("set_external_move_speed_multiplier"):
+				enemy.set_external_move_speed_multiplier(mvp2_run_controller.get_mutator_enemy_speed_multiplier())
 		if enemy.has_method("configure_wave_context"):
-			enemy.configure_wave_context(
+				enemy.configure_wave_context(
 				_player,
 				_get_defense_sockets(),
 				preferred_socket_ids

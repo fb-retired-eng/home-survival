@@ -63,6 +63,7 @@ var _visual_movement_ratio: float = 0.0
 var _visual_bob_offset_y: float = 0.0
 var _visual_body_rotation: float = 0.0
 var _threat_indicator_grace_remaining: float = 0.0
+var _scream_cooldown_remaining: float = 0.0
 var _presentation_scale: Vector2 = Vector2.ONE
 var _visual_bob_height: float = 1.2
 var _visual_breathe_scale: float = 0.016
@@ -76,6 +77,9 @@ var _damage_feedback_distance: float = 4.0
 var _damage_feedback_scale: Vector2 = Vector2(1.06, 0.94)
 var _damage_feedback_duration: float = 0.12
 var _damage_feedback_rotation_offset: float = 0.0
+var _has_patrol_target: bool = false
+var _patrol_target_position: Vector2 = Vector2.ZERO
+var _external_move_speed_multiplier: float = 1.0
 
 @onready var body_shadow: Polygon2D = $BodyShadow
 @onready var state_indicator: Polygon2D = $StateIndicator
@@ -197,6 +201,22 @@ func is_engaged_with_player() -> bool:
 	return _is_chasing_player or runtime_controller.is_player_body_touching(live_player)
 
 
+func set_patrol_target_position(target_position: Vector2) -> void:
+	_has_patrol_target = true
+	_patrol_target_position = target_position
+
+
+func clear_patrol_target_position() -> void:
+	_has_patrol_target = false
+	_patrol_target_position = Vector2.ZERO
+
+
+func set_external_move_speed_multiplier(multiplier: float) -> void:
+	_external_move_speed_multiplier = maxf(multiplier, 0.0)
+	if definition != null:
+		move_speed = definition.move_speed * _external_move_speed_multiplier
+
+
 func is_investigating_noise() -> bool:
 	return targeting_controller.has_active_noise_investigation()
 
@@ -225,6 +245,7 @@ func _physics_process(delta: float) -> void:
 	_noise_investigation_detect_delay_remaining = max(_noise_investigation_detect_delay_remaining - delta, 0.0)
 	_slow_effect_remaining = max(_slow_effect_remaining - delta, 0.0)
 	_threat_indicator_grace_remaining = max(_threat_indicator_grace_remaining - delta, 0.0)
+	_scream_cooldown_remaining = max(_scream_cooldown_remaining - delta, 0.0)
 	if _slow_effect_remaining <= 0.0:
 		_slow_effect_multiplier = 1.0
 	movement_controller.decay_knockback(delta)
@@ -245,6 +266,13 @@ func _physics_process(delta: float) -> void:
 		velocity = movement_controller.compute_move_velocity(primary_target)
 		if not velocity.is_zero_approx():
 			_update_facing_direction(velocity)
+	elif _behavior_context == &"exploration" and _has_patrol_target:
+		var patrol_offset := _patrol_target_position - global_position
+		if patrol_offset.length() <= 6.0:
+			velocity = Vector2.ZERO
+		else:
+			velocity = patrol_offset.normalized() * move_speed * _slow_effect_multiplier
+			_update_facing_direction(patrol_offset)
 	else:
 		if primary_target != null and is_instance_valid(primary_target):
 			_update_facing_direction(combat_controller.get_target_point(primary_target) - global_position)
@@ -256,6 +284,10 @@ func _physics_process(delta: float) -> void:
 
 	if movement_controller.is_under_knockback():
 		return
+
+	if definition != null and float(definition.scream_alert_radius) > 0.0 and _is_chasing_player and _scream_cooldown_remaining <= 0.0:
+		targeting_controller.emit_scream_alert(runtime_controller.get_live_player())
+		_scream_cooldown_remaining = maxf(float(definition.scream_interval), 0.5)
 
 	var attack_target: Variant = combat_controller.get_attack_target(primary_target)
 	var is_attack_delayed: bool = combat_controller.process_attack_prep(attack_target)
@@ -327,6 +359,7 @@ func _apply_definition() -> void:
 	defense_flat_reduction = definition.defense_flat_reduction
 	defense_multiplier = definition.defense_multiplier
 	move_speed = definition.move_speed
+	move_speed *= _external_move_speed_multiplier
 	player_damage = definition.player_damage
 	player_knockback_force = definition.player_knockback_force
 	structure_damage = definition.structure_damage

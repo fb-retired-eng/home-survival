@@ -235,6 +235,8 @@ func sync_exploration_enemies() -> void:
 			enemy.global_position = get_exploration_spawn_position(child)
 			if enemy.has_method("configure_runtime_context"):
 				enemy.configure_runtime_context(player, exploration_enemy_layer, _get_placeables_root())
+			if poi_controller != null and poi_controller.mvp2_run_controller != null and enemy.has_method("set_external_move_speed_multiplier"):
+				enemy.set_external_move_speed_multiplier(poi_controller.mvp2_run_controller.get_mutator_enemy_speed_multiplier())
 			enemy.set_meta("spawn_id", spawn_id)
 			var initial_facing: Vector2 = Vector2.ZERO
 			if child.has_method("get_initial_facing_vector"):
@@ -287,6 +289,8 @@ func spawn_roaming_exploration_enemies() -> void:
 		enemy.global_position = get_roaming_spawn_position(zone)
 		if enemy.has_method("configure_runtime_context"):
 			enemy.configure_runtime_context(player, exploration_enemy_layer, _get_placeables_root())
+		if poi_controller != null and poi_controller.mvp2_run_controller != null and enemy.has_method("set_external_move_speed_multiplier"):
+			enemy.set_external_move_speed_multiplier(poi_controller.mvp2_run_controller.get_mutator_enemy_speed_multiplier())
 		enemy.set_meta("spawn_kind", "roaming")
 		var initial_facing := Vector2.RIGHT.rotated(randf() * TAU)
 		if enemy.has_method("configure_exploration_context"):

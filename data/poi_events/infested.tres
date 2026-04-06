@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="PoiEventDefinition" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/poi_event_definition.gd" id="1_event"]
+
+[resource]
+script = ExtResource("1_event")
+event_id = &"infested"
+display_name = "Infested"
+description = "More enemies are roaming this POI than usual."
+guard_count_delta = 2
+event_tint = Color(1, 0.52, 0.44, 1)

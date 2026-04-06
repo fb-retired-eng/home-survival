@@ -38,6 +38,25 @@
 [ext_resource type="Script" path="res://scripts/main/mvp1_run_controller.gd" id="54_mvp1_run_controller"]
 [ext_resource type="Script" path="res://scripts/main/run_phase_controller.gd" id="55_run_phase_controller"]
 [ext_resource type="Script" path="res://scripts/main/power_manager.gd" id="50_power_manager"]
+[ext_resource type="Script" path="res://scripts/main/patrol_director.gd" id="59_patrol_director"]
+[ext_resource type="Script" path="res://scripts/main/mvp2_run_controller.gd" id="60_mvp2_run_controller"]
+[ext_resource type="PackedScene" path="res://scenes/world/ContractBoardPoint.tscn" id="61_contract_board_scene"]
+[ext_resource type="Script" path="res://scripts/world/patrol_route_point.gd" id="62_patrol_route_point"]
+[ext_resource type="Resource" path="res://data/placeables/power_relay.tres" id="63_power_relay_profile"]
+[ext_resource type="Resource" path="res://data/poi_events/battery_cache.tres" id="64_poi_event_battery_cache"]
+[ext_resource type="Resource" path="res://data/poi_events/infested.tres" id="65_poi_event_infested"]
+[ext_resource type="Resource" path="res://data/poi_events/field_hospital.tres" id="66_poi_event_field_hospital"]
+[ext_resource type="Resource" path="res://data/poi_events/guarded_shipment.tres" id="67_poi_event_guarded_shipment"]
+[ext_resource type="Resource" path="res://data/poi_events/ammo_stash.tres" id="68_poi_event_ammo_stash"]
+[ext_resource type="Resource" path="res://data/mutators/extra_patrols.tres" id="69_mutator_extra_patrols"]
+[ext_resource type="Resource" path="res://data/mutators/rich_salvage.tres" id="70_mutator_rich_salvage"]
+[ext_resource type="Resource" path="res://data/mutators/strong_lights.tres" id="71_mutator_strong_lights"]
+[ext_resource type="Resource" path="res://data/mutators/restless_dead.tres" id="72_mutator_restless_dead"]
+[ext_resource type="Resource" path="res://data/enemies/zombie_screamer.tres" id="73_screamer_enemy"]
+[ext_resource type="Resource" path="res://data/enemies/zombie_breaker.tres" id="74_breaker_enemy"]
+[ext_resource type="Resource" path="res://data/legacy_perks/ammo_cache.tres" id="75_legacy_ammo_cache"]
+[ext_resource type="Resource" path="res://data/legacy_perks/scrapper.tres" id="76_legacy_scrapper"]
+[ext_resource type="Resource" path="res://data/legacy_perks/trainer.tres" id="77_legacy_trainer"]
 [ext_resource type="Resource" path="res://data/pois/poi_a_definition.tres" id="41_poi_a_definition"]
 [ext_resource type="Resource" path="res://data/pois/poi_b_definition.tres" id="42_poi_b_definition"]
 [ext_resource type="Resource" path="res://data/pois/poi_c_definition.tres" id="43_poi_c_definition"]
@@ -47,6 +66,9 @@
 [ext_resource type="PackedScene" path="res://scenes/world/Dog.tscn" id="47_dog_scene"]
 [ext_resource type="Resource" path="res://data/placeables/turret.tres" id="48_turret_profile"]
 [ext_resource type="Resource" path="res://data/placeables/floodlight.tres" id="49_floodlight_profile"]
+[ext_resource type="Resource" path="res://data/placeables/alarm_beacon.tres" id="56_alarm_beacon_profile"]
+[ext_resource type="Resource" path="res://data/placeables/repair_station.tres" id="57_repair_station_profile"]
+[ext_resource type="Resource" path="res://data/placeables/ammo_locker.tres" id="58_ammo_locker_profile"]
 [ext_resource type="Resource" path="res://data/legacy_perks/prepared_stash.tres" id="51_legacy_prepared_stash"]
 [ext_resource type="Resource" path="res://data/legacy_perks/dog_pack.tres" id="52_legacy_dog_pack"]
 
@@ -87,13 +109,16 @@ poi_definitions = Array[Resource]([ExtResource("41_poi_a_definition"), ExtResour
 construction_placeable_scene = ExtResource("30_placeable_scene")
 resource_pickup_scene = ExtResource("35_resource_pickup_scene")
 barricade_placeable_profile = ExtResource("31_barricade_profile")
-buildable_placeable_profiles = Array[Resource]([ExtResource("31_barricade_profile"), ExtResource("32_spike_trap_profile"), ExtResource("48_turret_profile"), ExtResource("49_floodlight_profile")])
-legacy_perk_definitions = Array[Resource]([ExtResource("22_legacy_max_energy"), ExtResource("51_legacy_prepared_stash"), ExtResource("52_legacy_dog_pack")])
+buildable_placeable_profiles = Array[Resource]([ExtResource("31_barricade_profile"), ExtResource("32_spike_trap_profile"), ExtResource("48_turret_profile"), ExtResource("49_floodlight_profile"), ExtResource("56_alarm_beacon_profile"), ExtResource("57_repair_station_profile"), ExtResource("58_ammo_locker_profile"), ExtResource("63_power_relay_profile")])
+legacy_perk_definitions = Array[Resource]([ExtResource("22_legacy_max_energy"), ExtResource("51_legacy_prepared_stash"), ExtResource("52_legacy_dog_pack"), ExtResource("75_legacy_ammo_cache"), ExtResource("76_legacy_scrapper"), ExtResource("77_legacy_trainer")])
+poi_event_definitions = Array[Resource]([ExtResource("64_poi_event_battery_cache"), ExtResource("65_poi_event_infested"), ExtResource("66_poi_event_field_hospital"), ExtResource("67_poi_event_guarded_shipment"), ExtResource("68_poi_event_ammo_stash")])
 enable_test_mode = true
 test_mode_weapons = Array[Resource]([ExtResource("17_baseball_bat"), ExtResource("18_pistol"), ExtResource("19_shotgun")])
 roaming_early_enemies = Array[Resource]([ExtResource("16_basic_enemy"), ExtResource("23_runner_enemy")])
-roaming_mid_enemies = Array[Resource]([ExtResource("16_basic_enemy"), ExtResource("23_runner_enemy"), ExtResource("26_brute_enemy")])
-roaming_late_enemies = Array[Resource]([ExtResource("16_basic_enemy"), ExtResource("23_runner_enemy"), ExtResource("26_brute_enemy"), ExtResource("24_spitter_enemy")])
+roaming_mid_enemies = Array[Resource]([ExtResource("16_basic_enemy"), ExtResource("23_runner_enemy"), ExtResource("26_brute_enemy"), ExtResource("73_screamer_enemy")])
+roaming_late_enemies = Array[Resource]([ExtResource("16_basic_enemy"), ExtResource("23_runner_enemy"), ExtResource("26_brute_enemy"), ExtResource("24_spitter_enemy"), ExtResource("73_screamer_enemy"), ExtResource("74_breaker_enemy")])
+daily_mutator_definitions = Array[Resource]([ExtResource("69_mutator_extra_patrols"), ExtResource("70_mutator_rich_salvage"), ExtResource("71_mutator_strong_lights"), ExtResource("72_mutator_restless_dead")])
+patrol_enemy_definitions = Array[Resource]([ExtResource("16_basic_enemy"), ExtResource("23_runner_enemy"), ExtResource("73_screamer_enemy"), ExtResource("74_breaker_enemy")])
 
 [node name="GameManager" type="Node" parent="." unique_id=1744512340]
 script = ExtResource("4_game_manager")
@@ -120,6 +145,12 @@ script = ExtResource("54_mvp1_run_controller")
 
 [node name="RunPhaseController" type="Node" parent="." unique_id=347891006]
 script = ExtResource("55_run_phase_controller")
+
+[node name="Mvp2RunController" type="Node" parent="." unique_id=347891007]
+script = ExtResource("60_mvp2_run_controller")
+
+[node name="PatrolDirector" type="Node" parent="." unique_id=347891008]
+script = ExtResource("59_patrol_director")
 
 [node name="FogController" type="Node" parent="." unique_id=1984275659]
 script = ExtResource("34_fog_controller")
@@ -199,6 +230,7 @@ position = Vector2(2180, 404)
 script = ExtResource("36_micro_loot_spawn")
 spawn_id = &"micro_ne_depot_battery"
 resource_id = "battery"
+amount = 2
 
 [node name="NorthCenterFood" type="Marker2D" parent="World/MicroLootSpawns" unique_id=2116939616]
 position = Vector2(1280, 326)
@@ -271,6 +303,7 @@ position = Vector2(1508, 1272)
 script = ExtResource("36_micro_loot_spawn")
 spawn_id = &"micro_scrapyard_battery"
 resource_id = "battery"
+amount = 2
 
 [node name="NorthLane" type="Polygon2D" parent="World" unique_id=348883657]
 color = Color(0.46, 0.19, 0.16, 0.5)
@@ -871,6 +904,9 @@ position = Vector2(1232, 720)
 [node name="GeneratorPoint" parent="World" unique_id=1428063010 instance=ExtResource("21_generator_scene")]
 position = Vector2(1180, 720)
 
+[node name="ContractBoardPoint" parent="World" unique_id=1428063011 instance=ExtResource("61_contract_board_scene")]
+position = Vector2(1396, 720)
+
 [node name="DefenseSockets" type="Node2D" parent="World" unique_id=1508673809]
 
 [node name="ExplorationSpawnPoints" type="Node2D" parent="World" unique_id=360507860]
@@ -1015,6 +1051,50 @@ position = Vector2(1284, 1038)
 script = ExtResource("25_roaming_zone")
 zone_id = &"roam_s_scrapyard"
 spawn_weight = 0.75
+
+[node name="PatrolRoutes" type="Node2D" parent="World" unique_id=1538528862]
+
+[node name="NorthLoop_0" type="Marker2D" parent="World/PatrolRoutes" unique_id=1538528863]
+position = Vector2(960, 308)
+script = ExtResource("62_patrol_route_point")
+patrol_id = &"north_loop"
+order_index = 0
+arrival_radius = 26.0
+
+[node name="NorthLoop_1" type="Marker2D" parent="World/PatrolRoutes" unique_id=1538528864]
+position = Vector2(1284, 234)
+script = ExtResource("62_patrol_route_point")
+patrol_id = &"north_loop"
+order_index = 1
+arrival_radius = 26.0
+
+[node name="NorthLoop_2" type="Marker2D" parent="World/PatrolRoutes" unique_id=1538528865]
+position = Vector2(1618, 316)
+script = ExtResource("62_patrol_route_point")
+patrol_id = &"north_loop"
+order_index = 2
+arrival_radius = 26.0
+
+[node name="SouthLoop_0" type="Marker2D" parent="World/PatrolRoutes" unique_id=1538528866]
+position = Vector2(964, 1118)
+script = ExtResource("62_patrol_route_point")
+patrol_id = &"south_loop"
+order_index = 0
+arrival_radius = 26.0
+
+[node name="SouthLoop_1" type="Marker2D" parent="World/PatrolRoutes" unique_id=1538528867]
+position = Vector2(1296, 1194)
+script = ExtResource("62_patrol_route_point")
+patrol_id = &"south_loop"
+order_index = 1
+arrival_radius = 26.0
+
+[node name="SouthLoop_2" type="Marker2D" parent="World/PatrolRoutes" unique_id=1538528868]
+position = Vector2(1624, 1110)
+script = ExtResource("62_patrol_route_point")
+patrol_id = &"south_loop"
+order_index = 2
+arrival_radius = 26.0
 
 [node name="ExplorationEnemies" type="Node2D" parent="World" unique_id=1108712987]
 

@@ -160,6 +160,12 @@ func receive_ally_alert(player_ref) -> void:
 	alert_to_player(player_ref, false)
 
 
+func emit_scream_alert(player_ref) -> void:
+	if player_ref == null or not is_instance_valid(player_ref):
+		return
+	_alert_nearby_enemies(player_ref, _get_scream_alert_radius())
+
+
 func get_noise_alert_weight() -> float:
 	if enemy.definition == null:
 		return 1.0
@@ -230,7 +236,16 @@ func _get_closest_intact_structure():
 	if not preferred_structures.is_empty():
 		return _get_closest_structure_from_list(preferred_structures)
 
-	return _get_closest_structure_from_list(_get_all_structure_targets())
+	var structures: Array = _get_all_structure_targets()
+	if enemy.definition != null and bool(enemy.definition.prefers_powered_placeables):
+		var powered_structures: Array = []
+		for structure in structures:
+			if structure != null and is_instance_valid(structure) and structure.has_method("is_powered") and bool(structure.is_powered()):
+				powered_structures.append(structure)
+		if not powered_structures.is_empty():
+			return _get_closest_structure_from_list(powered_structures)
+
+	return _get_closest_structure_from_list(structures)
 
 
 func _get_intact_preferred_structures() -> Array:
@@ -274,6 +289,14 @@ func _get_all_structure_targets() -> Array:
 		if placeable.has_method("is_breached") and placeable.is_breached():
 			continue
 		structures.append(placeable)
+	if enemy.definition != null and bool(enemy.definition.prefers_powered_placeables):
+		structures.sort_custom(func(a, b):
+			var a_powered := bool(a.has_method("is_powered") and a.is_powered())
+			var b_powered := bool(b.has_method("is_powered") and b.is_powered())
+			if a_powered != b_powered:
+				return a_powered and not b_powered
+			return enemy.global_position.distance_squared_to(a.global_position) < enemy.global_position.distance_squared_to(b.global_position)
+		)
 	return structures
 
 
@@ -350,6 +373,12 @@ func _get_ally_alert_radius() -> float:
 	return enemy.definition.ally_alert_radius
 
 
+func _get_scream_alert_radius() -> float:
+	if enemy.definition == null:
+		return 0.0
+	return enemy.definition.scream_alert_radius
+
+
 func _get_player_lost_sight_break_radius() -> float:
 	var detection_radius := get_player_detection_radius()
 	var chase_break_radius := get_player_chase_break_radius()
@@ -398,11 +427,11 @@ func _is_facing_target_for_detection(target) -> bool:
 	return enemy._facing_direction.dot(target_direction) >= _get_detection_facing_dot_threshold()
 
 
-func _alert_nearby_enemies(player_ref) -> void:
+func _alert_nearby_enemies(player_ref, override_radius: float = -1.0) -> void:
 	if not _should_alert_nearby_enemies():
 		return
 
-	var alert_radius := _get_ally_alert_radius()
+	var alert_radius := _get_ally_alert_radius() if override_radius < 0.0 else override_radius
 	if alert_radius <= 0.0:
 		return
 

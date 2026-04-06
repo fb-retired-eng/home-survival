@@ -4,28 +4,25 @@
 
 [resource]
 script = ExtResource("1_profile")
-placeable_id = &"turret"
-display_name = "Turret"
-category = "turret"
+placeable_id = &"power_relay"
+display_name = "Power Relay"
+category = "utility"
 placement_layer = "utility"
 footprint_cells = PackedVector2Array(0, 0)
 build_cost = {
-"parts": 7,
-"salvage": 13
+"battery": 1,
+"parts": 5,
+"salvage": 10
 }
 repair_cost = {
 "parts": 2,
 "salvage": 4
 }
-max_hp = 90
+max_hp = 75
 blocks_movement = false
 blocks_projectiles = false
-interaction_priority = 13
-power_draw = 2
-fire_range = 240.0
-fire_arc = 360.0
-fire_interval = 0.48
-attack_damage = 28
-bullet_cost_per_shot = 1
+interaction_priority = 12
+power_draw = 1
+fire_range = 180.0
 line_of_fire_required = false
-visual_color = Color(0.72, 0.48, 0.34, 1)
+visual_color = Color(0.54, 0.82, 0.98, 1)

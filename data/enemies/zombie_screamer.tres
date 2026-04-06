@@ -1,0 +1,37 @@
+[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_definition.gd" id="1_enemy_definition"]
+
+[resource]
+script = ExtResource("1_enemy_definition")
+enemy_id = &"zombie_screamer"
+body_color = Color(0.78, 0.48, 0.42, 1)
+shadow_polygon = PackedVector2Array(-11, -6, 11, -6, 15, 0, 11, 6, -11, 6, -15, 0)
+body_polygon = PackedVector2Array(-9, -13, 9, -13, 11, 2, 5, 11, -5, 11, -11, 2)
+facing_marker_polygon = PackedVector2Array(0, -20, 7, -8, -7, -8)
+attack_tell_polygon = PackedVector2Array(-9, -24, 9, -24, 12, -8, 0, 6, -12, -8)
+attack_flash_polygon = PackedVector2Array(-10, -24, 10, -24, 14, -8, 0, 8, -14, -8)
+max_health = 42
+move_speed = 42.0
+player_damage = 8
+structure_damage = 5
+attack_interval = 1.8
+attack_prep_time = 0.46
+wave_target_mode = 1
+exploration_target_mode = 3
+chase_player_when_nearby = true
+chase_overrides_target_mode = true
+idle_until_player_detected = true
+ally_alert_radius = 90.0
+scream_alert_radius = 180.0
+scream_interval = 2.2
+noise_alert_weight = 1.2
+player_detection_radius = 104.0
+player_chase_break_radius = 152.0
+attack_player_on_contact = true
+presentation_scale = Vector2(0.98, 1.04)
+visual_bob_height = 1.4
+visual_turn_speed = 11.0
+attack_tell_color = Color(1, 0.58, 0.42, 0.74)
+drop_salvage = 1
+bonus_salvage_chance = 0.15

@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="DailyMutatorDefinition" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/daily_mutator_definition.gd" id="1_mutator"]
+
+[resource]
+script = ExtResource("1_mutator")
+mutator_id = &"rich_salvage"
+display_name = "Rich Salvage"
+description = "Scrap is easier to recover today."
+salvage_bonus = 1

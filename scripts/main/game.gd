@@ -23,11 +23,14 @@ signal return_to_menu_requested
 @export var perimeter_definition: Resource
 @export var default_daily_elite_enemy: Resource
 @export var poi_definitions: Array[Resource] = []
+@export var poi_event_definitions: Array[Resource] = []
 @export var construction_placeable_scene: PackedScene
 @export var resource_pickup_scene: PackedScene
 @export var barricade_placeable_profile: Resource
 @export var buildable_placeable_profiles: Array[Resource] = []
 @export var legacy_perk_definitions: Array[Resource] = []
+@export var daily_mutator_definitions: Array[Resource] = []
+@export var patrol_enemy_definitions: Array[Resource] = []
 @export var sleep_heal_amount: int = 25
 @export_range(1, 100, 1) var food_energy_per_unit: int = 25
 @export_range(0, 4, 1) var daily_poi_refill_base_nodes: int = 1
@@ -51,6 +54,7 @@ signal return_to_menu_requested
 @onready var world_root: Node2D = $World
 @onready var food_table: Area2D = $World/FoodTable
 @onready var generator_point: Area2D = $World/GeneratorPoint
+@onready var contract_board_point: Area2D = $World/ContractBoardPoint
 @onready var sleep_point: Area2D = $World/SleepPoint
 @onready var spawn_markers_root: Node2D = $World/SpawnMarkers
 @onready var defense_sockets: Node2D = $World/DefenseSockets
@@ -58,6 +62,7 @@ signal return_to_menu_requested
 @onready var player_camera: Camera2D = $Player/Camera2D
 @onready var exploration_spawn_points_root: Node2D = $World/ExplorationSpawnPoints
 @onready var roaming_spawn_zones_root: Node2D = $World/RoamingSpawnZones
+@onready var patrol_routes_root: Node2D = $World/PatrolRoutes
 @onready var construction_placeables: Node2D = $World/ConstructionPlaceables
 @onready var micro_loot_spawns_root: Node2D = $World/MicroLootSpawns
 @onready var ambient_pickups_root: Node2D = $World/AmbientPickups
@@ -69,6 +74,8 @@ signal return_to_menu_requested
 @onready var fog_controller = $FogController
 @onready var power_manager = $PowerManager
 @onready var mvp1_run_controller = $Mvp1RunController
+@onready var mvp2_run_controller = $Mvp2RunController
+@onready var patrol_director = $PatrolDirector
 @onready var run_phase_controller = $RunPhaseController
 @onready var dog = $Dog
 
@@ -135,6 +142,7 @@ func _ready() -> void:
 		"exploration_enemy_layer": exploration_enemy_layer,
 		"default_daily_elite_enemy": default_daily_elite_enemy,
 		"poi_definitions": poi_definitions,
+		"poi_event_definitions": poi_event_definitions,
 		"get_local_scavenge_nodes_callback": Callable(self, "_get_local_scavenge_nodes"),
 		"daily_poi_refill_base_nodes": daily_poi_refill_base_nodes,
 		"daily_poi_refill_bonus_chance": daily_poi_refill_bonus_chance,
@@ -174,6 +182,7 @@ func _ready() -> void:
 		"home_world_position": Vector2(1280.0, 720.0),
 	})
 	power_manager.configure({
+		"game_manager": game_manager,
 		"hud": hud,
 		"player": player,
 		"construction_placeables": construction_placeables,
@@ -194,6 +203,29 @@ func _ready() -> void:
 		"legacy_perk_definitions": legacy_perk_definitions,
 		"legacy_perk_id": legacy_perk_id,
 	})
+	patrol_director.configure({
+		"game_manager": game_manager,
+		"player": player,
+		"patrol_routes_root": patrol_routes_root,
+		"exploration_enemy_layer": exploration_enemy_layer,
+		"exploration_enemy_scene": exploration_enemy_scene,
+		"placeables_root": construction_placeables,
+		"patrol_enemy_definitions": patrol_enemy_definitions,
+	})
+	mvp2_run_controller.configure({
+		"game_manager": game_manager,
+		"player": player,
+		"hud": hud,
+		"poi_controller": poi_controller,
+		"patrol_director": patrol_director,
+		"wave_manager": wave_manager,
+		"defense_sockets": defense_sockets,
+		"daily_mutator_definitions": daily_mutator_definitions,
+	})
+	poi_controller.mvp2_run_controller = mvp2_run_controller
+	power_manager.mvp2_run_controller = mvp2_run_controller
+	if not poi_controller.poi_discovered.is_connected(Callable(mvp2_run_controller, "on_poi_discovered")):
+		poi_controller.poi_discovered.connect(Callable(mvp2_run_controller, "on_poi_discovered"))
 	run_phase_controller.configure({
 		"game_manager": game_manager,
 		"player": player,
@@ -208,11 +240,13 @@ func _ready() -> void:
 	})
 	food_table.configure(Callable(run_phase_controller, "can_player_eat"), Callable(run_phase_controller, "get_food_table_label"))
 	generator_point.configure(Callable(run_phase_controller, "can_player_upgrade_generator"), Callable(run_phase_controller, "get_generator_label"))
+	contract_board_point.configure(Callable(mvp2_run_controller, "can_player_access_contract_board"), Callable(mvp2_run_controller, "get_contract_board_label"))
 	sleep_point.configure(Callable(run_phase_controller, "can_player_sleep"), Callable(run_phase_controller, "get_sleep_label"))
 	wave_manager.wave_started.connect(Callable(run_phase_controller, "on_wave_started"))
 	wave_manager.wave_cleared.connect(Callable(run_phase_controller, "on_wave_cleared"))
 	food_table.table_requested.connect(Callable(run_phase_controller, "on_food_table_requested"))
 	generator_point.upgrade_requested.connect(Callable(run_phase_controller, "on_generator_upgrade_requested"))
+	contract_board_point.board_requested.connect(Callable(mvp2_run_controller, "on_contract_board_requested"))
 	sleep_point.sleep_requested.connect(Callable(run_phase_controller, "on_sleep_requested"))
 	if not run_phase_controller.autosave_requested.is_connected(_request_autosave):
 		run_phase_controller.autosave_requested.connect(_request_autosave)
@@ -222,6 +256,10 @@ func _ready() -> void:
 	dog.message_requested.connect(hud.set_status)
 	if not dog.autosave_requested.is_connected(_request_autosave):
 		dog.autosave_requested.connect(_request_autosave)
+	if not mvp2_run_controller.autosave_requested.is_connected(_request_autosave):
+		mvp2_run_controller.autosave_requested.connect(_request_autosave)
+	if not patrol_director.patrol_enemy_defeated.is_connected(_on_patrol_enemy_defeated):
+		patrol_director.patrol_enemy_defeated.connect(_on_patrol_enemy_defeated)
 	_configure_world_art_layers()
 	_configure_camera_bounds()
 	exploration_controller.validate_exploration_spawn_points()
@@ -379,6 +417,7 @@ func _on_player_died() -> void:
 
 func _on_run_state_changed(new_state: int) -> void:
 	mvp1_run_controller.on_run_state_changed(new_state)
+	mvp2_run_controller.on_run_state_changed(new_state)
 	_sync_mvp1_state_aliases()
 	player.set_build_mode_allowed(new_state != game_manager.RunState.LOSS and new_state != game_manager.RunState.WIN)
 	if new_state == game_manager.RunState.LOSS:
@@ -589,11 +628,14 @@ func _on_player_weapon_noise_emitted(source_position: Vector2, noise_radius: flo
 
 
 func _enter_day_phase() -> void:
+	mvp2_run_controller.generate_day_state()
 	poi_controller.roll_daily_poi_modifiers()
+	poi_controller.roll_daily_poi_events(mvp2_run_controller)
 	poi_controller.apply_daily_poi_refills()
 	poi_controller.refresh_poi_modifier_visuals()
 	poi_controller.clear_stale_daily_modifier_enemies()
 	exploration_controller.enter_day_phase()
+	patrol_director.enter_day_phase()
 	poi_controller.sync_daily_modifier_enemies()
 	hud.set_phase("Phase: Day")
 	player.refresh_interaction_prompt()
@@ -629,6 +671,7 @@ func _connect_defense_socket_signals() -> void:
 
 func _on_defense_socket_state_changed(_socket) -> void:
 	mvp1_run_controller.on_defense_socket_state_changed(_socket)
+	mvp2_run_controller.on_defense_socket_state_changed(_socket)
 	_sync_mvp1_state_aliases()
 	_register_fixed_grid_footprints()
 	_refresh_base_status()
@@ -672,6 +715,7 @@ func get_save_state() -> Dictionary:
 	var saved_refilled_pois: Array[String] = poi_state.get("last_daily_refilled_pois", [])
 	var exploration_state: Dictionary = exploration_controller.get_save_state()
 	var mvp1_state: Dictionary = mvp1_run_controller.get_save_state_fragment()
+	var mvp2_state: Dictionary = mvp2_run_controller.get_save_state_fragment()
 	return {
 		"game": {
 			"wave": int(game_manager.current_wave),
@@ -684,14 +728,17 @@ func get_save_state() -> Dictionary:
 			"defeated_exploration_enemy_counts": exploration_state.get("defeated_exploration_enemy_counts", {}).duplicate(true),
 			"current_exploration_target_counts": exploration_state.get("current_exploration_target_counts", {}).duplicate(true),
 			"daily_poi_modifiers": saved_daily_modifiers,
+			"daily_poi_events": poi_state.get("daily_poi_events", {}).duplicate(true),
 			"last_daily_refilled_pois": saved_refilled_pois,
 			"collected_micro_loot_ids": exploration_state.get("collected_micro_loot_ids", []),
 		},
 		"player": player.get_save_state() if player != null and is_instance_valid(player) else {},
 		"dog": dog.get_save_state() if dog != null and is_instance_valid(dog) else {},
 		"power": power_manager.get_save_state() if power_manager != null and is_instance_valid(power_manager) else {},
+		"patrols": patrol_director.get_save_state() if patrol_director != null and is_instance_valid(patrol_director) else {},
 		"legacy_perk_id": mvp1_state.get("legacy_perk_id", legacy_perk_id),
 		"heirlooms": mvp1_state.get("heirlooms", {}),
+		"mvp2": mvp2_state,
 		"defense_sockets": _get_defense_socket_save_states(),
 		"scavenge_nodes": _get_scavenge_node_save_states(),
 		"placeables": construction_controller.get_construction_placeable_save_states(),
@@ -720,6 +767,7 @@ func apply_save_state(save_state: Dictionary) -> void:
 	construction_controller.restore_selection_from_state(game_state)
 	_restore_daily_run_state(game_state)
 	mvp1_run_controller.apply_save_state_fragment(save_state)
+	mvp2_run_controller.apply_save_state_fragment(save_state.get("mvp2", {}))
 	_sync_mvp1_state_aliases()
 	legacy_perk_id = mvp1_run_controller.legacy_perk_id
 
@@ -729,6 +777,8 @@ func apply_save_state(save_state: Dictionary) -> void:
 		dog.apply_save_state(save_state.get("dog", {}))
 	if power_manager != null and is_instance_valid(power_manager):
 		power_manager.apply_save_state(save_state.get("power", {}))
+	if patrol_director != null and is_instance_valid(patrol_director):
+		patrol_director.apply_save_state(save_state.get("patrols", {}))
 
 	_apply_defense_socket_save_states(save_state.get("defense_sockets", []))
 	mvp1_run_controller.apply_heirloom_socket_state()
@@ -743,6 +793,7 @@ func apply_save_state(save_state: Dictionary) -> void:
 	poi_controller.refresh_player_poi_discovery_from_current_position()
 	poi_controller.refresh_poi_modifier_visuals()
 	exploration_controller.sync_exploration_enemies()
+	patrol_director.restore_day_patrols()
 	poi_controller.sync_daily_modifier_enemies()
 	_refresh_base_status()
 	_refresh_phase_status()
@@ -802,6 +853,10 @@ func _set_pause_state(paused: bool) -> void:
 
 func _on_player_dog_command_requested() -> void:
 	mvp1_run_controller.on_player_dog_command_requested()
+
+
+func _on_patrol_enemy_defeated() -> void:
+	mvp2_run_controller.on_patrol_enemy_defeated()
 
 
 func _get_defense_socket_save_states() -> Array[Dictionary]:

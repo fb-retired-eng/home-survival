@@ -32,10 +32,17 @@ func _spawn_enemy(game, position: Vector2):
 	return enemy
 
 
+func _enemy_health(enemy) -> int:
+	if enemy == null or not is_instance_valid(enemy):
+		return 0
+	return int(enemy.current_health)
+
+
 func _init() -> void:
 	var game = GAME_SCENE.instantiate()
 	root.add_child(game)
 	await _wait_frames(4)
+	game.mvp2_run_controller.active_mutator_id = StringName()
 
 	var near_turret = _spawn_placeable(game, TURRET_PROFILE, HOME_POSITION + Vector2(96.0, -24.0))
 	var floodlight = _spawn_placeable(game, FLOODLIGHT_PROFILE, HOME_POSITION + Vector2(-96.0, -24.0))
@@ -51,8 +58,8 @@ func _init() -> void:
 	var floodlight_enemy = _spawn_enemy(game, floodlight.global_position + Vector2(48.0, 0.0))
 	await _wait_frames(36)
 
-	print("power_probe_turret_enemy_health=%d" % int(turret_enemy.current_health))
-	print("power_probe_floodlight_enemy_slow=%.2f" % float(floodlight_enemy.get_slow_effect_multiplier()))
+	print("power_probe_turret_enemy_health=%d" % _enemy_health(turret_enemy))
+	print("power_probe_floodlight_enemy_slow=%.2f" % float(floodlight_enemy.get_slow_effect_multiplier() if floodlight_enemy != null and is_instance_valid(floodlight_enemy) else 1.0))
 
 	game.queue_free()
 	await _wait_frames(2)

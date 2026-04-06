@@ -4,7 +4,8 @@
 
 [resource]
 script = ExtResource("1_definition")
-perk_id = &"dog_pack"
-display_name = "Dog +25 Max Stamina"
-description = "Your dog starts each run with more stamina."
-dog_max_stamina_bonus = 25
+perk_id = &"scrapper"
+display_name = "+1 Battery, +5 Energy"
+description = "Start with more charge and a slightly better reserve."
+max_energy_bonus = 5
+stash_battery_bonus = 1

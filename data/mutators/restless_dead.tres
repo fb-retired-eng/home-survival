@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="DailyMutatorDefinition" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/daily_mutator_definition.gd" id="1_mutator"]
+
+[resource]
+script = ExtResource("1_mutator")
+mutator_id = &"restless_dead"
+display_name = "Restless Dead"
+description = "The dead are pushing harder today."
+poi_guard_bonus = 1
+enemy_speed_multiplier_bonus = 0.1

@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_definition")
 perk_id = &"prepared_stash"
-display_name = "+1 Battery, +4 Bullets"
+display_name = "+1 Battery, +2 Bullets"
 description = "Start each run with a small prepared stash."
 stash_battery_bonus = 1
-stash_bullets_bonus = 4
+stash_bullets_bonus = 2

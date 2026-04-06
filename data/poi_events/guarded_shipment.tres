@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="PoiEventDefinition" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/poi_event_definition.gd" id="1_event"]
+
+[resource]
+script = ExtResource("1_event")
+event_id = &"guarded_shipment"
+display_name = "Guarded Shipment"
+description = "Something valuable is still here, and heavily watched."
+reward_bonus = {
+"parts": 1,
+"salvage": 1
+}
+guard_count_delta = 1
+forces_elite = true
+eligible_reward_roles = Array[StringName]([&"salvage_parts", &"parts", &"mixed"])
+event_tint = Color(1, 0.82, 0.52, 1)

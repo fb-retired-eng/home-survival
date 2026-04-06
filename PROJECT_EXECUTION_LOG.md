@@ -2092,3 +2092,69 @@ Validation:
 - save/load and construction regressions still passed:
   - `save_probe_continue_did_not_rewrite=true`
   - `construction_escape_probe_both=true`
+
+## 2026-04-04 MVP2 Systems Pass
+- Added [`MVP2_SPEC.md`](MVP2_SPEC.md) and implemented the full MVP2 gameplay layer on top of the now-stable MVP1/controller baseline.
+- Daytime pressure is now live through `PatrolDirector` and scene-authored `PatrolRoutePoint` markers in `Game.tscn`:
+  - patrol squads spawn during the day, walk authored loops, investigate noise, persist across save/load, and no longer incorrectly respawn after all patrols were already cleared and the day is restored from save.
+- Daily map variance is now live through `PoiEventDefinition` resources and POI-event assignment in `poi_controller.gd`:
+  - the first event set includes `battery_cache`, `infested`, `field_hospital`, `guarded_shipment`, and `ammo_stash`
+  - event state persists in save/load and is reflected in the daily modifier summary path
+  - `forces_elite` POI events now spawn a real special elite instead of only inflating normal guard count
+- Added a contract/intel layer at home:
+  - authored `ContractBoardPoint`
+  - `Mvp2RunController` now generates daily contracts, tracks patrol-defeat / POI-visit / survive-without-breach goals, pays rewards, and persists that state
+  - visit-contract selection now scores live world state instead of always biasing toward the first known POI, so events and depletion actually shape the board
+- Expanded powered construction with `Power Relay`:
+  - `power_manager.gd` now supports local powered anchors instead of only the base generator radius
+  - relay-linked utility/turret placement is now probe-covered
+- Added new enemy counterplay roles:
+  - `zombie_screamer` can emit ally-alert scream pulses while actively chasing the player
+  - `zombie_breaker` now prioritizes powered placeables correctly instead of only sorting them cosmetically
+  - both enemies are now authored into later waves in `mvp0_waves.tres`, not just roaming/patrol pools
+- Added daily mutators and expanded the legacy-perk pool:
+  - mutators: `extra_patrols`, `rich_salvage`, `strong_lights`, `restless_dead`
+  - `restless_dead` now applies its authored enemy-speed bonus across patrol, exploration, POI-elite, and wave spawns
+  - perks: `ammo_cache`, `scrapper`, `trainer`
+- Tightened verification quality while shipping MVP2:
+  - new MVP2 probes were added for patrols, POI events, contracts, power relays, screamers, breakers, mutators, persistence, and wave-content presence
+  - older power/dog/utility probes now explicitly clear mutator state where they are measuring baseline behavior, so the new randomness layer does not make them flaky
+
+Validation:
+- MVP2 probes passed:
+  - `patrol_probe_spawn_count=2`
+  - `patrol_probe_moved=true`
+  - `patrol_probe_restored_count=2`
+  - `patrol_probe_empty_restore_count=0`
+  - `poi_event_probe_assigned_count=2`
+  - `poi_event_probe_battery_bonus=1`
+  - `poi_event_probe_forced_elite_spawned=true`
+  - `contract_probe_contract_count=3`
+  - `contract_probe_visit_target=poi_e`
+  - `contract_probe_visit_claimed=true`
+  - `power_relay_probe_turret_unpowered_before=true`
+  - `power_relay_probe_turret_powered_after=true`
+  - `screamer_probe_ally_alerted=true`
+  - `breaker_probe_target_is_powered_placeable=true`
+  - `daily_mutator_probe_generated=true`
+  - `daily_mutator_probe_active_id=restless_dead`
+  - `daily_mutator_probe_strong_lights_slow=0.56`
+  - `daily_mutator_probe_restless_speed=39.6`
+  - `mvp2_persistence_probe_mutator=rich_salvage`
+  - `mvp2_persistence_probe_contract_completed=true`
+  - `mvp2_persistence_probe_poi_event=battery_cache`
+  - `mvp2_wave_probe_wave6_has_screamer=true`
+  - `mvp2_wave_probe_wave7_has_breaker=true`
+  - `mvp2_wave_probe_wave8_has_screamer=true`
+  - `mvp2_wave_probe_wave8_has_breaker=true`
+- Regressions still passed after the MVP2 rollout:
+  - `dog_probe_total_haul=3`
+  - `power_probe_turret_enemy_health=0`
+  - `power_probe_floodlight_enemy_slow=0.66`
+  - `powered_defense_probe_turret_defeated=2`
+  - `powered_defense_probe_floodlight_avg_slow=0.66`
+  - `utility_placeables_probe_alarm_enemy_investigating=true`
+  - `legacy_probe_ammo_cache_bullets=42`
+  - `legacy_probe_scrapper_energy=105`
+  - `legacy_probe_trainer_dog_stamina=140`
+  - `save_probe_continue_did_not_rewrite=true`

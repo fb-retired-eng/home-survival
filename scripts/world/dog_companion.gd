@@ -15,12 +15,12 @@ enum DogState {
 }
 
 @export var max_stamina: int = 100
-@export_range(0, 100, 1) var scavenge_stamina_cost: int = 35
-@export_range(1.0, 180.0, 1.0) var scavenge_duration: float = 60.0
-@export_range(0, 100, 1) var lure_stamina_cost: int = 25
+@export_range(0, 100, 1) var scavenge_stamina_cost: int = 30
+@export_range(1.0, 180.0, 1.0) var scavenge_duration: float = 48.0
+@export_range(0, 100, 1) var lure_stamina_cost: int = 22
 @export_range(1.0, 20.0, 0.5) var lure_duration: float = 8.0
 @export_range(0.5, 5.0, 0.1) var lure_bark_interval: float = 1.0
-@export_range(0.0, 400.0, 5.0) var lure_radius: float = 180.0
+@export_range(0.0, 400.0, 5.0) var lure_radius: float = 200.0
 @export_range(0.0, 400.0, 5.0) var follow_speed: float = 150.0
 @export_range(0.0, 500.0, 5.0) var lure_move_speed: float = 190.0
 @export_range(0.0, 200.0, 5.0) var follow_distance: float = 42.0

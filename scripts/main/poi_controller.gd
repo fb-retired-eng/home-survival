@@ -4,12 +4,14 @@ class_name PoiController
 const EXPLORATION_SPAWN_POINT_SCRIPT := preload("res://scripts/world/exploration_spawn_point.gd")
 const ENEMY_DEFINITION_SCRIPT := preload("res://scripts/data/enemy_definition.gd")
 const POI_DEFINITION_SCRIPT := preload("res://scripts/data/poi_definition.gd")
+const POI_EVENT_DEFINITION_SCRIPT := preload("res://scripts/data/poi_event_definition.gd")
 const EMPTY_POI_ID: StringName = &""
 
 const POSITIVE_POI_MODIFIERS: Array[StringName] = [&"bountiful_food", &"extra_parts"]
 const NEGATIVE_POI_MODIFIERS: Array[StringName] = [&"disturbed", &"elite_present"]
 
 signal autosave_requested
+signal poi_discovered(poi_id: StringName)
 
 var game_manager
 var player
@@ -19,6 +21,8 @@ var exploration_enemy_scene: PackedScene
 var exploration_enemy_layer
 var default_daily_elite_enemy: Resource
 var poi_definitions: Array[Resource] = []
+var poi_event_definitions: Array[Resource] = []
+var mvp2_run_controller = null
 var get_local_scavenge_nodes_callback: Callable = Callable()
 var daily_poi_refill_base_nodes: int = 1
 var daily_poi_refill_bonus_chance: float = 0.3
@@ -27,6 +31,8 @@ var daily_poi_refill_bonus_nodes: int = 1
 var _daily_poi_modifiers: Dictionary = {}
 var _poi_visuals_by_id: Dictionary = {}
 var _poi_definitions_by_id: Dictionary = {}
+var _poi_event_definitions_by_id: Dictionary = {}
+var _daily_poi_events: Dictionary = {}
 var _debug_forced_next_daily_poi_modifiers: Dictionary = {}
 var _last_daily_refilled_pois: Array[StringName] = []
 var _visited_poi_ids: Dictionary = {}
@@ -41,11 +47,13 @@ func configure(config: Dictionary) -> void:
 	exploration_enemy_layer = config.get("exploration_enemy_layer")
 	default_daily_elite_enemy = config.get("default_daily_elite_enemy")
 	poi_definitions = config.get("poi_definitions", [])
+	poi_event_definitions = config.get("poi_event_definitions", [])
 	get_local_scavenge_nodes_callback = config.get("get_local_scavenge_nodes_callback", Callable())
 	daily_poi_refill_base_nodes = int(config.get("daily_poi_refill_base_nodes", daily_poi_refill_base_nodes))
 	daily_poi_refill_bonus_chance = float(config.get("daily_poi_refill_bonus_chance", daily_poi_refill_bonus_chance))
 	daily_poi_refill_bonus_nodes = int(config.get("daily_poi_refill_bonus_nodes", daily_poi_refill_bonus_nodes))
 	_cache_poi_definitions()
+	_cache_poi_event_definitions()
 	cache_poi_visuals()
 	_connect_poi_discovery_areas()
 	refresh_player_poi_discovery_from_current_position()
@@ -62,6 +70,7 @@ func configure_scavenge_nodes() -> void:
 
 func reset_for_new_run() -> void:
 	_daily_poi_modifiers.clear()
+	_daily_poi_events.clear()
 	_last_daily_refilled_pois.clear()
 	_visited_poi_ids.clear()
 
@@ -77,7 +86,42 @@ func apply_daily_poi_reward_modifier(node, rewards: Dictionary) -> Dictionary:
 			modified_rewards["food"] = int(modified_rewards.get("food", 0)) + 1
 		&"extra_parts":
 			modified_rewards["parts"] = int(modified_rewards.get("parts", 0)) + 1
+	var event_id := get_daily_poi_event(poi_id)
+	var poi_event = _get_poi_event_definition(event_id)
+	if poi_event != null:
+		for resource_id in poi_event.reward_bonus.keys():
+			modified_rewards[String(resource_id)] = int(modified_rewards.get(String(resource_id), 0)) + int(poi_event.reward_bonus.get(resource_id, 0))
+	if mvp2_run_controller != null:
+		var salvage_bonus: int = int(mvp2_run_controller.get_mutator_salvage_bonus())
+		if salvage_bonus > 0:
+			modified_rewards["salvage"] = int(modified_rewards.get("salvage", 0)) + salvage_bonus
 	return modified_rewards
+
+
+func roll_daily_poi_events(mvp2_controller = null) -> void:
+	_daily_poi_events.clear()
+	if mvp2_controller != null:
+		mvp2_run_controller = mvp2_controller
+	if _poi_event_definitions_by_id.is_empty():
+		return
+	var available_pois: Array[StringName] = []
+	for poi_id_variant in _poi_visuals_by_id.keys():
+		var poi_id := StringName(poi_id_variant)
+		if not _is_poi_depleted(poi_id):
+			available_pois.append(poi_id)
+	if available_pois.is_empty():
+		return
+	var available_events: Array = _poi_event_definitions_by_id.keys()
+	var assignment_count := mini(2, mini(available_pois.size(), available_events.size()))
+	for _i in range(assignment_count):
+		var poi_id: StringName = available_pois[randi() % available_pois.size()]
+		var candidate_events: Array[StringName] = _get_eligible_event_ids_for_poi(poi_id)
+		if candidate_events.is_empty():
+			available_pois.erase(poi_id)
+			continue
+		var event_id := candidate_events[randi() % candidate_events.size()]
+		_daily_poi_events[poi_id] = event_id
+		available_pois.erase(poi_id)
 
 
 func roll_daily_poi_modifiers() -> void:
@@ -170,16 +214,25 @@ func refresh_poi_modifier_visuals() -> void:
 		var base_marker_scale: Vector2 = visual_data.get("base_marker_scale", Vector2.ONE)
 		var base_label_color: Color = visual_data.get("base_label_color", Color.WHITE)
 		var modifier_id := get_daily_poi_modifier(poi_id)
+		var event_id := get_daily_poi_event(poi_id)
+		var poi_event = _get_poi_event_definition(event_id)
 		if modifier_id == StringName():
 			label.text = base_text
 			label.tooltip_text = String(visual_data.get("base_tooltip_text", base_text))
+			if poi_event != null:
+				label.text = "%s [%s]" % [base_text, poi_event.display_name]
+				label.tooltip_text = "%s\nEvent: %s" % [String(visual_data.get("base_tooltip_text", base_text)), poi_event.display_name]
 			label.add_theme_color_override("font_color", base_label_color)
-			marker.color = base_marker_color
+			marker.color = poi_event.event_tint.lerp(base_marker_color, 0.4) if poi_event != null else base_marker_color
 			marker.scale = base_marker_scale
 			continue
 		label.text = "%s %s" % [base_text, _get_modifier_label_text(modifier_id)]
 		label.tooltip_text = "%s\nModifier: %s" % [String(visual_data.get("base_tooltip_text", base_text)), _get_modifier_label_text(modifier_id)]
 		var modifier_tint := _get_modifier_tint(modifier_id)
+		if poi_event != null:
+			label.text = "%s %s [%s]" % [base_text, _get_modifier_label_text(modifier_id), poi_event.display_name]
+			label.tooltip_text = "%s\nModifier: %s\nEvent: %s" % [String(visual_data.get("base_tooltip_text", base_text)), _get_modifier_label_text(modifier_id), poi_event.display_name]
+			modifier_tint = modifier_tint.lerp(poi_event.event_tint, 0.3)
 		label.add_theme_color_override("font_color", modifier_tint)
 		marker.color = base_marker_color.lerp(modifier_tint, 0.48)
 		marker.scale = base_marker_scale * _get_modifier_marker_scale(modifier_id)
@@ -200,6 +253,11 @@ func get_daily_modifier_summary() -> String:
 				clauses.append("%s is disturbed." % poi_name)
 			&"elite_present":
 				clauses.append("%s has an elite guard." % poi_name)
+	for poi_id_variant in _daily_poi_events.keys():
+		var poi_id := StringName(poi_id_variant)
+		var poi_event = _get_poi_event_definition(StringName(_daily_poi_events[poi_id]))
+		if poi_event != null:
+			clauses.append("%s is affected by %s." % [get_poi_display_name_with_role(poi_id), poi_event.display_name])
 	if not _last_daily_refilled_pois.is_empty():
 		var restocked_names: Array[String] = []
 		for poi_id in _last_daily_refilled_pois:
@@ -229,6 +287,30 @@ func get_daily_poi_modifier(poi_id: StringName) -> StringName:
 	return StringName(_daily_poi_modifiers.get(poi_id, StringName()))
 
 
+func get_daily_poi_event(poi_id: StringName) -> StringName:
+	return StringName(_daily_poi_events.get(poi_id, StringName()))
+
+
+func get_all_poi_ids() -> Array[StringName]:
+	var poi_ids: Array[StringName] = []
+	for poi_id_variant in _poi_visuals_by_id.keys():
+		poi_ids.append(StringName(poi_id_variant))
+	return poi_ids
+
+
+func get_known_poi_ids() -> Array[StringName]:
+	var poi_ids: Array[StringName] = []
+	for poi_id_variant in _poi_visuals_by_id.keys():
+		var poi_id := StringName(poi_id_variant)
+		if is_poi_known(poi_id):
+			poi_ids.append(poi_id)
+	return poi_ids
+
+
+func is_poi_depleted(poi_id: StringName) -> bool:
+	return _is_poi_depleted(poi_id)
+
+
 func get_adjusted_exploration_spawn_count(spawn_point, current_target_counts: Dictionary, exploration_spawn_counts: Dictionary) -> int:
 	var spawn_id := String(spawn_point.spawn_id)
 	var target_count := _get_or_roll_exploration_spawn_count(spawn_point, exploration_spawn_counts)
@@ -238,6 +320,12 @@ func get_adjusted_exploration_spawn_count(spawn_point, current_target_counts: Di
 		return target_count
 	if get_daily_poi_modifier(poi_id) == &"disturbed":
 		target_count += 1
+	var event_id := get_daily_poi_event(poi_id)
+	var poi_event = _get_poi_event_definition(event_id)
+	if poi_event != null:
+		target_count += int(poi_event.guard_count_delta)
+	if mvp2_run_controller != null:
+		target_count += int(mvp2_run_controller.get_mutator_poi_guard_bonus())
 	current_target_counts[spawn_id] = target_count
 	return target_count
 
@@ -249,12 +337,23 @@ func sync_daily_modifier_enemies() -> void:
 		var poi_id := StringName(poi_id_variant)
 		if get_daily_poi_modifier(poi_id) != &"elite_present":
 			continue
-		if _has_active_daily_modifier_elite(poi_id):
+		if _has_active_special_poi_elite(poi_id):
 			continue
 		var guard_spawn = _get_poi_guard_spawn_point(poi_id)
 		if guard_spawn == null:
 			continue
-		_spawn_daily_modifier_elite(poi_id, guard_spawn)
+		_spawn_special_poi_elite(poi_id, guard_spawn, &"daily_modifier_elite")
+	for poi_id_variant in _daily_poi_events.keys():
+		var poi_id := StringName(poi_id_variant)
+		var poi_event = _get_poi_event_definition(get_daily_poi_event(poi_id))
+		if poi_event == null or not bool(poi_event.forces_elite):
+			continue
+		if _has_active_special_poi_elite(poi_id):
+			continue
+		var guard_spawn = _get_poi_guard_spawn_point(poi_id)
+		if guard_spawn == null:
+			continue
+		_spawn_special_poi_elite(poi_id, guard_spawn, &"daily_event_elite")
 
 
 func clear_stale_daily_modifier_enemies() -> void:
@@ -265,10 +364,14 @@ func clear_stale_daily_modifier_enemies() -> void:
 			continue
 		if child.is_queued_for_deletion():
 			continue
-		if String(child.get_meta("spawn_kind", "")) != "daily_modifier_elite":
+		var spawn_kind := String(child.get_meta("spawn_kind", ""))
+		if spawn_kind != "daily_modifier_elite" and spawn_kind != "daily_event_elite":
 			continue
 		var poi_id := StringName(child.get_meta("daily_modifier_poi_id", StringName()))
-		if get_daily_poi_modifier(poi_id) == &"elite_present":
+		var modifier_active := get_daily_poi_modifier(poi_id) == &"elite_present"
+		var poi_event = _get_poi_event_definition(get_daily_poi_event(poi_id))
+		var event_active := poi_event != null and bool(poi_event.forces_elite)
+		if modifier_active or event_active:
 			continue
 		child.queue_free()
 
@@ -282,6 +385,7 @@ func get_save_state() -> Dictionary:
 		saved_refilled_pois.append(String(poi_id))
 	return {
 		"daily_poi_modifiers": saved_daily_modifiers,
+		"daily_poi_events": _get_saved_daily_poi_events(),
 		"last_daily_refilled_pois": saved_refilled_pois,
 		"visited_poi_ids": _get_saved_visited_poi_ids(),
 	}
@@ -289,6 +393,7 @@ func get_save_state() -> Dictionary:
 
 func apply_game_state(game_state: Dictionary) -> void:
 	_daily_poi_modifiers = _duplicate_stringname_dictionary(game_state.get("daily_poi_modifiers", {}))
+	_daily_poi_events = _duplicate_stringname_dictionary(game_state.get("daily_poi_events", {}))
 	_last_daily_refilled_pois.clear()
 	for raw_poi_id in game_state.get("last_daily_refilled_pois", []):
 		_last_daily_refilled_pois.append(StringName(raw_poi_id))
@@ -384,6 +489,8 @@ func roll_dog_scavenge_reward(poi_id: StringName) -> Dictionary:
 			continue
 		if StringName(node.poi_id) != poi_id:
 			continue
+		if bool(node.is_depleted):
+			continue
 		totals["salvage"] += int(node.reward_salvage)
 		totals["parts"] += int(node.reward_parts)
 		totals["medicine"] += int(node.reward_medicine)
@@ -407,7 +514,7 @@ func roll_dog_scavenge_reward(poi_id: StringName) -> Dictionary:
 		"battery": 0,
 	}
 	rewards[primary_resource_id] = _get_dog_reward_amount(primary_resource_id, int(totals.get(primary_resource_id, 0)))
-	if randf() <= 0.28:
+	if randf() <= 0.4:
 		var secondary_resource_id := weighted_ids[randi() % weighted_ids.size()]
 		if secondary_resource_id != primary_resource_id:
 			rewards[secondary_resource_id] = _get_dog_reward_amount(secondary_resource_id, int(totals.get(secondary_resource_id, 0)))
@@ -566,6 +673,7 @@ func _refresh_player_poi_discovery(player_position: Vector2) -> void:
 		var poi_position := _get_poi_world_position(poi_id)
 		if player_position.distance_to(poi_position) <= 150.0:
 			_visited_poi_ids[poi_id] = true
+			poi_discovered.emit(poi_id)
 
 
 func _get_poi_world_position(poi_id: StringName) -> Vector2:
@@ -579,10 +687,16 @@ func _get_poi_world_position(poi_id: StringName) -> Vector2:
 
 func _get_dog_reward_amount(resource_id: String, total_amount: int) -> int:
 	match resource_id:
-		"salvage", "food":
-			return clampi(max(total_amount / 3, 1), 1, 2)
+		"salvage":
+			return clampi(maxi(int(round(total_amount * 0.4)), 1), 1, 3)
+		"food":
+			return clampi(maxi(int(round(total_amount * 0.45)), 1), 1, 3)
+		"parts":
+			return clampi(maxi(int(round(total_amount * 0.4)), 1), 1, 2)
 		"bullets":
-			return clampi(max(total_amount / 4, 1), 1, 3)
+			return clampi(maxi(int(round(total_amount * 0.35)), 2), 2, 6)
+		"medicine":
+			return clampi(maxi(int(round(total_amount * 0.4)), 1), 1, 2)
 		"battery":
 			return 1
 		_:
@@ -602,7 +716,7 @@ func _get_modifier_marker_scale(modifier_id: StringName) -> Vector2:
 	return Vector2.ONE
 
 
-func _has_active_daily_modifier_elite(poi_id: StringName) -> bool:
+func _has_active_special_poi_elite(poi_id: StringName) -> bool:
 	if exploration_enemy_layer == null:
 		return false
 	for child in exploration_enemy_layer.get_children():
@@ -615,7 +729,7 @@ func _has_active_daily_modifier_elite(poi_id: StringName) -> bool:
 	return false
 
 
-func _spawn_daily_modifier_elite(poi_id: StringName, guard_spawn) -> void:
+func _spawn_special_poi_elite(poi_id: StringName, guard_spawn, spawn_kind: StringName) -> void:
 	var elite_definition := _resolve_daily_modifier_elite_definition(guard_spawn)
 	if exploration_enemy_scene == null or elite_definition == null or exploration_enemy_layer == null:
 		return
@@ -625,7 +739,9 @@ func _spawn_daily_modifier_elite(poi_id: StringName, guard_spawn) -> void:
 	enemy.global_position = _get_exploration_spawn_position(guard_spawn)
 	if enemy.has_method("configure_runtime_context"):
 		enemy.configure_runtime_context(player, exploration_enemy_layer, _get_placeables_root())
-	enemy.set_meta("spawn_kind", "daily_modifier_elite")
+	if mvp2_run_controller != null and enemy.has_method("set_external_move_speed_multiplier"):
+		enemy.set_external_move_speed_multiplier(mvp2_run_controller.get_mutator_enemy_speed_multiplier())
+	enemy.set_meta("spawn_kind", spawn_kind)
 	enemy.set_meta("daily_modifier_poi_id", poi_id)
 	var initial_facing := Vector2.ZERO
 	if guard_spawn.has_method("get_initial_facing_vector"):
@@ -769,3 +885,43 @@ func _on_poi_discovery_area_body_entered(body: Node, poi_id: StringName) -> void
 	if body != player:
 		return
 	_visited_poi_ids[poi_id] = true
+	poi_discovered.emit(poi_id)
+
+
+func _get_saved_daily_poi_events() -> Dictionary:
+	var saved_events := {}
+	for poi_id_variant in _daily_poi_events.keys():
+		saved_events[String(poi_id_variant)] = String(_daily_poi_events[poi_id_variant])
+	return saved_events
+
+
+func _cache_poi_event_definitions() -> void:
+	_poi_event_definitions_by_id.clear()
+	for definition_resource in poi_event_definitions:
+		if definition_resource == null or definition_resource.get_script() != POI_EVENT_DEFINITION_SCRIPT:
+			continue
+		if not definition_resource.is_valid_definition():
+			continue
+		_poi_event_definitions_by_id[definition_resource.event_id] = definition_resource
+
+
+func _get_poi_event_definition(event_id: StringName):
+	if not _poi_event_definitions_by_id.has(event_id):
+		return null
+	return _poi_event_definitions_by_id[event_id]
+
+
+func _get_eligible_event_ids_for_poi(poi_id: StringName) -> Array[StringName]:
+	var eligible: Array[StringName] = []
+	var poi_definition = _get_poi_definition(poi_id)
+	for event_id_variant in _poi_event_definitions_by_id.keys():
+		var event_id := StringName(event_id_variant)
+		var poi_event = _get_poi_event_definition(event_id)
+		if poi_event == null:
+			continue
+		if not poi_event.eligible_poi_ids.is_empty() and not poi_event.eligible_poi_ids.has(poi_id):
+			continue
+		if poi_definition != null and not poi_event.eligible_reward_roles.is_empty() and not poi_event.eligible_reward_roles.has(poi_definition.reward_role):
+			continue
+		eligible.append(event_id)
+	return eligible

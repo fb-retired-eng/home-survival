@@ -8,6 +8,8 @@
 [ext_resource type="Resource" path="res://data/enemies/zombie_runner.tres" id="6_runner_enemy"]
 [ext_resource type="Resource" path="res://data/enemies/zombie_spitter.tres" id="7_spitter_enemy"]
 [ext_resource type="Resource" path="res://data/enemies/zombie_elite_spitter.tres" id="8_elite_spitter_enemy"]
+[ext_resource type="Resource" path="res://data/enemies/zombie_screamer.tres" id="9_screamer_enemy"]
+[ext_resource type="Resource" path="res://data/enemies/zombie_breaker.tres" id="10_breaker_enemy"]
 
 [sub_resource type="Resource" id="1"]
 script = ExtResource("3_lane")
@@ -105,11 +107,29 @@ lane_id = &"west"
 enemy_definition = ExtResource("5_brute_enemy")
 preferred_socket_ids = PackedStringArray("door_w")
 
+[sub_resource type="Resource" id="24"]
+script = ExtResource("3_lane")
+lane_id = &"east"
+enemy_definition = ExtResource("9_screamer_enemy")
+preferred_socket_ids = PackedStringArray("door_e")
+
+[sub_resource type="Resource" id="25"]
+script = ExtResource("3_lane")
+lane_id = &"west"
+enemy_definition = ExtResource("10_breaker_enemy")
+preferred_socket_ids = PackedStringArray("door_w")
+
+[sub_resource type="Resource" id="26"]
+script = ExtResource("3_lane")
+lane_id = &"north"
+enemy_definition = ExtResource("9_screamer_enemy")
+preferred_socket_ids = PackedStringArray("wall_n")
+
 [sub_resource type="Resource" id="16"]
 script = ExtResource("2_wave")
 wave_number = 6
 spawn_interval = 0.54
-lanes = Array[Resource]([SubResource("14"), SubResource("3"), SubResource("15"), SubResource("12")])
+lanes = Array[Resource]([SubResource("14"), SubResource("3"), SubResource("15"), SubResource("12"), SubResource("24")])
 
 [sub_resource type="Resource" id="17"]
 script = ExtResource("3_lane")
@@ -128,7 +148,7 @@ preferred_socket_ids = PackedStringArray("door_e")
 script = ExtResource("2_wave")
 wave_number = 7
 spawn_interval = 0.54
-lanes = Array[Resource]([SubResource("17"), SubResource("18"), SubResource("15"), SubResource("12")])
+lanes = Array[Resource]([SubResource("17"), SubResource("18"), SubResource("15"), SubResource("12"), SubResource("25")])
 
 [sub_resource type="Resource" id="20"]
 script = ExtResource("3_lane")
@@ -153,7 +173,7 @@ preferred_socket_ids = PackedStringArray("door_w")
 script = ExtResource("2_wave")
 wave_number = 8
 spawn_interval = 0.52
-lanes = Array[Resource]([SubResource("20"), SubResource("17"), SubResource("18"), SubResource("15"), SubResource("21"), SubResource("22")])
+lanes = Array[Resource]([SubResource("20"), SubResource("17"), SubResource("18"), SubResource("15"), SubResource("21"), SubResource("22"), SubResource("24"), SubResource("25"), SubResource("26")])
 
 [resource]
 script = ExtResource("1_wave_set")

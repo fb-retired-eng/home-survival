@@ -10,19 +10,19 @@ category = "utility"
 placement_layer = "utility"
 footprint_cells = PackedVector2Array(0, 0)
 build_cost = {
-"parts": 5,
-"salvage": 10
+"parts": 4,
+"salvage": 9
 }
 repair_cost = {
 "parts": 2,
-"salvage": 4
+"salvage": 3
 }
 max_hp = 80
 blocks_movement = false
 blocks_projectiles = false
 interaction_priority = 12
 power_draw = 1
-fire_range = 200.0
-slow_factor = 0.72
+fire_range = 220.0
+slow_factor = 0.66
 line_of_fire_required = false
 visual_color = Color(0.78, 0.88, 0.42, 1)
