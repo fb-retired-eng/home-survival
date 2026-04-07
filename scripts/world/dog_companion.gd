@@ -17,6 +17,8 @@ enum DogState {
 @export var max_stamina: int = 100
 @export_range(0, 100, 1) var scavenge_stamina_cost: int = 30
 @export_range(1.0, 180.0, 1.0) var scavenge_duration: float = 48.0
+@export_range(0.0, 10.0, 0.1) var scavenge_collect_pause: float = 1.2
+@export_range(0.0, 500.0, 5.0) var scavenge_move_speed: float = 180.0
 @export_range(0, 100, 1) var lure_stamina_cost: int = 22
 @export_range(1.0, 20.0, 0.5) var lure_duration: float = 8.0
 @export_range(0.5, 5.0, 0.1) var lure_bark_interval: float = 1.0
@@ -35,6 +37,9 @@ var current_stamina: int = max_stamina
 var _state: int = DogState.FOLLOW
 var _active_poi_id: StringName = StringName()
 var _remaining_trip_time: float = 0.0
+var _scavenge_target_position: Vector2 = Vector2.ZERO
+var _scavenge_pause_remaining: float = 0.0
+var _scavenge_returning: bool = false
 var _lure_target_position: Vector2 = Vector2.ZERO
 var _lure_bark_remaining: float = 0.0
 var _base_body_color: Color
@@ -47,6 +52,8 @@ var _base_body_color: Color
 @onready var state_ring: Polygon2D = $StateRing
 @onready var label: Label = $Label
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
+@onready var target_ring: Area2D = $TargetRing
+@onready var target_ring_visual: Polygon2D = $TargetRing/RingVisual
 
 
 func _ready() -> void:
@@ -55,6 +62,7 @@ func _ready() -> void:
 	_base_body_color = body.color
 	_emit_state()
 	_update_render_order()
+	_update_target_ring()
 
 
 func configure(config: Dictionary) -> void:
@@ -69,11 +77,10 @@ func _process(delta: float) -> void:
 		DogState.FOLLOW:
 			_update_follow_movement(delta)
 		DogState.SCAVENGING:
-			_remaining_trip_time = maxf(_remaining_trip_time - delta, 0.0)
-			if _remaining_trip_time <= 0.0:
-				_complete_scavenge_trip()
+			_update_scavenge_state(delta)
 		DogState.LURING:
 			_update_lure_state(delta)
+	_update_target_ring()
 	_update_visuals(delta)
 	_update_render_order()
 
@@ -126,21 +133,24 @@ func issue_scavenge_command() -> bool:
 		return false
 	if poi_controller == null or not is_instance_valid(poi_controller):
 		return false
-	var poi_id: StringName = poi_controller.get_best_known_poi_for_dog(_get_reference_position())
+	var poi_id: StringName = poi_controller.get_best_known_poi_for_dog(global_position)
 	if poi_id == StringName():
 		message_requested.emit("No known POI for dog yet")
 		return false
+	var poi_target_position: Vector2 = poi_controller.get_poi_world_position(poi_id)
+	if poi_target_position == Vector2.ZERO:
+		poi_target_position = _get_reference_position()
 	current_stamina = max(current_stamina - scavenge_stamina_cost, 0)
 	_state = DogState.SCAVENGING
 	_active_poi_id = poi_id
 	_remaining_trip_time = scavenge_duration
-	visible = false
-	monitoring = false
-	monitorable = false
-	if collision_shape != null:
-		collision_shape.disabled = true
+	_scavenge_target_position = poi_target_position
+	_scavenge_pause_remaining = 0.0
+	_scavenge_returning = false
+	_apply_state_visibility()
 	message_requested.emit("Dog scavenging %s" % poi_controller.get_poi_display_name(poi_id))
 	_emit_state()
+	_update_target_ring()
 	autosave_requested.emit()
 	return true
 
@@ -165,6 +175,7 @@ func issue_lure_command(target_position: Vector2) -> bool:
 	message_requested.emit("Dog is luring enemies")
 	_emit_lure_bark()
 	_emit_state()
+	_update_target_ring()
 	return true
 
 
@@ -193,6 +204,12 @@ func get_save_state() -> Dictionary:
 		"state": _state,
 		"active_poi_id": String(_active_poi_id),
 		"remaining_trip_time": _remaining_trip_time,
+		"scavenge_target_position": {
+			"x": _scavenge_target_position.x,
+			"y": _scavenge_target_position.y,
+		},
+		"scavenge_pause_remaining": _scavenge_pause_remaining,
+		"scavenge_returning": _scavenge_returning,
 		"lure_target_position": {
 			"x": _lure_target_position.x,
 			"y": _lure_target_position.y,
@@ -211,6 +228,13 @@ func apply_save_state(save_state: Dictionary) -> void:
 	_state = int(save_state.get("state", DogState.FOLLOW))
 	_active_poi_id = StringName(save_state.get("active_poi_id", String(_active_poi_id)))
 	_remaining_trip_time = maxf(float(save_state.get("remaining_trip_time", 0.0)), 0.0)
+	var scavenge_target_data: Dictionary = save_state.get("scavenge_target_position", {})
+	_scavenge_target_position = Vector2(
+		float(scavenge_target_data.get("x", _scavenge_target_position.x)),
+		float(scavenge_target_data.get("y", _scavenge_target_position.y))
+	)
+	_scavenge_pause_remaining = maxf(float(save_state.get("scavenge_pause_remaining", 0.0)), 0.0)
+	_scavenge_returning = bool(save_state.get("scavenge_returning", false))
 	var lure_target_data: Dictionary = save_state.get("lure_target_position", {})
 	_lure_target_position = Vector2(
 		float(lure_target_data.get("x", _lure_target_position.x)),
@@ -219,6 +243,7 @@ func apply_save_state(save_state: Dictionary) -> void:
 	_lure_bark_remaining = maxf(float(save_state.get("lure_bark_remaining", 0.0)), 0.0)
 	_apply_state_visibility()
 	_emit_state()
+	_update_target_ring()
 
 
 func debug_complete_active_scavenge() -> bool:
@@ -234,11 +259,15 @@ func reset_for_new_run() -> void:
 	_state = DogState.FOLLOW
 	_active_poi_id = StringName()
 	_remaining_trip_time = 0.0
+	_scavenge_target_position = Vector2.ZERO
+	_scavenge_pause_remaining = 0.0
+	_scavenge_returning = false
 	_lure_target_position = Vector2.ZERO
 	_lure_bark_remaining = 0.0
 	global_position = home_world_position + Vector2(-18.0, 20.0)
 	_apply_state_visibility()
 	_emit_state()
+	_update_target_ring()
 
 
 func _update_follow_movement(delta: float) -> void:
@@ -273,6 +302,9 @@ func _complete_scavenge_trip() -> void:
 	_remaining_trip_time = 0.0
 	var completed_poi_id: StringName = _active_poi_id
 	_active_poi_id = StringName()
+	_scavenge_target_position = Vector2.ZERO
+	_scavenge_pause_remaining = 0.0
+	_scavenge_returning = false
 	_lure_target_position = Vector2.ZERO
 	_lure_bark_remaining = 0.0
 	global_position = _get_reference_position() + Vector2(-18.0, 20.0)
@@ -283,6 +315,7 @@ func _complete_scavenge_trip() -> void:
 		else:
 			message_requested.emit("Dog returned from %s: %s" % [poi_controller.get_poi_display_name(completed_poi_id), ", ".join(summary)])
 	_emit_state()
+	_update_target_ring()
 	autosave_requested.emit()
 
 
@@ -301,6 +334,37 @@ func _update_lure_state(delta: float) -> void:
 		_complete_lure()
 
 
+func _update_scavenge_state(delta: float) -> void:
+	_remaining_trip_time = maxf(_remaining_trip_time - delta, 0.0)
+	if _scavenge_pause_remaining > 0.0:
+		_scavenge_pause_remaining = maxf(_scavenge_pause_remaining - delta, 0.0)
+		if _scavenge_pause_remaining <= 0.0 and not _scavenge_returning:
+			_scavenge_returning = true
+		return
+	if _scavenge_returning:
+		_scavenge_target_position = _get_reference_position() + Vector2(-18.0, 20.0)
+	var offset: Vector2 = _scavenge_target_position - global_position
+	var distance: float = offset.length()
+	if _remaining_trip_time <= 0.0 and not _scavenge_returning:
+		_scavenge_returning = true
+		_scavenge_pause_remaining = 0.0
+		_scavenge_target_position = _get_reference_position() + Vector2(-18.0, 20.0)
+		offset = _scavenge_target_position - global_position
+		distance = offset.length()
+	if _scavenge_returning and _remaining_trip_time <= 0.0 and distance >= teleport_distance * 1.5:
+		global_position = _scavenge_target_position
+		_complete_scavenge_trip()
+		return
+	if distance <= 6.0:
+		if not _scavenge_returning:
+			_scavenge_pause_remaining = scavenge_collect_pause
+		else:
+			_complete_scavenge_trip()
+		return
+	global_position += offset.normalized() * minf(scavenge_move_speed * delta, distance)
+	_update_facing_for_motion(offset)
+
+
 func _complete_lure() -> void:
 	_state = DogState.FOLLOW
 	_remaining_trip_time = 0.0
@@ -309,6 +373,7 @@ func _complete_lure() -> void:
 	message_requested.emit("Dog returned to follow")
 	_apply_state_visibility()
 	_emit_state()
+	_update_target_ring()
 
 
 func _emit_lure_bark() -> void:
@@ -327,7 +392,7 @@ func _emit_lure_bark() -> void:
 
 func _apply_state_visibility() -> void:
 	var scavenging := _state == DogState.SCAVENGING
-	visible = not scavenging
+	visible = true
 	monitoring = not scavenging
 	monitorable = not scavenging
 	if collision_shape != null:
@@ -339,17 +404,45 @@ func _emit_state() -> void:
 	status_changed.emit(_build_status_text())
 
 
+func _update_target_ring() -> void:
+	if target_ring == null or target_ring_visual == null:
+		return
+	var ring_visible := false
+	var ring_position := Vector2.ZERO
+	var ring_color := Color(0.98, 0.86, 0.46, 0.32)
+	if _state == DogState.SCAVENGING:
+		ring_visible = true
+		ring_position = _scavenge_target_position
+		ring_color = Color(0.98, 0.86, 0.46, 0.32) if not _scavenge_returning else Color(0.54, 0.92, 0.72, 0.34)
+	elif _state == DogState.LURING:
+		ring_visible = true
+		ring_position = _lure_target_position
+		ring_color = Color(1.0, 0.44, 0.34, 0.34)
+	target_ring.visible = ring_visible
+	target_ring.global_position = ring_position
+	target_ring_visual.color = ring_color
+
+
 func _build_status_text() -> String:
 	match _state:
 		DogState.SCAVENGING:
 			var poi_text := "Unknown"
 			if poi_controller != null and is_instance_valid(poi_controller) and _active_poi_id != StringName():
 				poi_text = poi_controller.get_poi_display_name(_active_poi_id)
-			return "Dog %d/%d | Scavenging %s" % [current_stamina, max_stamina, poi_text]
+			var eta_text := _get_remaining_task_eta_text()
+			if _scavenge_returning:
+				return "Dog %d/%d | Return%s" % [current_stamina, max_stamina, eta_text]
+			return "Dog %d/%d | Fetch %s%s" % [current_stamina, max_stamina, poi_text, eta_text]
 		DogState.LURING:
-			return "Dog %d/%d | Luring [G]" % [current_stamina, max_stamina]
+			return "Dog %d/%d | Lure [G]%s" % [current_stamina, max_stamina, _get_remaining_task_eta_text()]
 		_:
 			return "Dog %d/%d | Ready [G]" % [current_stamina, max_stamina]
+
+
+func _get_remaining_task_eta_text() -> String:
+	if _remaining_trip_time <= 0.0:
+		return ""
+	return " %ds" % maxi(1, int(ceil(_remaining_trip_time)))
 
 
 func _get_reference_position() -> Vector2:
@@ -382,7 +475,13 @@ func _update_visuals(delta: float) -> void:
 			ring_color = Color(1.0, 0.48, 0.34, 0.72)
 		state_ring.color = ring_color
 		state_ring.modulate.a = 0.42 + 0.08 * sin(time * 5.0)
+	if target_ring.visible:
+		target_ring_visual.modulate.a = 0.34 + 0.1 * sin(time * 4.0)
 	label.text = "DOG"
+	if _state == DogState.SCAVENGING:
+		label.text = "RETURN" if _scavenge_returning else "FETCH"
+	elif _state == DogState.LURING:
+		label.text = "LURE"
 	label.modulate.a = move_toward(label.modulate.a, 0.86, delta * 3.0)
 	body.color = _base_body_color
 

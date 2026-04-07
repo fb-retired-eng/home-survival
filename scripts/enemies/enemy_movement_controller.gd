@@ -39,6 +39,10 @@ func compute_move_velocity(primary_target) -> Vector2:
 	if not separation.is_zero_approx():
 		move_direction += separation * get_separation_weight()
 
+	var dog_avoidance := get_dog_avoidance_vector()
+	if not dog_avoidance.is_zero_approx():
+		move_direction += dog_avoidance * get_dog_avoidance_weight()
+
 	var sidestep := get_enemy_block_sidestep(primary_target, target_offset)
 	if not sidestep.is_zero_approx():
 		move_direction += sidestep * get_sidestep_weight()
@@ -120,6 +124,10 @@ func get_sidestep_weight() -> float:
 	return enemy.definition.sidestep_weight
 
 
+func get_dog_avoidance_weight() -> float:
+	return 1.2
+
+
 func get_enemy_separation_vector() -> Vector2:
 	var radius := get_separation_radius()
 	if radius <= 0.0:
@@ -144,6 +152,29 @@ func get_enemy_separation_vector() -> Vector2:
 	if push.is_zero_approx():
 		return Vector2.ZERO
 
+	return push.normalized()
+
+
+func get_dog_avoidance_vector() -> Vector2:
+	var scene_tree := enemy.get_tree()
+	if scene_tree == null:
+		return Vector2.ZERO
+	var radius := 28.0
+	var push := Vector2.ZERO
+	for dog in scene_tree.get_nodes_in_group("dog_companion"):
+		if dog == null or not is_instance_valid(dog):
+			continue
+		if not (dog is Node2D):
+			continue
+		if not dog.visible:
+			continue
+		var offset: Vector2 = enemy.global_position - dog.global_position
+		var distance := offset.length()
+		if distance <= 0.001 or distance >= radius:
+			continue
+		push += offset.normalized() * ((radius - distance) / radius)
+	if push.is_zero_approx():
+		return Vector2.ZERO
 	return push.normalized()
 
 

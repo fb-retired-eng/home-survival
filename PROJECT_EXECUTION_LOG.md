@@ -2158,3 +2158,20 @@ Validation:
   - `legacy_probe_scrapper_energy=105`
   - `legacy_probe_trainer_dog_stamina=140`
   - `save_probe_continue_did_not_rewrite=true`
+
+## 2026-04-07 Dog Scavenge Stock and Task Persistence Pass
+- Tightened Dog scavenge behavior so it consumes shared POI stock instead of inventing extra loot:
+  - hidden POI stock drains before visible search points
+  - later Dog trips deplete one visible search node at a time in a stable node-ID order
+  - player searches use the same remaining POI stock that the Dog consumes
+- Added Dog task persistence coverage for:
+  - outbound scavenging
+  - returning scavenging
+  - night lure targeting
+- Improved Dog readability:
+  - task ETA now appears in the existing HUD status line
+  - the world target ring stays visible for scavenging, returning, and luring
+- Updated probes:
+  - `dog_companion_probe`
+  - `dog_shared_stock_probe`
+  - `dog_task_persistence_probe`

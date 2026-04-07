@@ -36,7 +36,7 @@ The repo currently includes:
 - data-driven POI identity through `PoiDefinition` resources, with role-driven bonus tables, POI-tied micro-loot defaults, explicit `poi_id` wiring, and probe-visible role labels for debugging and UI
 - authored POI guard tuning and softer mid/late-wave pacing, plus an economy balance probe that reports POI yield, support loot, construction costs, and wave pressure totals for future tuning passes
 - MVP1 strategic systems now live:
-  - Dog companion support with follow, feed, known-POI scavenging, night lure, HUD status, and save/load
+  - Dog companion support with follow, feed, known-POI scavenging, shared POI stock, night lure, clearer task status/ETA feedback, and save/load
   - generator-based power management with battery upgrades, powered turrets, and floodlights
   - heirloom debris on previously broken fortified sockets, plus a small legacy-perk layer at boot
 - MVP2 expansion systems now live:

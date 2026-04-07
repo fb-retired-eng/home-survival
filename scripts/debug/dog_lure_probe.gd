@@ -37,6 +37,7 @@ func _init() -> void:
 	print("dog_lure_probe_stamina=%d" % int(game.dog.current_stamina))
 	print("dog_lure_probe_enemy_investigating=%s" % str(enemy.is_investigating_noise()))
 	print("dog_lure_probe_dog_moved_toward_target=%s" % str(game.dog.global_position.distance_to(lure_target) < game.player.global_position.distance_to(lure_target)))
+	print("dog_lure_probe_enemy_not_overlapping_dog=%s" % str(enemy.global_position.distance_to(game.dog.global_position) >= 14.0))
 
 	game.dog.debug_complete_active_scavenge()
 	game.dog._remaining_trip_time = 0.0

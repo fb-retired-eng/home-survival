@@ -2,6 +2,7 @@ extends CharacterBody2D
 class_name GameEnemy
 
 const EnemyDefinitionResource = preload("res://scripts/data/enemy_definition.gd")
+const EnemyProjectileScene = preload("res://scenes/enemies/EnemyProjectile.tscn")
 const HEALTH_BAR_FILL_HALF_WIDTH := 14.0
 const HEALTH_BAR_FILL_HALF_HEIGHT := 2.0
 const GAMEPLAY_Z_BASE := 1000

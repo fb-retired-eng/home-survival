@@ -6,6 +6,7 @@ const ENEMY_DEFINITION_SCRIPT := preload("res://scripts/data/enemy_definition.gd
 const POI_DEFINITION_SCRIPT := preload("res://scripts/data/poi_definition.gd")
 const POI_EVENT_DEFINITION_SCRIPT := preload("res://scripts/data/poi_event_definition.gd")
 const EMPTY_POI_ID: StringName = &""
+const DOG_HIDDEN_STOCK_RATIO := 0.25
 
 const POSITIVE_POI_MODIFIERS: Array[StringName] = [&"bountiful_food", &"extra_parts"]
 const NEGATIVE_POI_MODIFIERS: Array[StringName] = [&"disturbed", &"elite_present"]
@@ -36,6 +37,8 @@ var _daily_poi_events: Dictionary = {}
 var _debug_forced_next_daily_poi_modifiers: Dictionary = {}
 var _last_daily_refilled_pois: Array[StringName] = []
 var _visited_poi_ids: Dictionary = {}
+var _poi_hidden_stock_defaults: Dictionary = {}
+var _poi_hidden_stock_remaining: Dictionary = {}
 
 
 func configure(config: Dictionary) -> void:
@@ -55,6 +58,8 @@ func configure(config: Dictionary) -> void:
 	_cache_poi_definitions()
 	_cache_poi_event_definitions()
 	cache_poi_visuals()
+	_rebuild_poi_hidden_stock_defaults()
+	_reset_poi_hidden_stock_remaining()
 	_connect_poi_discovery_areas()
 	refresh_player_poi_discovery_from_current_position()
 
@@ -66,6 +71,9 @@ func configure_scavenge_nodes() -> void:
 			node.configure_reward_modifier(Callable(self, "apply_daily_poi_reward_modifier"))
 		if node.has_signal("state_changed") and not node.state_changed.is_connected(_on_scavenge_node_state_changed):
 			node.state_changed.connect(_on_scavenge_node_state_changed)
+	_rebuild_poi_hidden_stock_defaults()
+	if _poi_hidden_stock_remaining.is_empty():
+		_reset_poi_hidden_stock_remaining()
 
 
 func reset_for_new_run() -> void:
@@ -73,6 +81,7 @@ func reset_for_new_run() -> void:
 	_daily_poi_events.clear()
 	_last_daily_refilled_pois.clear()
 	_visited_poi_ids.clear()
+	_reset_poi_hidden_stock_remaining()
 
 
 func apply_daily_poi_reward_modifier(node, rewards: Dictionary) -> Dictionary:
@@ -388,6 +397,7 @@ func get_save_state() -> Dictionary:
 		"daily_poi_events": _get_saved_daily_poi_events(),
 		"last_daily_refilled_pois": saved_refilled_pois,
 		"visited_poi_ids": _get_saved_visited_poi_ids(),
+		"hidden_stock_remaining": _get_saved_hidden_stock_remaining(),
 	}
 
 
@@ -402,6 +412,7 @@ func apply_game_state(game_state: Dictionary) -> void:
 		var poi_id := StringName(raw_poi_id)
 		if poi_id != StringName():
 			_visited_poi_ids[poi_id] = true
+	_restore_hidden_stock_remaining(game_state.get("hidden_stock_remaining", {}))
 	refresh_player_poi_discovery_from_current_position()
 
 
@@ -475,50 +486,19 @@ func get_best_known_poi_for_dog(from_position: Vector2) -> StringName:
 	return best_poi_id
 
 
+func get_poi_world_position(poi_id: StringName) -> Vector2:
+	return _get_poi_world_position(poi_id)
+
+
 func roll_dog_scavenge_reward(poi_id: StringName) -> Dictionary:
-	var totals := {
-		"salvage": 0,
-		"parts": 0,
-		"medicine": 0,
-		"bullets": 0,
-		"food": 0,
-		"battery": 0,
-	}
-	for node in _get_local_scavenge_nodes():
-		if node == null or not is_instance_valid(node):
-			continue
-		if StringName(node.poi_id) != poi_id:
-			continue
-		if bool(node.is_depleted):
-			continue
-		totals["salvage"] += int(node.reward_salvage)
-		totals["parts"] += int(node.reward_parts)
-		totals["medicine"] += int(node.reward_medicine)
-		totals["bullets"] += int(node.reward_bullets)
-		totals["food"] += int(node.reward_food)
-		totals["battery"] += int(node.reward_battery)
-	var weighted_ids: Array[String] = []
-	for resource_id in totals.keys():
-		var weight := int(totals[resource_id])
-		for _i in range(max(weight, 0)):
-			weighted_ids.append(resource_id)
-	if weighted_ids.is_empty():
+	var hidden_remaining: Dictionary = _get_hidden_stock_remaining_for_poi(poi_id)
+	if _get_reward_total(hidden_remaining) > 0:
+		_poi_hidden_stock_remaining[poi_id] = _empty_reward_dictionary()
+		return hidden_remaining
+	var node = _get_next_visible_dog_scavenge_node(poi_id)
+	if node == null:
 		return {}
-	var primary_resource_id := weighted_ids[randi() % weighted_ids.size()]
-	var rewards := {
-		"salvage": 0,
-		"parts": 0,
-		"medicine": 0,
-		"bullets": 0,
-		"food": 0,
-		"battery": 0,
-	}
-	rewards[primary_resource_id] = _get_dog_reward_amount(primary_resource_id, int(totals.get(primary_resource_id, 0)))
-	if randf() <= 0.4:
-		var secondary_resource_id := weighted_ids[randi() % weighted_ids.size()]
-		if secondary_resource_id != primary_resource_id:
-			rewards[secondary_resource_id] = _get_dog_reward_amount(secondary_resource_id, int(totals.get(secondary_resource_id, 0)))
-	return rewards
+	return node.consume_all_remaining_rewards()
 
 
 func get_poi_id_for_exploration_spawn(spawn_point) -> StringName:
@@ -606,15 +586,21 @@ func _get_modifier_eligible_poi_ids(modifier_id: StringName, excluded_pois: Dict
 
 
 func _is_poi_depleted(poi_id: StringName) -> bool:
-	var total_nodes := 0
-	var depleted_nodes := 0
+	var visible_remaining_total := 0
 	for node in _get_local_scavenge_nodes():
 		if StringName(node.poi_id) != poi_id:
 			continue
-		total_nodes += 1
-		if bool(node.is_depleted):
-			depleted_nodes += 1
-	return total_nodes > 0 and total_nodes == depleted_nodes
+		if node.has_method("get_remaining_rewards"):
+			var remaining_rewards: Dictionary = node.get_remaining_rewards()
+			for resource_id in remaining_rewards.keys():
+				visible_remaining_total += int(remaining_rewards.get(resource_id, 0))
+		elif not bool(node.is_depleted):
+			visible_remaining_total += int(node.reward_salvage) + int(node.reward_parts) + int(node.reward_medicine) + int(node.reward_bullets) + int(node.reward_food) + int(node.reward_battery)
+	var hidden_remaining_total := 0
+	var hidden_remaining: Dictionary = _get_hidden_stock_remaining_for_poi(poi_id)
+	for resource_id in hidden_remaining.keys():
+		hidden_remaining_total += int(hidden_remaining.get(resource_id, 0))
+	return visible_remaining_total <= 0 and hidden_remaining_total <= 0
 
 
 func _is_poi_eligible_for_elite_modifier(poi_id: StringName) -> bool:
@@ -701,6 +687,154 @@ func _get_dog_reward_amount(resource_id: String, total_amount: int) -> int:
 			return 1
 		_:
 			return 1
+
+
+func debug_get_remaining_poi_stock_total(poi_id: StringName) -> int:
+	var total := 0
+	var hidden_remaining: Dictionary = _get_hidden_stock_remaining_for_poi(poi_id)
+	for resource_id in hidden_remaining.keys():
+		total += int(hidden_remaining.get(resource_id, 0))
+	for node in _get_local_scavenge_nodes():
+		if node == null or not is_instance_valid(node):
+			continue
+		if StringName(node.poi_id) != poi_id:
+			continue
+		if not node.has_method("get_remaining_rewards"):
+			continue
+		var remaining_rewards: Dictionary = node.get_remaining_rewards()
+		for resource_id in remaining_rewards.keys():
+			total += int(remaining_rewards.get(resource_id, 0))
+	return total
+
+
+func _rebuild_poi_hidden_stock_defaults() -> void:
+	_poi_hidden_stock_defaults.clear()
+	for node in _get_local_scavenge_nodes():
+		if node == null or not is_instance_valid(node):
+			continue
+		var poi_id := StringName(node.poi_id)
+		if poi_id == StringName():
+			continue
+		if not _poi_hidden_stock_defaults.has(poi_id):
+			_poi_hidden_stock_defaults[poi_id] = {
+				"salvage": 0,
+				"parts": 0,
+				"medicine": 0,
+				"bullets": 0,
+				"food": 0,
+				"battery": 0,
+			}
+		var hidden_stock: Dictionary = _poi_hidden_stock_defaults[poi_id]
+		hidden_stock["salvage"] = int(hidden_stock.get("salvage", 0)) + int(round(int(node.reward_salvage) * DOG_HIDDEN_STOCK_RATIO))
+		hidden_stock["parts"] = int(hidden_stock.get("parts", 0)) + int(round(int(node.reward_parts) * DOG_HIDDEN_STOCK_RATIO))
+		hidden_stock["medicine"] = int(hidden_stock.get("medicine", 0)) + int(round(int(node.reward_medicine) * DOG_HIDDEN_STOCK_RATIO))
+		hidden_stock["bullets"] = int(hidden_stock.get("bullets", 0)) + int(round(int(node.reward_bullets) * DOG_HIDDEN_STOCK_RATIO))
+		hidden_stock["food"] = int(hidden_stock.get("food", 0)) + int(round(int(node.reward_food) * DOG_HIDDEN_STOCK_RATIO))
+		hidden_stock["battery"] = int(hidden_stock.get("battery", 0)) + int(round(int(node.reward_battery) * DOG_HIDDEN_STOCK_RATIO))
+
+
+func _reset_poi_hidden_stock_remaining() -> void:
+	_poi_hidden_stock_remaining.clear()
+	for poi_id_variant in _poi_hidden_stock_defaults.keys():
+		var poi_id := StringName(poi_id_variant)
+		_poi_hidden_stock_remaining[poi_id] = Dictionary(_poi_hidden_stock_defaults[poi_id]).duplicate(true)
+
+
+func _get_hidden_stock_remaining_for_poi(poi_id: StringName) -> Dictionary:
+	if not _poi_hidden_stock_remaining.has(poi_id):
+		return _empty_reward_dictionary()
+	return Dictionary(_poi_hidden_stock_remaining[poi_id])
+
+
+func _get_next_visible_dog_scavenge_node(poi_id: StringName):
+	var best_node = null
+	var best_key := ""
+	for node in _get_local_scavenge_nodes():
+		if node == null or not is_instance_valid(node):
+			continue
+		if StringName(node.poi_id) != poi_id:
+			continue
+		if bool(node.is_depleted):
+			continue
+		if not node.has_method("get_remaining_reward_total"):
+			continue
+		if int(node.get_remaining_reward_total()) <= 0:
+			continue
+		if node.has_method("has_weapon_reward") and bool(node.has_weapon_reward()):
+			continue
+		var node_key := String(node.node_id)
+		if best_node == null or node_key < best_key:
+			best_node = node
+			best_key = node_key
+	return best_node
+
+
+func _empty_reward_dictionary() -> Dictionary:
+	return {
+		"salvage": 0,
+		"parts": 0,
+		"medicine": 0,
+		"bullets": 0,
+		"food": 0,
+		"battery": 0,
+	}
+
+
+func _get_reward_total(rewards: Dictionary) -> int:
+	var total := 0
+	for resource_id in rewards.keys():
+		total += int(rewards.get(resource_id, 0))
+	return total
+
+
+func _consume_dog_reward_from_poi(poi_id: StringName, rewards: Dictionary) -> void:
+	var hidden_remaining: Dictionary = _get_hidden_stock_remaining_for_poi(poi_id)
+	for resource_id_variant in rewards.keys():
+		var resource_id := String(resource_id_variant)
+		var amount_to_consume := int(rewards.get(resource_id, 0))
+		if amount_to_consume <= 0:
+			continue
+		var hidden_amount := int(hidden_remaining.get(resource_id, 0))
+		var hidden_consumed := mini(hidden_amount, amount_to_consume)
+		hidden_remaining[resource_id] = hidden_amount - hidden_consumed
+		amount_to_consume -= hidden_consumed
+		if amount_to_consume <= 0:
+			continue
+		for node in _get_local_scavenge_nodes():
+			if node == null or not is_instance_valid(node):
+				continue
+			if StringName(node.poi_id) != poi_id:
+				continue
+			if not node.has_method("consume_remaining_reward"):
+				continue
+			amount_to_consume -= int(node.consume_remaining_reward(resource_id, amount_to_consume))
+			if amount_to_consume <= 0:
+				break
+	_poi_hidden_stock_remaining[poi_id] = hidden_remaining
+
+
+func _get_saved_hidden_stock_remaining() -> Dictionary:
+	var saved: Dictionary = {}
+	for poi_id_variant in _poi_hidden_stock_remaining.keys():
+		saved[String(poi_id_variant)] = Dictionary(_poi_hidden_stock_remaining[poi_id_variant]).duplicate(true)
+	return saved
+
+
+func _restore_hidden_stock_remaining(raw_saved: Dictionary) -> void:
+	_reset_poi_hidden_stock_remaining()
+	for poi_id_string in raw_saved.keys():
+		var poi_id := StringName(poi_id_string)
+		if poi_id == StringName():
+			continue
+		var saved_remaining: Dictionary = raw_saved.get(poi_id_string, {})
+		_poi_hidden_stock_remaining[poi_id] = {
+			"salvage": int(saved_remaining.get("salvage", 0)),
+			"parts": int(saved_remaining.get("parts", 0)),
+			"medicine": int(saved_remaining.get("medicine", 0)),
+			"bullets": int(saved_remaining.get("bullets", 0)),
+			"food": int(saved_remaining.get("food", 0)),
+			"battery": int(saved_remaining.get("battery", 0)),
+		}
 
 
 func _get_modifier_marker_scale(modifier_id: StringName) -> Vector2:
